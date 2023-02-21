@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Root files
+root_files/
+
+# PDFs library
+libCpp/
