@@ -15,10 +15,14 @@ def makeAndSavePlot(axis, histo, func, name='prova.png', title="Histo"):
     c = ROOT.TCanvas()
     c.cd()
     frame = axis.frame(Title=title+' '+str(axis))
-    dh.plotOn(frame)
-    gauss.plotOn(frame)
+    histo.plotOn(frame)
+    func.plotOn(frame)
     frame.Draw()
     c.SaveAs(name)
+
+
+def roodouble(x, xmin, xmax):
+    return ROOT.RooRealVar(str(x), str(x), x, xmin, xmax)
 
 
 if __name__ == '__main__':
@@ -33,13 +37,9 @@ if __name__ == '__main__':
     zmin = histo_pass.GetZaxis().GetXmin()
     zmax = histo_pass.GetZaxis().GetNbins()
 
-    histo = histo_pass.ProjectionX("histo1", 0, ymax, 0, zmax)
-    # histo = makeGaussianHisto()
+    x = roodouble(91, 50, 130)
 
-    print(ymin, zmax, histo_pass.GetXaxis().GetNbins())
-
-    x = ROOT.RooRealVar("x", "x", histo.GetXaxis().GetXmin(),
-                        histo.GetXaxis().GetXmax())
+    histo = makeGaussianHisto()
 
     dh = ROOT.RooDataHist("dh", "dh", [x], Import=histo)
 

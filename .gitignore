@@ -131,5 +131,9 @@ dmypy.json
 # Root files
 root_files/
 
-# PDFs library
-libCpp/
+# Operative macros in PDFs library
+libCpp/*.C
+
+# Accessory files generated in PDFs library loading
+libCpp/*.pcm
+libCpp/*.d
