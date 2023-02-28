@@ -5,21 +5,22 @@ import ROOT
 from utilities import makeAndSavePlot
 
 
-def import_pdf_library(function):
+def import_pdf_library(*functions):
     """
     """
-    header_incl = ' #include "libCpp/'+function+'.h"'
-    sourcefile = 'libCpp/'+function+'.cc'
+    for function in functions:
+        header_incl = ' #include "libCpp/'+function+'.h"'
+        sourcefile = 'libCpp/'+function+'.cc'
 
-    ctrl_head = ROOT.gInterpreter.Declare(header_incl)
-    ctrl_source = ROOT.gSystem.CompileMacro(sourcefile, opt="ks")
+        ctrl_head = ROOT.gInterpreter.Declare(header_incl)
+        ctrl_source = ROOT.gSystem.CompileMacro(sourcefile, opt="ks")
 
-    if not ctrl_head:
-        print("ERROR in header loading")
-        quit()
-    if not ctrl_source == 1:
-        print("ERROR in sourcefile compiling and loading")
-        quit()
+        if not ctrl_head:
+            print("ERROR in header loading")
+            quit()
+        if not ctrl_source == 1:
+            print("ERROR in sourcefile compiling and loading")
+            quit()
 
 
 def import_histo(histo_th3, bin_pt, bin_eta):
@@ -65,9 +66,9 @@ def fit_composite(histo, axis, signal, background, NEvents=10000):
 
 if __name__ == '__main__':
 
-    custom_pdfs = ['RooCBExGaussShape', 'RooDoubleCBFast', 'RooCMSShape']
+    custom_pdfs = ['RooCBExGaussShape', 'RooDoubleCBFast', 'RooCMSShape', 'my_double_CB']
 
-    import_pdf_library(custom_pdfs[0])
+    import_pdf_library(custom_pdfs[2], custom_pdfs[3])
 
     f = ROOT.TFile("root_files/tnp_iso_data.root")
     histo_pass = f.pass_mu_RunGtoH
@@ -77,20 +78,24 @@ if __name__ == '__main__':
     # c = ROOT.TCanvas()
     # c.cd()
 
-    #n_events = dh.numEntries()
-    # print(n_events)
-
     # a = ROOT.RooRealVar("a", "a", 90, 80, 100)
-    b = ROOT.RooRealVar("b", "b", 91, 80, 100)
-    c = ROOT.RooRealVar("c", "c", 2, 0.1, 10)
-    d = ROOT.RooRealVar("d", "d", 0.5, 0, 1)
-    e = ROOT.RooRealVar("e", "e", 10, 0, 20)
-    f = ROOT.RooRealVar("f", "f", 2, 0.1, 10)
-    g = ROOT.RooRealVar("g", "g", 0.2, 0, 1)
+    mean = ROOT.RooRealVar("b", "b", 91, 80, 100)
+    sigma = ROOT.RooRealVar("c", "c", 2, 0.1, 10)
+    a1 = ROOT.RooRealVar("d", "d", 1.5, 0, 3)
+    n1 = ROOT.RooRealVar("e", "e", 1, -5, 5)
+    a2 = ROOT.RooRealVar("f", "f", 1.5, 0, 3)
+    n2 = ROOT.RooRealVar("g", "g", 1, 5, 5)
+
+
+    '''
     tau = ROOT.RooRealVar("tau", "tau", -0.5, -1, 1)
     
     func1 = ROOT.RooCBExGaussShape("strange_CB", "strange_cb", x, b, c, d, e, f, g)
     func2 = ROOT.RooExponential("expo", "expo", x, tau)
-    
-    fit_composite(dh, x, func1, func2, n_events) 
+    '''
+    func3 = ROOT.RooVoigtian("CB", "CB", x, mean, a1, sigma) 
+    func3.fitTo(dh)
+    makeAndSavePlot(x, dh, func3, name="provafit_voigtian.png")
+
+    # fit_composite(dh, x, func1, func2, n_events) 
     # makeAndSavePlot(x, dh, func1, func2, name="prova_custompdf.png")
