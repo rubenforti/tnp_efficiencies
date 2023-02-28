@@ -11,12 +11,14 @@ def makeGaussianHisto():
     return hh
 
 
-def makeAndSavePlot(axis, histo, func, name='prova.png', title="Histo"):
+def makeAndSavePlot(axis, histo, func1, func2, name='prova.png', title="Histo"):
     c = ROOT.TCanvas()
     c.cd()
+    sum = ROOT.RooAddPdf("pdf", "pdf", [func1, func2], [1])
     frame = axis.frame(Title=title+' '+str(axis))
     histo.plotOn(frame)
-    func.plotOn(frame)
+    func2.plotOn(frame)
+    sum.plotOn(frame)
     frame.Draw()
     c.SaveAs(name)
 

@@ -38,7 +38,7 @@ def import_histo(histo_th3, bin_pt, bin_eta):
         "histo_mass", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1])
     xAxis = histo_th1.GetXaxis()
 
-    x = ROOT.RooRealVar("x", "x", 91, xAxis.GetXmin(),
+    x = ROOT.RooRealVar("x", "x", xAxis.GetXmin(),
                         xAxis.GetXmax(), unit="GeV/c^2")
 
     roohist = ROOT.RooDataHist("roohist", "roohist", [x], Import=histo_th1)
@@ -67,6 +67,9 @@ if __name__ == '__main__':
     e = ROOT.RooRealVar("e", "e", 10, 0, 20)
     f = ROOT.RooRealVar("f", "f", 2, 0.1, 10)
     g = ROOT.RooRealVar("g", "g", 0.2, 0, 1)
-    func = ROOT.RooCBExGaussShape("prova", "prova", x, b, c, d, e, f, g)
+    tau = ROOT.RooRealVar("tau", "tau", -0.5, -1, 1)
+    func1 = ROOT.RooCBExGaussShape("prova", "prova", x, b, c, d, e, f, g)
+    func2 = ROOT.RooExponential("expo", "expo", x, tau)
+    sum = ROOT.RooAddPdf("pdf", "pdf", [func1, func2], [1])
 
-    makeAndSavePlot(x, dh, func, name="prova_custompdf.png")
+    makeAndSavePlot(x, dh, func1, func2, name="prova_custompdf.png")
