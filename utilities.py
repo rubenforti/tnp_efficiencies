@@ -29,17 +29,24 @@ def makeAndSavePlot(axis, histo, *functions, name='prova.png', title="Histo"):
 def roodouble(x, xmin, xmax):
     return ROOT.RooRealVar(str(x), str(x), x, xmin, xmax)
 
-def init_Gaussian(x, mean=[], sigma=[], name="gaussian", title="gaussian"):
+
+def init_Gaussian(x, mean=91., sigma=1.2, name="gaussian", title="gaussian"):
     """
     """
-    if not mean:
-        mean = [91., 75., 105.]
-    if not sigma:
-        sigma = [2.5, 0.1, 5.]
-    mu = ROOT.RooRealVar("mu", "mu", mean[0], mean[1], mean[2])
-    s = ROOT.RooRealVar("sigma", "sigma", sigma[0], sigma[1], sigma[2])
-    output = ROOT.RooGaussian(name, title, x, mu, s)
-    return output
+    mu = ROOT.RooRealVar("mu", "mu", mean, 80, 100)
+    s = ROOT.RooRealVar("sigma", "sigma", sigma, 0.1, 5)
+    return ROOT.RooGaussian(name, title, x, mu, s)
+
+
+def init_CrystalBall(x, mean=91., sigma=1.2, n=1, alpha=1.5, name="CB", title="CB"):
+    """
+    """
+    mu = roodouble(mean, 80, 100)
+    s = roodouble(sigma, 0.1, 5)
+    nn = roodouble(n, 0, 4)
+    al = roodouble(alpha, -5, 5)
+    return ROOT.RooCBShape(name, title, x, mu, s, nn, al)
+
 
 
 if __name__ == '__main__':

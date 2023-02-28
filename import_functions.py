@@ -2,7 +2,7 @@
 """
 
 import ROOT
-from utilities import makeAndSavePlot
+from utilities import makeAndSavePlot, init_CrystalBall, roodouble
 
 
 def import_pdf_library(*functions):
@@ -50,7 +50,7 @@ def import_histo(histo_th3, bin_pt, bin_eta):
     return roohist, x, n_events
 
 
-def fit_composite(histo, axis, signal, background, NEvents=10000):
+def fit_composite(axis, histo, signal, background, NEvents=10000):
     """
     """
     Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, NEvents)
@@ -59,8 +59,8 @@ def fit_composite(histo, axis, signal, background, NEvents=10000):
     bkg_funcname = background.GetName()
 
     model = ROOT.RooAddPdf("model", "model", [signal, background], [Nsig, Nbkg])
-
-    model.fitTo(histo, Extended=True)
+    print(type(model))
+    fitres = signal.fitTo(histo, Extended=True, Save=True)
     makeAndSavePlot(axis, histo, model, name="provafit_composite.png")
 
 
@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     custom_pdfs = ['RooCBExGaussShape', 'RooDoubleCBFast', 'RooCMSShape', 'my_double_CB']
 
-    import_pdf_library(custom_pdfs[2], custom_pdfs[3])
+    # import_pdf_library(custom_pdfs[2], custom_pdfs[3])
 
     f = ROOT.TFile("root_files/tnp_iso_data.root")
     histo_pass = f.pass_mu_RunGtoH
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     dh, x, n_events = import_histo(histo_pass, [1], [1])
     # c = ROOT.TCanvas()
     # c.cd()
-
+    '''
     # a = ROOT.RooRealVar("a", "a", 90, 80, 100)
     mean = ROOT.RooRealVar("b", "b", 91, 80, 100)
     sigma = ROOT.RooRealVar("c", "c", 2, 0.1, 10)
@@ -85,17 +85,18 @@ if __name__ == '__main__':
     n1 = ROOT.RooRealVar("e", "e", 1, -5, 5)
     a2 = ROOT.RooRealVar("f", "f", 1.5, 0, 3)
     n2 = ROOT.RooRealVar("g", "g", 1, 5, 5)
-
-
     '''
-    tau = ROOT.RooRealVar("tau", "tau", -0.5, -1, 1)
+
     
-    func1 = ROOT.RooCBExGaussShape("strange_CB", "strange_cb", x, b, c, d, e, f, g)
-    func2 = ROOT.RooExponential("expo", "expo", x, tau)
+    tau = ROOT.RooRealVar("tau", "tau", -0.5, -1, 1)
+
+    cb_func = init_CrystalBall(x)
+    expo = ROOT.RooExponential("expo", "expo", x, tau)
+    res = cb_func.fitTo(dh, Save=True)
     '''
     func3 = ROOT.RooVoigtian("CB", "CB", x, mean, a1, sigma) 
     func3.fitTo(dh)
     makeAndSavePlot(x, dh, func3, name="provafit_voigtian.png")
-
-    # fit_composite(dh, x, func1, func2, n_events) 
-    # makeAndSavePlot(x, dh, func1, func2, name="prova_custompdf.png")
+    '''
+    # total_func = fit_composite(x, dh, cb_func, expo, n_events) 
+    # makeAndSavePlot(x, dh, total_func, name="provafit_composite.png")
