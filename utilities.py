@@ -11,17 +11,15 @@ def makeGaussianHisto():
     return hh
 
 
-def makeAndSavePlot(axis, histo, *functions, name='prova.png', title="Histo"):
+def makeAndSavePlot(axis, histo, function, name='prova.png', title="Histo"):
     c = ROOT.TCanvas()
     c.cd()
-    func_list = []
-    [func_list.append(func) for func in functions]
-    sum = ROOT.RooAddPdf("pdf", "pdf", func_list, [0.5])
     frame = axis.frame(Title=title+' '+str(axis))
+    for comp in function.getComponents():
+        print(comp.GetName())
+        function.plotOn(frame, Components={comp}, LineStyle=':')
     histo.plotOn(frame)
-    for func in functions:
-        func.plotOn(frame)
-    sum.plotOn(frame)
+    function.plotOn(frame)
     frame.Draw()
     c.SaveAs(name)
 
@@ -60,18 +58,25 @@ if __name__ == '__main__':
 
     zmin = histo_pass.GetZaxis().GetXmin()
     zmax = histo_pass.GetZaxis().GetNbins()
+    
+    c = ROOT.TCanvas()
+    c.cd()
 
     x = roodouble(91, 50, 130)
-
+    frame = x.frame(Title='prova')
     histo = makeGaussianHisto()
 
     dh = ROOT.RooDataHist("dh", "dh", [x], Import=histo)
 
     mean = ROOT.RooRealVar("mean", "mean", 91, 85, 97)
     sigma = ROOT.RooRealVar("sigma", "sigma", 0.1, 5)
-    gauss = ROOT.RooGaussian("gauss", "gauss", x, mean, sigma)
+    gauss_1 = ROOT.RooGaussian("gauss", "gauss", x, mean, sigma)
     
-    # gauss = init_Gaussian(x)    
-    gauss.fitTo(dh)
 
-    makeAndSavePlot(x, dh, gauss)
+    function.plotOn(frame, Components={comp}, LineStyle=':')
+    histo.plotOn(frame)
+    function.plotOn(frame)
+    frame.Draw()
+    c.SaveAs(name)
+
+    # makeAndSavePlot(x, dh, gauss_1)

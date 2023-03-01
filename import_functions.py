@@ -75,9 +75,10 @@ if __name__ == '__main__':
     histo_fail = f.fail_mu_RunGtoH
 
     dh, x, n_events = import_histo(histo_pass, [1], [1])
-    # c = ROOT.TCanvas()
-    # c.cd()
-    '''
+    
+    c = ROOT.TCanvas()
+    c.cd()
+   
     # a = ROOT.RooRealVar("a", "a", 90, 80, 100)
     mean = ROOT.RooRealVar("b", "b", 91, 80, 100)
     sigma = ROOT.RooRealVar("c", "c", 2, 0.1, 10)
@@ -85,18 +86,39 @@ if __name__ == '__main__':
     n1 = ROOT.RooRealVar("e", "e", 1, -5, 5)
     a2 = ROOT.RooRealVar("f", "f", 1.5, 0, 3)
     n2 = ROOT.RooRealVar("g", "g", 1, 5, 5)
-    '''
-
+   
+    cb_shape = ROOT.RooCBShape("cb", "cb", x, mean, sigma, a1, n1)
     
     tau = ROOT.RooRealVar("tau", "tau", -0.5, -1, 1)
-
-    cb_func = init_CrystalBall(x)
     expo = ROOT.RooExponential("expo", "expo", x, tau)
-    res = cb_func.fitTo(dh, Save=True)
-    '''
-    func3 = ROOT.RooVoigtian("CB", "CB", x, mean, a1, sigma) 
-    func3.fitTo(dh)
-    makeAndSavePlot(x, dh, func3, name="provafit_voigtian.png")
-    '''
+
+    gamma = roodouble(1, 0.5, 3)
+    voigt = ROOT.RooVoigtian("voigt", "voigt", x, mean, gamma, sigma)
+
+    mean = ROOT.RooRealVar("mean", "mean", 91, 85, 97)
+    sigma = ROOT.RooRealVar("sigma", "sigma", 0.1, 5)
+    gauss = ROOT.RooGaussian("gauss", "gauss", x, mean, sigma)
+    
+    a2 = ROOT.RooRealVar("a2", "a2", -10, 10)
+    a3 = ROOT.RooRealVar("a3", "a3", -10, 10)
+    pol = ROOT.RooPolynomial("pol", "pol", x, [a2, a3])
+
+
+    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, n_events)
+    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, n_events)
+    sum_func = ROOT.RooAddPdf("sum", "sum", [gauss, pol], [Nsig, Nbkg])
+
+    res = sum_func.fitTo(dh, Save=True)
+    
+    frame = x.frame("Titolo")
+    sum_func.plotOn(frame, Components={expo}, LineStyle=':')
+    dh.plotOn(frame)
+    sum_func.plotOn(frame)
+    frame.Draw()
+    c.SaveAs("provafit_composite.png")
+
+
+    # makeAndSavePlot(x, dh, sum_func, name="provafit_voigtian.png")
+    
     # total_func = fit_composite(x, dh, cb_func, expo, n_events) 
     # makeAndSavePlot(x, dh, total_func, name="provafit_composite.png")
