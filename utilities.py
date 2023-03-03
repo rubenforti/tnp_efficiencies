@@ -4,6 +4,51 @@
 import ROOT
 
 
+def import_pdf_library(*functions):
+    """
+    """
+    for function in functions:
+        header_incl = ' #include "libCpp/'+function+'.h"'
+        sourcefile = 'libCpp/'+function+'.cc'
+
+        ctrl_head = ROOT.gInterpreter.Declare(header_incl)
+        ctrl_source = ROOT.gSystem.CompileMacro(sourcefile, opt="ks")
+
+        if not ctrl_head:
+            print("ERROR in header loading")
+            quit()
+        if not ctrl_source == 1:
+            print("ERROR in sourcefile compiling and loading")
+            quit()
+
+
+def import_histo(histo_th3, bin_pt, bin_eta):
+    """
+    Returns a RooDataHist of the variable TP_mass, in a (pt, eta) bin, selected
+    from the TH3 given as input.
+    """
+    if len(bin_pt) == 1:
+        bin_pt.append(bin_pt[0])
+        bin_pt[0] -= 1
+    if len(bin_eta) == 1:
+        bin_eta.append(bin_eta[0])
+        bin_eta[0] -= 1
+
+    histo_th1 = histo_th3.ProjectionX(
+        "histo_mass", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1])
+    xAxis = histo_th1.GetXaxis()
+
+    x = ROOT.RooRealVar("x", "x", xAxis.GetXmin(),
+                        xAxis.GetXmax(), unit="GeV/c^2")
+
+    roohist = ROOT.RooDataHist("roohist", "roohist", [x], Import=histo_th1)
+
+    n_events = histo_th1.GetEntries()
+    print(n_events)
+
+    return roohist, x, n_events
+
+
 def makeGaussianHisto():
     hh = ROOT.TH1D("hh", "hh", 100, 50, 130)
     for i in range(100000):
@@ -24,18 +69,16 @@ def makeAndSavePlot(axis, histo, function, name='prova.png', title="Histo"):
     c.SaveAs(name)
 
 
-def roodouble(x, xmin, xmax):
-    return ROOT.RooRealVar(str(x), str(x), x, xmin, xmax)
-
-
+'''
 def init_Gaussian(x, mean=91., sigma=1.2, name="gaussian", title="gaussian"):
     """
     """
     mu = ROOT.RooRealVar("mu", "mu", mean, 80, 100)
     s = ROOT.RooRealVar("sigma", "sigma", sigma, 0.1, 5)
     return ROOT.RooGaussian(name, title, x, mu, s)
+'''
 
-
+'''
 def init_CrystalBall(x, mean=91., sigma=1.2, n=1, alpha=1.5, name="CB", title="CB"):
     """
     """
@@ -44,8 +87,7 @@ def init_CrystalBall(x, mean=91., sigma=1.2, n=1, alpha=1.5, name="CB", title="C
     nn = roodouble(n, 0, 4)
     al = roodouble(alpha, -5, 5)
     return ROOT.RooCBShape(name, title, x, mu, s, nn, al)
-
-
+'''
 
 if __name__ == '__main__':
 
@@ -58,11 +100,11 @@ if __name__ == '__main__':
 
     zmin = histo_pass.GetZaxis().GetXmin()
     zmax = histo_pass.GetZaxis().GetNbins()
-    
+
     c = ROOT.TCanvas()
     c.cd()
 
-    x = roodouble(91, 50, 130)
+    x = ROOT.RooRealVar("x", "x", 91, 50, 130)
     frame = x.frame(Title='prova')
     histo = makeGaussianHisto()
 
@@ -71,12 +113,5 @@ if __name__ == '__main__':
     mean = ROOT.RooRealVar("mean", "mean", 91, 85, 97)
     sigma = ROOT.RooRealVar("sigma", "sigma", 0.1, 5)
     gauss_1 = ROOT.RooGaussian("gauss", "gauss", x, mean, sigma)
-    
 
-    function.plotOn(frame, Components={comp}, LineStyle=':')
-    histo.plotOn(frame)
-    function.plotOn(frame)
-    frame.Draw()
-    c.SaveAs(name)
-
-    # makeAndSavePlot(x, dh, gauss_1)
+    makeAndSavePlot(x, dh, gauss_1)
