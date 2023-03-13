@@ -43,9 +43,9 @@ if __name__ == '__main__':
     z = ROOT.RooRealVar("z", "z", 50, 70)
 
     # General parameters - used everywhere
-    mean = ROOT.RooRealVar("mean", "mean", 91, 85, 97)
-    sigma = ROOT.RooRealVar("c", "c", 1, 0.1, 5)
-    gauss = ROOT.RooGaussian("gauss", "gauss", y, mean, sigma)
+    mean = ROOT.RooRealVar("mean", "mean", 91, 80, 101)
+    sigma = ROOT.RooRealVar("sigma", "sigma", 2, 0.2, 5)
+    gauss = ROOT.RooGaussian("gauss", "gauss", x, mean, sigma)
 
     # Crystal Ball PDF
     a1 = ROOT.RooRealVar("d", "d", 1.5, 0, 3)
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     cb_shape = ROOT.RooCBShape("cb", "cb", x, mean, sigma, a1, n1)
 
     # Breit-Wigner PDF
-    gamma = ROOT.RooRealVar("gamma", "gamma", 2.5, 0.5, 5)
+    gamma = ROOT.RooRealVar("gamma", "gamma", 2.5, 0.5, 8)
     breitwigner = ROOT.RooBreitWigner(
             "breitwigner", "breitwigner", x, mean, gamma)
 
@@ -86,26 +86,25 @@ if __name__ == '__main__':
     c = ROOT.TCanvas()
     c.cd()
 
-    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, 10000)
-    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, 10000)
+    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, n_events)
+    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, n_events)
 
-    sum_func = ROOT.RooAddPdf("sum", "sum", [breitwigner, pol], [Nsig, Nbkg])
+    sum_func = ROOT.RooAddPdf("sum", "sum", [gauss, pol], [Nsig, Nbkg])
 
     # res = sum_func.fitTo(dh, Save=True)
 
     # data = sum_func.generate({y}, 10000)
 
     frame = x.frame("Expo_bkg")
-    # frame.GetXaxis().SetLimits(50, 70)
     # sum_func.plotOn(frame)
     # data.plotOn(frame)
-    # model = ROOT.RooAddPdf(sum_func)
+    model = ROOT.RooAddPdf(sum_func)
 
-    sum_func.fitTo(dh, Save=True, Extended=True, Verbose=False, Hesse=False)
+    model.fitTo(dh, Save=True, Extended=True, Verbose=False, Hesse=False)
     # pol.setStringAttribute("fitrange", "")
-    # sum_func.plotOn(frame)
     dh.plotOn(frame)
-    sum_func.plotOn(frame)
+    model.plotOn(frame)
+    model.plotOn(frame, Components="pol", LineStyle=':')
 
     # sum_func.plotOn(frame)
     # model.plotOn(frame, Components="expo", LineStyle=':')
