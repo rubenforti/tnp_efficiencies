@@ -40,12 +40,16 @@ if __name__ == '__main__':
     # | ~~~~~~~~~~ PDF definition ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
     #  -----------------------------------------------------------------------
 
-    y = ROOT.RooRealVar("y", "y", -5, 5)
+    y = ROOT.RooRealVar("y", "y", 0, -5, 5)
 
     # General parameters - used everywhere
     mean = ROOT.RooRealVar("b", "b", 0, -5, 5)
     sigma = ROOT.RooRealVar("c", "c", 1, 0.1, 5)
     gauss = ROOT.RooGaussian("gauss", "gauss", y, mean, sigma)
+
+    # Breit-Wigner PDF
+    gamma = ROOT.RooRealVar("gamma", "gamma", 1, 0.5, 3)
+    breitwigner = ROOT.RooBreitWigner("bw", "bw", y, mean, gamma)
 
     # Crystal Ball PDF
     a1 = ROOT.RooRealVar("d", "d", 1.5, 0, 3)
@@ -57,10 +61,10 @@ if __name__ == '__main__':
     # Exponential PDF
     tau = ROOT.RooRealVar("tau", "tau", -0.5, -2, 2)
     expo = ROOT.RooExponential("expo", "expo", y, tau)
-
+    
     # Voigtian PDF
-    gamma = ROOT.RooRealVar("gamma", "gamma", 1, 0.5, 3)
-    voigt = ROOT.RooVoigtian("voigt", "voigt", x, mean, gamma, sigma)
+    # gamma = ROOT.RooRealVar("gamma", "gamma", 1, 0.5, 3)
+    voigt = ROOT.RooVoigtian("voigt", "voigt", y, mean, gamma, sigma)
 
     # Polynomial PDF (order 3)
     a2 = ROOT.RooRealVar("a2", "a2", -10, 10)
@@ -86,28 +90,37 @@ if __name__ == '__main__':
 
 
     sum_func = ROOT.RooAddPdf("sum", "sum", [gauss, expo], [Nsig, Nbkg])
-
+    
+    y.setBins(10000, name='cache')
+    conv_func = ROOT.RooFFTConvPdf("conv", "conv", y, breitwigner, gauss, 2)
+    
+    name = conv_func.Class_Name()
+    print(name)
     # res = sum_func.fitTo(dh, Save=True)
 
-    data = sum_func.generate({y}, 10000)
-
+    
+    data = conv_func.generate({y}, 10000)
+    print(data.Class_Name())
     frame = y.frame("Gauss+expo")
+    
     # sum_func.plotOn(frame)
     # data.plotOn(frame)
-    model = ROOT.RooAddPdf(sum_func)
-    r = model.fitTo(data, Save=True, Extended=True, Verbose=False)
+    
+    # model = ROOT.RooAbsPdf(conv_func)
+    
+    r = conv_func.fitTo(data, Save=True, Verbose=False)
     # sum_func.plotOn(frame)
     data.plotOn(frame)
-    model.plotOn(frame, VisualizeError=(r, 2))
-    model.plotOn(frame)
+    conv_func.plotOn(frame, VisualizeError=(r, 2))
+    # model.plotOn(frame)
     # model.plotOn(frame, Components="expo", LineStyle=':')
-    model.paramOn(frame)
+    conv_func.paramOn(frame)
 
     frame.Draw()
     #alpha.Print()
     #beta.Print()
     #gamma.Print()
     #peak.Print()
-    c.SaveAs("gauss-expo_plot.png")
-
+    c.SaveAs("fit/convolution_pdf_plot.png")
+    
     # makeAndSavePlot(x, dh, sum_func, name="provafit_voigtian.png")
