@@ -31,19 +31,19 @@ if __name__ == '__main__':
     f = ROOT.TFile("root_files/tnp_iso_data.root")
     histo_pass = f.pass_mu_RunGtoH
     histo_fail = f.fail_mu_RunGtoH
-    
+
     # Histogram in the first bin (eta, pt)
     dh, x, n_events = import_histo(histo_pass, [1], [1])
-
 
     #  -----------------------------------------------------------------------
     # | ~~~~~~~~~~ PDF definition ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
     #  -----------------------------------------------------------------------
 
-    y = ROOT.RooRealVar("y", "y", -5, 5)    
+    y = ROOT.RooRealVar("y", "y", -5, 5)
+    z = ROOT.RooRealVar("z", "z", 50, 70)
 
     # General parameters - used everywhere
-    mean = ROOT.RooRealVar("b", "b", 0, -5, 5)
+    mean = ROOT.RooRealVar("mean", "mean", 91, 85, 97)
     sigma = ROOT.RooRealVar("c", "c", 1, 0.1, 5)
     gauss = ROOT.RooGaussian("gauss", "gauss", y, mean, sigma)
 
@@ -54,6 +54,11 @@ if __name__ == '__main__':
     n2 = ROOT.RooRealVar("g", "g", 1, 5, 5)
     cb_shape = ROOT.RooCBShape("cb", "cb", x, mean, sigma, a1, n1)
 
+    # Breit-Wigner PDF
+    gamma = ROOT.RooRealVar("gamma", "gamma", 2.5, 0.5, 5)
+    breitwigner = ROOT.RooBreitWigner(
+            "breitwigner", "breitwigner", x, mean, gamma)
+
     # Exponential PDF
     tau = ROOT.RooRealVar("tau", "tau", -0.5, -2, 2)
     expo = ROOT.RooExponential("expo", "expo", y, tau)
@@ -63,9 +68,9 @@ if __name__ == '__main__':
     voigt = ROOT.RooVoigtian("voigt", "voigt", x, mean, gamma, sigma)
 
     # Polynomial PDF (order 3)
-    a2 = ROOT.RooRealVar("a2", "a2", -10, 10)
-    a3 = ROOT.RooRealVar("a3", "a3", -10, 10)
-    pol = ROOT.RooPolynomial("pol", "pol", x, [a2, a3])
+    a1 = ROOT.RooRealVar("a1", "a1", -1e-2, 1e-2)
+    a2 = ROOT.RooRealVar("a2", "a2", -2, 2)
+    pol = ROOT.RooPolynomial("pol", "pol", x, [a1])
 
     # CMS shape
     alpha = ROOT.RooRealVar("alpha", "alpha", 0.5, -10, 10)
@@ -83,31 +88,34 @@ if __name__ == '__main__':
 
     Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, 10000)
     Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, 10000)
-    
-    
-    sum_func = ROOT.RooAddPdf("sum", "sum", [gauss, expo], [Nsig, Nbkg])
+
+    sum_func = ROOT.RooAddPdf("sum", "sum", [breitwigner, pol], [Nsig, Nbkg])
 
     # res = sum_func.fitTo(dh, Save=True)
 
-    data = sum_func.generate({y}, 10000)
-   
-    frame = y.frame("Gauss+expo")
+    # data = sum_func.generate({y}, 10000)
+
+    frame = x.frame("Expo_bkg")
+    # frame.GetXaxis().SetLimits(50, 70)
     # sum_func.plotOn(frame)
     # data.plotOn(frame)
     # model = ROOT.RooAddPdf(sum_func)
-    r = sum_func.fitTo(data, Save=True, Extended=True, Verbose=False)
+
+    sum_func.fitTo(dh, Save=True, Extended=True, Verbose=False, Hesse=False)
+    # pol.setStringAttribute("fitrange", "")
     # sum_func.plotOn(frame)
-    data.plotOn(frame)
-    sum_func.plotOn(frame, VisualizeError=(r, 2))
+    dh.plotOn(frame)
     sum_func.plotOn(frame)
+
+    # sum_func.plotOn(frame)
     # model.plotOn(frame, Components="expo", LineStyle=':')
-    sum_func.paramOn(frame)
-    
+    # sum_func.paramOn(frame)
+
     frame.Draw()
     #alpha.Print()
     #beta.Print()
     #gamma.Print()
     #peak.Print()
-    c.SaveAs("gauss-expo_plot.png")
+    c.SaveAs("prova.png")
 
     # makeAndSavePlot(x, dh, sum_func, name="provafit_voigtian.png")
