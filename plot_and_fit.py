@@ -2,7 +2,7 @@
 """
 
 import ROOT
-from utilities import import_pdf_library, import_histo, makeAndSavePlot
+from utilities import import_pdf_library, import_Steve_histos, makeAndSavePlot
 
 
 # Needs to be improved !!!
@@ -24,16 +24,12 @@ if __name__ == '__main__':
 
     custom_pdfs = ['RooCBExGaussShape',
                    'RooDoubleCBFast', 'RooCMSShape', 'my_double_CB']
-
     import_pdf_library(custom_pdfs[2])
 
-    # Import of the 3D histograms
-    f = ROOT.TFile("root_files/tnp_iso_data.root")
-    histo_pass = f.pass_mu_RunGtoH
-    histo_fail = f.fail_mu_RunGtoH
+    type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
+    t = type_eff[3]
 
-    # Histogram in the first bin (eta, pt)
-    dh, x, n_events = import_histo(histo_pass, [1], [1])
+    h_data, h_mc, x = import_Steve_histos(t, [1], [1])
 
     #  -----------------------------------------------------------------------
     # | ~~~~~~~~~~ PDF definition ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
@@ -83,38 +79,40 @@ if __name__ == '__main__':
     # | ~~~~~~~~~~ Fit and Plot section ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
     #  -----------------------------------------------------------------------
 
-    c = ROOT.TCanvas()
-    c.cd()
-
-    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, n_events)
-    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, n_events)
+    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, h_data[0].GetEntries())
+    Nbkg = ROOT.RooRealVar("nbkg", "#background events",
+                           0, h_data[0].GetEntries())
 
     sum_func = ROOT.RooAddPdf("sum", "sum", [gauss, pol], [Nsig, Nbkg])
 
     # res = sum_func.fitTo(dh, Save=True)
 
     # data = sum_func.generate({y}, 10000)
+    model = ROOT.RooAddPdf(sum_func)
+    model.fitTo(h_data[0], Save=True, Extended=True,
+                Verbose=False, Hesse=False)
 
-    frame = x.frame("Expo_bkg")
+    makeAndSavePlot(x, h_data[0], model, name="provafit_voigtian.png")
+    # frame = x.frame("Expo_bkg")
     # sum_func.plotOn(frame)
     # data.plotOn(frame)
-    model = ROOT.RooAddPdf(sum_func)
 
-    model.fitTo(dh, Save=True, Extended=True, Verbose=False, Hesse=False)
     # pol.setStringAttribute("fitrange", "")
-    dh.plotOn(frame)
+    '''
+    h_data[0].plotOn(frame)
     model.plotOn(frame)
     model.plotOn(frame, Components="pol", LineStyle=':')
+    '''
 
     # sum_func.plotOn(frame)
     # model.plotOn(frame, Components="expo", LineStyle=':')
     # sum_func.paramOn(frame)
 
-    frame.Draw()
+    # frame.Draw()
     #alpha.Print()
     #beta.Print()
     #gamma.Print()
     #peak.Print()
     c.SaveAs("prova.png")
 
-    # makeAndSavePlot(x, dh, sum_func, name="provafit_voigtian.png")
+    #

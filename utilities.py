@@ -1,6 +1,7 @@
 """
 """
 
+import sys
 import ROOT
 
 
@@ -14,19 +15,29 @@ def import_pdf_library(*functions):
         ctrl_head = ROOT.gInterpreter.Declare(header_incl)
         ctrl_source = ROOT.gSystem.CompileMacro(sourcefile, opt="ks")
 
-        if not ctrl_head:
+        if ctrl_head is not True:
             print("ERROR in header loading")
-            quit()
-        if not ctrl_source == 1:
+            sys.exit()
+        if ctrl_source != 1:
             print("ERROR in sourcefile compiling and loading")
-            quit()
+            sys.exit()
 
 
-def import_histo(histo1_th3, bin_pt, bin_eta):
+def profile_histo(histo_th3, bin_pt, bin_eta):
     """
     Returns a RooDataHist of the variable TP_mass, in a (pt, eta) bin, selected
     from the TH3 given as input.
     """
+
+    histo_th1 = histo_th3.ProjectionX(
+        "histo_mass", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1])
+    roohist = ROOT.RooDataHist("roohist", "roohist", [x], Import=histo_th1)
+
+    return roohist
+
+
+def import_Steve_histos(type_eff, bin_pt, bin_eta):
+
     if len(bin_pt) == 1:
         bin_pt.append(bin_pt[0])
         bin_pt[0] -= 1
@@ -34,19 +45,23 @@ def import_histo(histo1_th3, bin_pt, bin_eta):
         bin_eta.append(bin_eta[0])
         bin_eta[0] -= 1
 
-    histo_th1 = histo_th3.ProjectionX(
-        "histo_mass", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1])
-    xAxis = histo_th1.GetXaxis()
+    # Import of the 3D histograms
+    f_data = ROOT.TFile(f"root_files/tnp_{type_eff}_data.root")
+    f_mc = ROOT.TFile(f"root_files/tnp_{type_eff}_mc.root")
 
-    x = ROOT.RooRealVar("x", "x", xAxis.GetXmin(),
-                        xAxis.GetXmax(), unit="GeV/c^2")
+    h_pass_data = profile_histo(f_data.pass_mu_RunGtoH, bin_pt, bin_eta)
+    h_fail_data = profile_histo(f_data.fail_mu_RunGtoH, bin_pt, bin_eta)
+    h_pass_mc = profile_histo(f_mc.pass_mu_DY_PostVFP, bin_pt, bin_eta)
+    h_fail_mc = profile_histo(f_mc.fail_mu_DY_PostVFP, bin_pt, bin_eta)
 
-    roohist = ROOT.RooDataHist("roohist", "roohist", [x], Import=histo_th1)
+    xAxis = h_pass_data.GetXaxis()
+    x = ROOT.RooRealVar(
+        "x", "x", xAxis.GetXmin(), xAxis.GetXmax(), unit="GeV/c^2")
 
-    n_events = histo_th1.GetEntries()
-    print(n_events)
+    histos_data = (h_pass_data, h_fail_data)
+    histos_mc = (h_pass_mc, h_fail_mc)
 
-    return roohist, x, n_events
+    return histos_data, histos_mc, x
 
 
 def makeGaussianHisto():
@@ -62,7 +77,7 @@ def makeAndSavePlot(axis, histo, function, name='prova.png', title="Histo"):
     frame = axis.frame(Title=title+' '+str(axis))
     for comp in function.getComponents():
         print(comp.GetName())
-        function.plotOn(frame, Components={comp}, LineStyle=':')
+        function.plotOn(frame, Components={comp}, LineStyle='-')
     histo.plotOn(frame)
     function.plotOn(frame)
     frame.Draw()
