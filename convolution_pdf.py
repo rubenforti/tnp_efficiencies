@@ -5,19 +5,22 @@ import ROOT
 from utilities import import_pdf_library, import_Steve_histos, makeAndSavePlot
 
 
-# Needs to be improved !!!
-#def fit_composite(axis, histo, signal, background, NEvents=10000):
-#
-#    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, NEvents)
-#    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, NEvents)
-#    sig_funcname = signal.GetName()
-#    bkg_funcname = background.GetName()
-#
-#    model = ROOT.RooAddPdf(
-#        "model", "model", [signal, background], [Nsig, Nbkg])
-#    print(type(model))
-#    fitres = signal.fitTo(histo, Extended=True, Save=True)
-#    makeAndSavePlot(axis, histo, model, name="provafit_composite.png")
+def fit_convolution(axis, histo, template_pdf, smearing, nbins=1000, buffer_frac=0.1, int_order=3):
+    """
+    """
+    axis.setBins(1000, "cache")
+    conv_func = ROOT.RooFFTConvPdf("conv", "conv", axis, template_pdf, smearing, int_order)
+    conv_func.setBufferFraction(buffer_frac)
+    name = conv_func.Class_Name()
+    print(name)
+    model = ROOT.RooFFTConvPdf(conv_func)
+    
+    res = model.fitTo(histo, Save=True, Verbose=False)
+    
+    return model
+
+
+
 
 
 if __name__ == '__main__':
@@ -39,11 +42,9 @@ if __name__ == '__main__':
     sigma = ROOT.RooRealVar("sigma", "sigma", 0.5, 0.001, 2)
     smearing = ROOT.RooGaussian("smearing", "smearing", x, mean, sigma)
 
-    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, 10000)
-    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, 10000)
-
-    
+        
     x.setBins(1000, "cache")
+    '''
     conv_func = ROOT.RooFFTConvPdf("conv", "conv", x, pdf_mc, smearing, 3)
     conv_func.setBufferFraction(0.1)
     name = conv_func.Class_Name()
@@ -58,7 +59,11 @@ if __name__ == '__main__':
     
     # data = pdf_mc.generate({x}, 500000)
     res = model.fitTo(h_data[0], Save=True, Verbose=False)
-    
+    '''
+
+    model = fit_convolution(x, h_data[0], pdf_mc, smearing)
+
+
     makeAndSavePlot(x, h_data[0], model, name="fit_on_data_smearing_nobkg.png", pull=False)
 
     '''
