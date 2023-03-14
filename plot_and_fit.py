@@ -30,6 +30,7 @@ if __name__ == '__main__':
     t = type_eff[3]
 
     h_data, h_mc, x = import_Steve_histos(t, [1], [1])
+    
 
     #  -----------------------------------------------------------------------
     # | ~~~~~~~~~~ PDF definition ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
@@ -56,15 +57,15 @@ if __name__ == '__main__':
             "breitwigner", "breitwigner", x, mean, gamma)
 
     # Exponential PDF
-    tau = ROOT.RooRealVar("tau", "tau", -0.5, -2, 2)
-    expo = ROOT.RooExponential("expo", "expo", y, tau)
+    tau = ROOT.RooRealVar("tau", "tau", -0.02, -0.1, 0.0)
+    expo = ROOT.RooExponential("expo", "expo", x, tau)
 
     # Voigtian PDF
-    gamma = ROOT.RooRealVar("gamma", "gamma", 1, 0.5, 3)
+    gamma = ROOT.RooRealVar("gamma", "gamma", 3, 0.5, 8)
     voigt = ROOT.RooVoigtian("voigt", "voigt", x, mean, gamma, sigma)
 
     # Polynomial PDF (order 3)
-    a1 = ROOT.RooRealVar("a1", "a1", -1e-2, 1e-2)
+    a1 = ROOT.RooRealVar("a1", "a1", -2222222222222222222222, 0)
     a2 = ROOT.RooRealVar("a2", "a2", -2, 2)
     pol = ROOT.RooPolynomial("pol", "pol", x, [a1])
 
@@ -79,30 +80,31 @@ if __name__ == '__main__':
     # | ~~~~~~~~~~ Fit and Plot section ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
     #  -----------------------------------------------------------------------
 
-    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, h_data[0].GetEntries())
-    Nbkg = ROOT.RooRealVar("nbkg", "#background events",
-                           0, h_data[0].GetEntries())
+    print(h_data[0].mean(x))
+
+    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, h_data[0].numEntries())
+    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, h_data[0].numEntries())
 
     sum_func = ROOT.RooAddPdf("sum", "sum", [gauss, pol], [Nsig, Nbkg])
 
     # res = sum_func.fitTo(dh, Save=True)
-
     # data = sum_func.generate({y}, 10000)
+    
     model = ROOT.RooAddPdf(sum_func)
-    model.fitTo(h_data[0], Save=True, Extended=True,
-                Verbose=False, Hesse=False)
+    model.fitTo(h_data[0], Save=True, Extended=True, Verbose=False, Hesse=False)
 
-    makeAndSavePlot(x, h_data[0], model, name="provafit_voigtian.png")
-    # frame = x.frame("Expo_bkg")
-    # sum_func.plotOn(frame)
-    # data.plotOn(frame)
+    # makeAndSavePlot(x, h_data[0], model, name="prova_composite.png")
 
-    # pol.setStringAttribute("fitrange", "")
-    '''
+    c = ROOT.TCanvas()
+    c.cd()
+
+    frame = x.frame("Gaussian+expo")
     h_data[0].plotOn(frame)
     model.plotOn(frame)
     model.plotOn(frame, Components="pol", LineStyle=':')
-    '''
+    frame.Draw()
+    c.SaveAs("figs/prova_gauss_pol.png")
+    
 
     # sum_func.plotOn(frame)
     # model.plotOn(frame, Components="expo", LineStyle=':')
@@ -113,6 +115,5 @@ if __name__ == '__main__':
     #beta.Print()
     #gamma.Print()
     #peak.Print()
-    c.SaveAs("prova.png")
+    # c.SaveAs("prova.png")
 
-    #

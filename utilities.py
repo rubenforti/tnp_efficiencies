@@ -23,17 +23,20 @@ def import_pdf_library(*functions):
             sys.exit()
 
 
-def profile_histo(histo_th3, bin_pt, bin_eta):
+def profile_histo(histo_th3, bin_pt, bin_eta, flag):
     """
     Returns a RooDataHist of the variable TP_mass, in a (pt, eta) bin, selected
     from the TH3 given as input.
     """
 
-    histo_th1 = histo_th3.ProjectionX(
-        "histo_mass", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1])
-    roohist = ROOT.RooDataHist("roohist", "roohist", [x], Import=histo_th1)
+    histo_th1 = histo_th3.ProjectionX(f"histo_mass_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1])
+    
+    xAxis = histo_th1.GetXaxis()
+    x = ROOT.RooRealVar("x", "x", xAxis.GetXmin(), xAxis.GetXmax(), unit="GeV/c^2")
+    print(f"Num TH1 entries = {histo_th1.GetEntries()}")
+    roohist = ROOT.RooDataHist(f"roohist_{flag}", f"roohist_{flag}", [x], Import=histo_th1)
 
-    return roohist
+    return roohist, x
 
 
 def import_Steve_histos(type_eff, bin_pt, bin_eta):
@@ -49,15 +52,15 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
     f_data = ROOT.TFile(f"root_files/tnp_{type_eff}_data.root")
     f_mc = ROOT.TFile(f"root_files/tnp_{type_eff}_mc.root")
 
-    h_pass_data = profile_histo(f_data.pass_mu_RunGtoH, bin_pt, bin_eta)
-    h_fail_data = profile_histo(f_data.fail_mu_RunGtoH, bin_pt, bin_eta)
-    h_pass_mc = profile_histo(f_mc.pass_mu_DY_PostVFP, bin_pt, bin_eta)
-    h_fail_mc = profile_histo(f_mc.fail_mu_DY_PostVFP, bin_pt, bin_eta)
+    h_pass_data, x = profile_histo(f_data.pass_mu_RunGtoH, bin_pt, bin_eta, 1)
+    h_fail_data, _ = profile_histo(f_data.fail_mu_RunGtoH, bin_pt, bin_eta, 2)
+    h_pass_mc, _ = profile_histo(f_mc.pass_mu_DY_postVFP, bin_pt, bin_eta, 3)
+    h_fail_mc, _ = profile_histo(f_mc.fail_mu_DY_postVFP, bin_pt, bin_eta, 4)
 
-    xAxis = h_pass_data.GetXaxis()
-    x = ROOT.RooRealVar(
-        "x", "x", xAxis.GetXmin(), xAxis.GetXmax(), unit="GeV/c^2")
+    # xAxis = h_pass_data.GetXaxis()
+    # x = ROOT.RooRealVar("x", "x", xAxis.GetXmin(), xAxis.GetXmax(), unit="GeV/c^2")
 
+    print(h_pass_data.numEntries(), h_pass_mc.numEntries())
     histos_data = (h_pass_data, h_fail_data)
     histos_mc = (h_pass_mc, h_fail_mc)
 
@@ -71,18 +74,31 @@ def makeGaussianHisto():
     return hh
 
 
-def makeAndSavePlot(axis, histo, function, name='prova.png', title="Histo"):
+def makeAndSavePlot(axis, data, function, name='prova.png', title="Histo", pull=False):
+        
     c = ROOT.TCanvas()
-    c.cd()
+    if pull is True:
+        c.Divide(2) 
+
+    c.cd(1)
+    ROOT.gPad.SetLeftMargin(0.15)
     frame = axis.frame(Title=title+' '+str(axis))
+    data.plotOn(frame)
     for comp in function.getComponents():
         print(comp.GetName())
-        function.plotOn(frame, Components={comp}, LineStyle='-')
-    histo.plotOn(frame)
+        function.plotOn(frame, Components=comp, LineStyle=':') 
     function.plotOn(frame)
     frame.Draw()
-    c.SaveAs(name)
 
+    if pull:
+        c.cd(2)
+        ROOT.gPad.SetLeftMargin(0.15)
+        hpull = frame.pullHist()
+        frame2 = axis.frame(Title="Residual Distribution")
+        frame2.addPlotable(hpull, "P")
+        frame2.Draw()
+    c.SaveAs(name)
+    print("Chi2 = ", frame.chiSquare())
 
 '''
 def init_Gaussian(x, mean=91., sigma=1.2, name="gaussian", title="gaussian"):
