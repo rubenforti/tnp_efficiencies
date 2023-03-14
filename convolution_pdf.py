@@ -25,15 +25,25 @@ if __name__ == '__main__':
     custom_pdfs = ['RooCBExGaussShape',
                    'RooDoubleCBFast', 'RooCMSShape', 'my_double_CB']
 
+    tpye_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
+    
+    t = type_eff[3]
+
+
+
     import_pdf_library(custom_pdfs[2])
 
     # Import of the 3D histograms
-    f = ROOT.TFile("root_files/tnp_iso_data.root")
-    histo_pass = f.pass_mu_RunGtoH
-    histo_fail = f.fail_mu_RunGtoH
+    f_data = ROOT.TFile("root_files/tnp_iso_data.root")
+    histo_pass_data = f_data.pass_mu_RunGtoH
+    histo_fail_data = f_data.fail_mu_RunGtoH
+
+    f_mc = ROOT.TFile("root_files/tnp_iso_mc.root")
+    histo_pass_mc = f_mc.pass_mu_DY_PostVFP
+    histo_fail_mc = f_mc.fail_mu_DY_PostVFP
 
     # Histogram in the first bin (eta, pt)
-    dh, x, n_events = import_histo(histo_pass, [1], [1])
+    dh_data, dh_mc, x, n_events = import_histos(t, [1], [1])
 
 
     #  -----------------------------------------------------------------------

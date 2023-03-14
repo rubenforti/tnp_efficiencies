@@ -22,7 +22,7 @@ def import_pdf_library(*functions):
             quit()
 
 
-def import_histo(histo_th3, bin_pt, bin_eta):
+def import_histo(histo1_th3, bin_pt, bin_eta):
     """
     Returns a RooDataHist of the variable TP_mass, in a (pt, eta) bin, selected
     from the TH3 given as input.
