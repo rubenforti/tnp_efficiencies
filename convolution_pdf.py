@@ -76,9 +76,9 @@ if __name__ == '__main__':
 
     print(f"Distance in sigma = {(chi2_obj.getVal()-npars)/chi2_sqrtvar}")
     
-    id_flag = "pass" if idx_cond==1 else "fail"
+    id_flag = "fail" if idx_cond==1 else "pass"
 
-    makeAndSavePlot(x, h_data[idx_cond], model, name=f"figs/iso/fit_{id_flag}_smearing_nobkg.pdf", pull=False)
+    makeAndSavePlot(x, h_data[idx_cond], model, name=f"figs/{t}/fit_{id_flag}_smearing_nobkg.pdf", pull=False)
 
     '''
     c = ROOT.TCanvas()
