@@ -1,0 +1,19 @@
+
+###############################################################################
+#######  Logbook for TnP-efficiencies measurement  ############################
+###############################################################################
+
+14/03/2023:
+
+Pulizia degli scripts esistenti e costruzione delle funzioni di import degli
+istogrammi.
+
+Pdf di fit dei dati costruita con RooHistPdf(mc_distribution) (x) smearing gaussiano;
+combinazione di parametri che ha restituito un fit "accettabile":
+    - interpolation_order=3
+    - axis_bins=1000
+    - buffer_fraction=0.1
+
+Fit results:
+    - Smearing: mu=-0.218+-0.056, sigma=0.97+-0.12
+    - Chi2 (pearson): measured=118.7, expected=78  ->  3.26 sigma
