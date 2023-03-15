@@ -98,7 +98,7 @@ def makeAndSavePlot(axis, data, function, name='prova.png', title="Histo", pull=
         frame2.addPlotable(hpull, "P")
         frame2.Draw()
     c.SaveAs(name)
-    print("Chi2 = ", frame.chiSquare())
+    
 
 '''
 def init_Gaussian(x, mean=91., sigma=1.2, name="gaussian", title="gaussian"):
