@@ -53,10 +53,10 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
     f_data = ROOT.TFile(f"root_files/tnp_{type_eff}_data.root")
     f_mc = ROOT.TFile(f"root_files/tnp_{type_eff}_mc.root")
 
-    h_pass_data, x = profile_histo(f_data.pass_mu_RunGtoH, bin_pt, bin_eta)
-    h_fail_data, _ = profile_histo(f_data.fail_mu_RunGtoH, bin_pt, bin_eta)
-    h_pass_mc, _ = profile_histo(f_mc.pass_mu_DY_postVFP, bin_pt, bin_eta)
-    h_fail_mc, _ = profile_histo(f_mc.fail_mu_DY_postVFP, bin_pt, bin_eta)
+    h_pass_data, x = profile_histo(f_data.pass_mu_RunGtoH, bin_pt, bin_eta, 1)
+    h_fail_data, _ = profile_histo(f_data.fail_mu_RunGtoH, bin_pt, bin_eta, 2)
+    h_pass_mc, _ = profile_histo(f_mc.pass_mu_DY_postVFP, bin_pt, bin_eta, 3)
+    h_fail_mc, _ = profile_histo(f_mc.fail_mu_DY_postVFP, bin_pt, bin_eta, 4)
 
     # xAxis = h_pass_data.GetXaxis()
     # x = ROOT.RooRealVar("x", "x", xAxis.GetXmin(), xAxis.GetXmax(), unit="GeV/c^2")
