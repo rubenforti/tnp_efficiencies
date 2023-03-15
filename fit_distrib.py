@@ -43,7 +43,7 @@ if __name__ == '__main__':
     type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
     t = type_eff[3]
 
-    idx_cond = 1  # One for "pass", zero for fail
+    idx_cond = 0  # One for "pass", zero for fail
     id_flag = "fail" if idx_cond == 0 else "pass"
 
     NBINS_MASS = 80
