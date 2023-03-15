@@ -3,7 +3,9 @@
 #######  Logbook for TnP-efficiencies measurement  ############################
 ###############################################################################
 
-14/03/2023:
+
+14/03/2023
+----------
 
 Pulizia degli scripts esistenti e costruzione delle funzioni di import degli
 istogrammi.
@@ -16,4 +18,29 @@ combinazione di parametri che ha restituito un fit "accettabile":
 
 Fit results:
     - Smearing: mu=-0.218+-0.056, sigma=0.97+-0.12
-    - Chi2 (pearson): measured=118.7, expected=78  ->  3.26 sigma
+    - Chi2 pearson: measured=118.7, expected=78  ->  3.26 sigma
+
+
+
+15/03/2023
+----------
+
+Funzione generale di import: dati i due file con gli istogrammi, fa il profile
+lungo l'asse x e ritorna le seguenti q.tà:
+    - Histos_data: tupla (fail, pass) di RooDataHist
+    - Histos_mc:   tupla (fail, pass) di RooDataHist
+    - nevts: tupla 2d formata da  ((ev_DATA_-, ev_DATA_+)
+                                   (ev_MC_-  , ev_MC_+  ))
+    - x: asse della massa invariante TP
+
+Fit con pdf di smearing più bkg esponenziale, fatta sia per pass che per fail:
+    - Pass:
+        - Nsig_fit = 4836 +- 77 (4933 eventi nel dataset)
+        - Chi2 pearson = 98.3  -> 1.9 sigma (DAJE)
+    - Fail:
+        - Nsig_fit = 442 +- 24 (469 eventi nel dataset)
+        - Chi2 pearson non affidabile!
+
+Nota: controllare le opzioni dei fit, per ora si è fatto tutto in MIGRAD, ma un
+occhio ad HESSE non sarebbe male e tenere sotto controllo le opzioni del fit (
+es. l'integrazione sul bin) è da fare.
