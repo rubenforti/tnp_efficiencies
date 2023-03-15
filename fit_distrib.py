@@ -5,7 +5,7 @@ import ROOT
 from utilities import import_pdf_library, import_Steve_histos, makeAndSavePlot
 
 
-'''
+
 
 def make_convolution(axis, histo, template_pdf, smearing, nbins=1000, buffer_frac=0.1, int_order=3):
     """
@@ -31,7 +31,7 @@ def add_pdfs(axis, histo, pdf_sig, pdf_bkg, nsig_exp=0, nbkg_exp=0):
 
     return model
 
-'''
+
 
 
 if __name__ == '__main__':
@@ -48,9 +48,12 @@ if __name__ == '__main__':
 
     NBINS_MASS = 80
 
-    h_data, h_mc, x = import_Steve_histos(t, [1], [1])
-    print(type(h_data[idx_cond]), type(h_mc[idx_cond]))
-    print(f"Num RooDataHist entries = {h_data[idx_cond].numEntries()}")
+    h_data, h_mc, n_events, x = import_Steve_histos(t, [1], [1])
+    
+    print(f"Num events in data and mc = {n_events[0][idx_cond]}, {n_events[1][idx_cond]}")
+
+    # print(type(h_data[idx_cond]), type(h_mc[idx_cond]))
+    # print(f"Num RooDataHist entries = {h_data[idx_cond].numEntries()}")
 
     pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", x, h_mc[idx_cond])
 
@@ -65,10 +68,8 @@ if __name__ == '__main__':
     conv_func = ROOT.RooFFTConvPdf("conv", "conv", x, pdf_mc, smearing, 3)
     conv_func.setBufferFraction(0.1)
 
-    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0,
-                           h_data[idx_cond].numEntries())
-    Nbkg = ROOT.RooRealVar("nbkg", "#background events",
-                           0, h_data[idx_cond].numEntries())
+    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, n_events[0][idx_cond])
+    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, n_events[0][idx_cond])
 
     sum_func = ROOT.RooAddPdf("sum", "sum", [conv_func, expo], [Nsig, Nbkg])
 
@@ -77,9 +78,9 @@ if __name__ == '__main__':
     #pdf_sig = make_convolution(x, h_data[idx_cond], pdf_mc, smearing)
     #model = add_pdfs(x, h_data[idx_cond], pdf_sig, expo)
 
-    model.fitTo(h_data[idx_cond], Extended=True, Save=True)
+    res = model.fitTo(h_data[idx_cond], Extended=True, Save=True, Hesse=False)
 
-    '''
+    
     npars = NBINS_MASS - res.floatParsFinal().getSize()
     chi2_sqrtvar = (2*npars)**(1/2.)
     print(f"Expected chi2 pars: mu={npars}, sqrt(var)={chi2_sqrtvar}")
@@ -90,8 +91,11 @@ if __name__ == '__main__':
     print(f"Distance in sigma = {(chi2_obj.getVal()-npars)/chi2_sqrtvar}")
 
 
-    # makeAndSavePlot(x, h_data[idx_cond], model, name=f"figs/{t}/fit_{id_flag}_smearing_nobkg.pdf", pull=False)
-    '''
+    makeAndSavePlot(x, h_data[idx_cond], model, name=f"figs/{t}/fit_{id_flag}_smearing_bkg.pdf", pull=False)
+   
+
+
+
     '''
     c = ROOT.TCanvas()
     c.cd()
@@ -99,7 +103,7 @@ if __name__ == '__main__':
     # sum_func.plotOn(frame)
     # h_mc[0].plotOn(frame, LineColor="kBlue")
     h_data[0].plotOn(frame, LineColor="kRed")
-   # data.plotOn(frame)
+    # data.plotOn(frame)
     #conv_func.plotOn(frame, VisualizeError=(r, 2))
     model.plotOn(frame)
     # model.plotOn(frame, Components="expo", LineStyle=':')

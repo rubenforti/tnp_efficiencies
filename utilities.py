@@ -23,7 +23,7 @@ def import_pdf_library(*functions):
             sys.exit()
 
 
-def profile_histo(histo_th3, bin_pt, bin_eta, flag):
+def profile_histo(histo_th3, axis, bin_pt, bin_eta, flag):
     """
     Returns a RooDataHist of the variable TP_mass, in a (pt, eta) bin, selected
     from the TH3 given as input.
@@ -35,8 +35,8 @@ def profile_histo(histo_th3, bin_pt, bin_eta, flag):
     x = ROOT.RooRealVar("x", "x", xAxis.GetXmin(), xAxis.GetXmax(), unit="GeV/c^2")
     print(f"Num TH1 entries = {histo_th1.GetEntries()}")
     roohist = ROOT.RooDataHist(f"roohist_{flag}", f"roohist_{flag}", [x], Import=histo_th1)
-
-    return roohist, x
+    print(f"Num RooDataHist entries = {roohist.numEntries()}") 
+    return roohist, histo_th1.GetEntries()
 
 
 def import_Steve_histos(type_eff, bin_pt, bin_eta):
@@ -47,25 +47,23 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
     if len(bin_eta) == 1:
         bin_eta.append(bin_eta[0])
         bin_eta[0] -= 1
-
     
+    x = ROOT.RooRealVar("x", "TP M_{inv}", 50, 130, unit="GeV/c^2") 
+
     # Import of the 3D histograms
     f_data = ROOT.TFile(f"root_files/tnp_{type_eff}_data.root")
     f_mc = ROOT.TFile(f"root_files/tnp_{type_eff}_mc.root")
 
-    h_pass_data, x = profile_histo(f_data.pass_mu_RunGtoH, bin_pt, bin_eta, 1)
-    h_fail_data, _ = profile_histo(f_data.fail_mu_RunGtoH, bin_pt, bin_eta, 2)
-    h_pass_mc, _ = profile_histo(f_mc.pass_mu_DY_postVFP, bin_pt, bin_eta, 3)
-    h_fail_mc, _ = profile_histo(f_mc.fail_mu_DY_postVFP, bin_pt, bin_eta, 4)
-
-    # xAxis = h_pass_data.GetXaxis()
-    # x = ROOT.RooRealVar("x", "x", xAxis.GetXmin(), xAxis.GetXmax(), unit="GeV/c^2")
-
-    print(h_pass_data.numEntries(), h_pass_mc.numEntries())
+    h_pass_data, nev_pass_data = profile_histo(f_data.pass_mu_RunGtoH, x, bin_pt, bin_eta, 1)
+    h_fail_data, nev_fail_data = profile_histo(f_data.fail_mu_RunGtoH, x, bin_pt, bin_eta, 2)
+    h_pass_mc, nev_pass_mc = profile_histo(f_mc.pass_mu_DY_postVFP, x, bin_pt, bin_eta, 3)
+    h_fail_mc, nev_fail_mc = profile_histo(f_mc.fail_mu_DY_postVFP, x, bin_pt, bin_eta, 4)
+    
+    nevts = ((nev_fail_data, nev_pass_data), (nev_fail_mc, nev_pass_mc))
     histos_data = (h_fail_data, h_pass_data)
     histos_mc = (h_fail_mc, h_pass_mc)
 
-    return histos_data, histos_mc, x
+    return histos_data, histos_mc, nevts, x
 
 
 def makeGaussianHisto():
@@ -123,6 +121,7 @@ def init_CrystalBall(x, mean=91., sigma=1.2, n=1, alpha=1.5, name="CB", title="C
 
 if __name__ == '__main__':
 
+    '''
     f = ROOT.TFile("root_files/tnp_iso_data.root")
     histo_pass = f.pass_mu_RunGtoH
     histo_fail = f.fail_mu_RunGtoH
@@ -145,5 +144,7 @@ if __name__ == '__main__':
     mean = ROOT.RooRealVar("mean", "mean", 91, 85, 97)
     sigma = ROOT.RooRealVar("sigma", "sigma", 0.1, 5)
     gauss_1 = ROOT.RooGaussian("gauss", "gauss", x, mean, sigma)
+    '''
 
-    makeAndSavePlot(x, dh, gauss_1)
+    i,b,c,d=import_Steve_histos("iso", [1], [1])
+    print(c)
