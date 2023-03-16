@@ -44,3 +44,21 @@ Fit con pdf di smearing più bkg esponenziale, fatta sia per pass che per fail:
 Nota: controllare le opzioni dei fit, per ora si è fatto tutto in MIGRAD, ma un
 occhio ad HESSE non sarebbe male e tenere sotto controllo le opzioni del fit (
 es. l'integrazione sul bin) è da fare.
+
+
+16/03/2023
+----------
+
+Rimodulata la struttura dei file: adesso "fit_distrib" contiene la funzione che
+effettua un fit (comprendente smearing e bkg) su una distribuzione; il modulo
+"independent_fit" invece fa i fit sulle due distribuzioni e calcola l'efficienza.
+
+Da fit con impostazioni uguali a ieri si ottiene: eff = 0.918 +- 0.016
+
+Resta da capire se e come implementare delle opzioni dei fit (vedi sopra)
+
+Una cosa MOLTO COMODA per la chiarezza del codice sarebbe riuscire a trovare il
+modo di farsi ritornare una RooAddPdf (o anche RooAbsPdf in generale) da una
+funzione di python. Perché per il momento va tutto bene (ritornare un RooFitResult
+non dà problemi), ma per snellire il codice sarebbe comodo poter gestire in questo
+modo anche le pdfs
