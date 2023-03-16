@@ -3,7 +3,7 @@
 
 import ROOT
 import os
-from utilities import import_Steve_histos
+from utilities import import_Steve_histos, eval_efficiency
 from fit_distrib import fit_distribution
 
 if __name__ == '__main__':
@@ -31,13 +31,21 @@ if __name__ == '__main__':
     tau = ROOT.RooRealVar("tau", "tau", -10, 0)
     expo = ROOT.RooExponential("expo", "expo", x, tau)
 
-    res_pass = fit_distribution(x, h_data[1], h_mc[1], expo, n_events[0][1])
+    res_pass = fit_distribution(x, t, h_data[1], h_mc[1], expo, 1, n_events[0][1], saveplot=True)
+    for par in res_pass.floatParsFinal():
+        if par.GetName() == 'nsig':
+            Npass = par.getVal()
+            sigma_Npass = par.getError()
 
-    Npass = res_pass.floatParsFinal()
-    print(Npass)
-    print(type(Npass))
-    print((Npass[3]))
+    res_fail = fit_distribution(x, t, h_data[0], h_mc[0], expo, 0, n_events[0][0], saveplot=True)
+    for par in res_fail.floatParsFinal():
+        if par.GetName() == 'nsig':
+            Nfail = par.getVal()
+            sigma_Nfail = par.getError()
 
 
+    eff, d_eff = eval_efficiency(Npass, Nfail, sigma_Npass, sigma_Nfail)
+    
+    print(f'Measured efficiency for {t} is: {eff} +- {d_eff}')
 
-    # res_fail = fit_distribution(x, h_data[0], h_mc[0], expo, n_events[0][0])
+

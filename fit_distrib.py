@@ -32,9 +32,11 @@ def add_pdfs(axis, histo, pdf_sig, pdf_bkg, nsig_exp=0, nbkg_exp=0):
 '''
 
 
-def fit_distribution(axis, histo_data, histo_mc, pdf_bkg, events_data, saveplot=False):
+def fit_distribution(axis, t, histo_data, histo_mc, pdf_bkg, flag, events_data, saveplot=False):
     """
     """
+
+    id_flag = 'pass' if flag==1 else 'fail'
 
     pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", axis, histo_mc)
     mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
@@ -61,8 +63,8 @@ def fit_distribution(axis, histo_data, histo_mc, pdf_bkg, events_data, saveplot=
 
     pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
 
-    makeAndSavePlot(x, h_data[idx_cond], model,
-                    name=f"figs/{t}/fit_{id_flag}_smearing_bkg.pdf", pull=False)
+    if saveplot is True:
+        makeAndSavePlot(axis, histo_data, model, name=f"figs/{t}/fit_{id_flag}_smearing_bkg.pdf", pull=False)
 
     return res
 
@@ -90,7 +92,7 @@ if __name__ == '__main__':
     expo = ROOT.RooExponential("expo", "expo", x, tau)
 
     res_pass = fit_distribution(
-        x, h_data[idx_cond], h_mc[idx_cond], expo, n_events[0][idx_cond])
+        x, t, h_data[idx_cond], h_mc[idx_cond], expo, idx_cond, n_events[0][idx_cond])
 
     '''
     pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", x, h_mc[idx_cond])
