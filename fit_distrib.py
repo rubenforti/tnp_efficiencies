@@ -40,7 +40,7 @@ if __name__ == '__main__':
     type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
     t = type_eff[3]
 
-    idx_cond = 0  # One for "pass", zero for fail
+    idx_cond = 1  # One for "pass", zero for fail
     id_flag = "fail" if idx_cond == 0 else "pass"
 
     NBINS_MASS = 80
@@ -80,16 +80,16 @@ if __name__ == '__main__':
     res = model.fitTo(h_data[idx_cond], Extended=True, Save=True, Hesse=False)
 
     '''
-    npars = NBINS_MASS - res.floatParsFinal().getSize()
+    npars = NBINS_MASS - res.floatParsFinal().getSize()  
     chi2_sqrtvar = (2*npars)**(1/2.)
     print(f"Expected chi2 pars: mu={npars}, sqrt(var)={chi2_sqrtvar}")
-
     chi2_obj = ROOT.RooChi2Var(
         "chi2", "chi2", model, h_data[idx_cond], Verbose=True)
     print(f"Measured chi2 = {chi2_obj.getVal()}")
-
     print(f"Distance in sigma = {(chi2_obj.getVal()-npars)/chi2_sqrtvar}")
     '''
+    
+    pearson_chi2_eval(h_data[idx_cond], model, NBINS_MASS, res)
 
     makeAndSavePlot(x, h_data[idx_cond], model,
                     name=f"figs/{t}/fit_{id_flag}_smearing_bkg.pdf", pull=False)

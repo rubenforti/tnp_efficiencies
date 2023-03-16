@@ -2,8 +2,9 @@
 """
 
 import ROOT
+import os
 from utilities import import_pdf_library, import_Steve_histos, makeAndSavePlot, \
-                      eval_efficiency
+                      eval_efficiency, pearson_chi2_eval
 
 '''
 def make_convolution(axis, histo, template_pdf, smearing, nbins=1000, buffer_frac=0.1, int_order=3):
@@ -35,6 +36,8 @@ def add_pdfs(axis, histo, pdf_sig, pdf_bkg, nsig_exp=0, nbkg_exp=0):
 def fit_on_distrib(axis, histo_data, histo_mc, pdf_bkg, events_data):
     """
     """
+    path = os.path.dirname(__file__)
+    ROOT.gSystem.cd(path)
 
     pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", axis, histo_mc)
     mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
@@ -57,9 +60,13 @@ def fit_on_distrib(axis, histo_data, histo_mc, pdf_bkg, events_data):
 
     model = ROOT.RooAddPdf(sum_func)
 
-    res = model.fitTo(h_data[idx_cond], Extended=True, Save=True, Hesse=False)
+    res = model.fitTo(histo_data, Extended=True, Save=True, Hesse=False)
 
-    return res
+    pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
+
+    makeAndSavePlot(x, h_data[idx_cond], model, name=f"figs/{t}/fit_{id_flag}_smearing_bkg.pdf", pull=False)
+
+    return res 
 
 
 
@@ -72,19 +79,26 @@ if __name__ == '__main__':
     type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
     t = type_eff[3]
 
-    idx_cond = 0  # One for "pass", zero for fail
+    idx_cond = 1  # One for "pass", zero for fail
     id_flag = "fail" if idx_cond == 0 else "pass"
 
     NBINS_MASS = 80
 
     h_data, h_mc, n_events, x = import_Steve_histos(t, [1], [1])
 
+
+    path = os.path.dirname(__file__)
+    ROOT.gSystem.cd(path)
+    
     print(
         f"Num events in data and mc = {n_events[0][idx_cond]}, {n_events[1][idx_cond]}")
 
-    # print(type(h_data[idx_cond]), type(h_mc[idx_cond]))
-    # print(f"Num RooDataHist entries = {h_data[idx_cond].numEntries()}")
+    tau = ROOT.RooRealVar("tau", "tau", -10, 0)
+    expo = ROOT.RooExponential("expo", "expo", x, tau)
 
+    res_pass = fit_on_distrib(x, h_data[idx_cond], h_mc[idx_cond], expo, n_events[0][idx_cond])
+
+    '''
     pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", x, h_mc[idx_cond])
 
     mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
@@ -108,18 +122,9 @@ if __name__ == '__main__':
 
     res = model.fitTo(h_data[idx_cond], Extended=True, Save=True, Hesse=False)
 
-    npars = NBINS_MASS - res.floatParsFinal().getSize()
-    chi2_sqrtvar = (2*npars)**(1/2.)
-    print(f"Expected chi2 pars: mu={npars}, sqrt(var)={chi2_sqrtvar}")
+    '''
 
-    chi2_obj = ROOT.RooChi2Var(
-        "chi2", "chi2", model, h_data[idx_cond], Verbose=True)
-    print(f"Measured chi2 = {chi2_obj.getVal()}")
-
-    print(f"Distance in sigma = {(chi2_obj.getVal()-npars)/chi2_sqrtvar}")
-
-    makeAndSavePlot(x, h_data[idx_cond], model,
-                    name=f"figs/{t}/fit_{id_flag}_smearing_bkg.pdf", pull=False)
+    # makeAndSavePlot(x, h_data[idx_cond], mod, name=f"figs/{t}/fit_{id_flag}_smearing_bkg.pdf", pull=False)
 
     '''
     c = ROOT.TCanvas()
