@@ -29,6 +29,8 @@ def profile_histo(histo_th3, axis, bin_pt, bin_eta, flag):
     from the TH3 given as input.
     """
 
+    # Option "e" has to be activated? Not clear how "errors are computed"
+    # Option "o" keeps the original y,z axes (so without under/overflow) (check)
     histo_th1 = histo_th3.ProjectionX(
         f"histo_mass_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1])
 
@@ -40,6 +42,17 @@ def profile_histo(histo_th3, axis, bin_pt, bin_eta, flag):
         f"roohist_{flag}", f"roohist_{flag}", [x], Import=histo_th1)
     print(f"Num RooDataHist entries = {roohist.numEntries()}")
     return roohist, histo_th1.GetEntries()
+
+
+def th3_checks(histo_th3):
+    """
+    """
+    histo_x = histo_th3.ProjectionX("histo_mass")
+    print(f"Number of events (with uf/of): {histo_x.GetEntries()}")
+    print(
+        f"Underflow and overflow: {histo_x.GetBinContent(0)}, {histo_x.GetBinContent(81)}")
+    histo_x_o = histo_th3.Projectionx("histo_mass_2", option="0")
+    print(f"Number of events (with option \"o\"): {histo_x_o.GetEntries()}")
 
 
 def import_Steve_histos(type_eff, bin_pt, bin_eta):
@@ -67,7 +80,7 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
         f_mc.fail_mu_DY_postVFP, x, bin_pt, bin_eta, 4)
 
     nevts = ((nev_fail_data, nev_pass_data), (nev_fail_mc, nev_pass_mc))
-    histos_data = (h_fail_data, h_pass_data)
+    histos_data = (h_fail_data, h_pass_data),
     histos_mc = (h_fail_mc, h_pass_mc)
 
     return histos_data, histos_mc, nevts, x
@@ -129,34 +142,8 @@ def pearson_chi2_eval(histo, pdf, nbins, res):
     print(f"Measured chi2 = {chi2_obj.getVal()}")
     print(f"Distance in sigma = {(chi2_obj.getVal()-npars)/chi2_sqrtvar}")
 
-    
 
 if __name__ == '__main__':
-
-    '''
-    f = ROOT.TFile("root_files/tnp_iso_data.root")
-    histo_pass = f.pass_mu_RunGtoH
-    histo_fail = f.fail_mu_RunGtoH
-
-    ymin = histo_pass.GetYaxis().GetXmin()
-    ymax = histo_pass.GetYaxis().GetNbins()
-
-    zmin = histo_pass.GetZaxis().GetXmin()
-    zmax = histo_pass.GetZaxis().GetNbins()
-
-    c = ROOT.TCanvas()
-    c.cd()
-
-    x = ROOT.RooRealVar("x", "x", 91, 50, 130)
-    frame = x.frame(Title='prova')
-    histo = makeGaussianHisto()
-
-    dh = ROOT.RooDataHist("dh", "dh", [x], Import=histo)
-
-    mean = ROOT.RooRealVar("mean", "mean", 91, 85, 97)
-    sigma = ROOT.RooRealVar("sigma", "sigma", 0.1, 5)
-    gauss_1 = ROOT.RooGaussian("gauss", "gauss", x, mean, sigma)
-    '''
-
-    i, b, c, d = import_Steve_histos("iso", [1], [1])
-    print(c)
+    file = ROOT.TFile("root_files/tnp_iso_data.root")
+    histo = file.pass_mu_RunGtoH
+    th3_checks(histo)
