@@ -43,9 +43,6 @@ if __name__ == '__main__':
             Nfail = par.getVal()
             sigma_Nfail = par.getError()
 
-
     eff, d_eff = eval_efficiency(Npass, Nfail, sigma_Npass, sigma_Nfail)
-    
+
     print(f'Measured efficiency for {t} is: {eff} +- {d_eff}')
-
-

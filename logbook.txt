@@ -29,7 +29,7 @@ Funzione generale di import: dati i due file con gli istogrammi, fa il profile
 lungo l'asse x e ritorna le seguenti q.tà:
     - Histos_data: tupla (fail, pass) di RooDataHist
     - Histos_mc:   tupla (fail, pass) di RooDataHist
-    - nevts: tupla 2d formata da  ((ev_DATA_-, ev_DATA_+)
+    - nevts: tupla 2d formata da  ((ev_DATA_-, ev_DATA_+),
                                    (ev_MC_-  , ev_MC_+  ))
     - x: asse della massa invariante TP
 
@@ -62,3 +62,26 @@ modo di farsi ritornare una RooAddPdf (o anche RooAbsPdf in generale) da una
 funzione di python. Perché per il momento va tutto bene (ritornare un RooFitResult
 non dà problemi), ma per snellire il codice sarebbe comodo poter gestire in questo
 modo anche le pdfs
+
+
+
+
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+COSE DA FARE A BREVE
+--------------------
+  - Controllare che nel profileX si prendano i giusti bin di (pt,eta)
+  - Check generale del trattamento degli histos 3D
+  - Serializzare la procedura di fit per "iso" su più bin
+  - Studiare il background MC fornito da Rajarshi ("iso" events with same charge)
+
+
+IDEE PER MIGLIORAMENTI
+----------------------
+  - LLR test sul parametro Nbkg (con H0: Nbkg=0), per testare l'ipotesi di assenza
+    di fondo
+  - Fit simultaneo tra pass e fail ANCHE sui mc: in questo modo si potrebbe
+    stimare contemporaneamente le efficienze e gli scale factors (a monte  va
+    capito come ricavare questi parametri da un fit simultaneo)
