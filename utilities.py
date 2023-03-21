@@ -2,6 +2,7 @@
 """
 
 import sys
+import pickle
 import ROOT
 
 
@@ -187,7 +188,7 @@ def add_result(dict_results, res_pass, res_fail, eff, bin_pt, bin_eta):
     """
     
     dict_results.update({
-       f"[{bin_pt}, {bin_eta}]" : {
+       f"{bin_pt},{bin_eta}" : {
             "efficiency" : eff,
             "fit_stat_pass" : {
                 "migrad_status" : res_pass.status(), 
@@ -211,7 +212,42 @@ def add_result(dict_results, res_pass, res_fail, eff, bin_pt, bin_eta):
     return dict_results
 
 
+def differential_eff_plot(file, binning_pt=(), binning_eta=()):
+    """
+    """
+    if len(binning_pt) == 0:
+        binning_pt = tuple([24., 26., 28., 30., 32., 34., 36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
+    if len(binning_eta) == 0:
+        binning_eta = tuple([round(-2.4 + i*0.1, 2) for i in range(49)])
+
+    histo = ROOT.TH2D("eff_histo", "Efficiency (pt,eta)", len(binning_pt)-1, binning_pt[0], binning_pt[-1], 
+                      len(binning_eta)-1, binning_eta[0], binning_eta[-1])
+
+    with open("indep_eff_results.pkl", "rb") as f:
+        results = pickle.load(f)
+    
+    bin_pt, bin_eta = 0, 0
+
+    for key in results.keys():
+        idx_pt = int(key.split(",")[0])
+        idx_eta = int(key.split(",")[1])
+        eff_val = results[key]["efficiency"][0]
+        histo.Fill((binning_pt[idx_pt-1]+binning_pt[idx_pt])/2, (binning_eta[idx_eta-1]+binning_eta[idx_eta])/2, eff_val)
+
+    c = ROOT.TCanvas()
+    c.cd()
+    histo.Draw("COLZ")
+    c.SaveAs("differential_eff.png")
+
+
+
 if __name__ == '__main__':
+    '''
     file = ROOT.TFile("root_files/tnp_iso_mc.root")
     histo = file.pass_mu_DY_postVFP
     th3_checks(histo)
+    '''
+    with open("indep_eff_results.pkl", "rb") as f:
+        results = pickle.load(f)
+    differential_eff_plot(results)
+
