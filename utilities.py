@@ -64,7 +64,7 @@ def th3_checks(histo_th3):
 
 
 def import_Steve_histos(type_eff, bin_pt, bin_eta):
-    
+
     if len(bin_pt) == 1:
         bin_pt.append(bin_pt[0])
 
@@ -79,10 +79,12 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
 
     h_pass_data, nev_pass_data = profile_histo(
         f_data.pass_mu_RunGtoH, x, bin_pt, bin_eta, 1)
-    h_pass_data.SetNameTitle(f"Events {type_eff} pass", f"Events {type_eff} pass")
+    h_pass_data.SetNameTitle(
+        f"Events {type_eff} pass", f"Events {type_eff} pass")
     h_fail_data, nev_fail_data = profile_histo(
         f_data.fail_mu_RunGtoH, x, bin_pt, bin_eta, 2)
-    h_fail_data.SetNameTitle(f"Events {type_eff} fail", f"Events {type_eff} fail")
+    h_fail_data.SetNameTitle(
+        f"Events {type_eff} fail", f"Events {type_eff} fail")
     h_pass_mc, nev_pass_mc = profile_histo(
         f_mc.pass_mu_DY_postVFP, x, bin_pt, bin_eta, 3)
     h_fail_mc, nev_fail_mc = profile_histo(
@@ -93,70 +95,6 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
     histos_mc = (h_fail_mc, h_pass_mc)
 
     return histos_data, histos_mc, nevts, x
-
-
-def llr_test_bkg(histo, pdf):
-    """
-    """
-    
-    pars_set = pdf.getParameters(histo)
-    
-    profiled_var = ROOT.RooRealVar()
-
-    for idx in range(pars_set.getSize()):
-        if pars_set[idx].GetName() == 'nbkg':
-            profiled_var = pars_set[idx]
-
-    null_profiled_var = ROOT.RooRealVar("nbkg", "nbkg", 0, 0, 0)
-    
-    llr_obj = ROOT.RooStats.ProfileLikelihoodCalculator(
-            histo, pdf, ROOT.RooArgSet(profiled_var), 0.05, ROOT.RooArgSet(null_profiled_var))
-    
-
-    test_res = llr_obj.GetHypoTest()
-
-    pval = test_res.NullPValue()
-
-    print(f"p-value for null hypo is: {pval}")
-
-    null = True if pval>0.05 else False
-
-    return null
-
-
-
-
-def makeGaussianHisto():
-    hh = ROOT.TH1D("hh", "hh", 100, 50, 130)
-    for i in range(100000):
-        hh.Fill(ROOT.gRandom.Gaus(91, 2.5))
-    return hh
-
-
-def makeAndSavePlot(axis, data, function, name='prova.png', title="Histo", pull=False):
-
-    c = ROOT.TCanvas()
-    if pull is True:
-        c.Divide(2)
-
-    c.cd(1)
-    ROOT.gPad.SetLeftMargin(0.15)
-    frame = axis.frame(Title=title+' '+str(axis))
-    data.plotOn(frame)
-    for comp in function.getComponents():
-        print(comp.GetName())
-        function.plotOn(frame, Components=comp, LineStyle=':')
-    function.plotOn(frame)
-    frame.Draw()
-
-    if pull:
-        c.cd(2)
-        ROOT.gPad.SetLeftMargin(0.15)
-        hpull = frame.pullHist()
-        frame2 = axis.frame(Title="Residual Distribution")
-        frame2.addPlotable(hpull, "P")
-        frame2.Draw()
-    c.SaveAs(name)
 
 
 def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
@@ -170,84 +108,34 @@ def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
     return eff, sigma_eff
 
 
-def pearson_chi2_eval(histo, pdf, nbins, res):
-    """
-    """
-    npars = nbins - res.floatParsFinal().getSize()
-    print(npars)
-    chi2_sqrtvar = (2*npars)**(1/2.)
-    print(f"Expected chi2 pars: mu={npars}, sqrt(var)={chi2_sqrtvar}")
-
-    chi2_obj = ROOT.RooChi2Var("chi2", "chi2", pdf, histo, Verbose=False)
-    print(f"Measured chi2 = {chi2_obj.getVal()}")
-    print(f"Distance in sigma = {(chi2_obj.getVal()-npars)/chi2_sqrtvar}")
-
-
 def add_result(dict_results, res_pass, res_fail, eff, bin_pt, bin_eta):
     """
     """
-    
     dict_results.update({
-       f"{bin_pt},{bin_eta}" : {
-            "efficiency" : eff,
-            "fit_stat_pass" : {
-                "migrad_status" : res_pass.status(), 
-                "parameters" : res_pass.floatParsFinal(),
-                "cov_matrix" : res_pass.covarianceMatrix(),
-                "cov_matrix_quality" : res_pass.covQual(),
-                "global_correlation" : res_pass.globalCorr(),
-                "EDM" : res_pass.edm()
+       f"{bin_pt},{bin_eta}": {
+            "efficiency": eff,
+            "fit_stat_pass": {
+                "migrad_status": res_pass.status(),
+                "parameters": res_pass.floatParsFinal(),
+                "cov_matrix": res_pass.covarianceMatrix(),
+                "cov_matrix_quality": res_pass.covQual(),
+                "global_correlation": res_pass.globalCorr(),
+                "EDM": res_pass.edm()
                 },
-            "fit_stat_fail" : {
-                "migrad_status" : res_fail.status(),
-                "parameters" : res_fail.floatParsFinal(),
-                "cov_matrix" : res_fail.covarianceMatrix(),
-                "cov_matrix_quality" : res_fail.covQual(),
-                "global_correlation" : res_fail.globalCorr(),
-                "EDM" : res_fail.edm()
+            "fit_stat_fail": {
+                "migrad_status": res_fail.status(),
+                "parameters": res_fail.floatParsFinal(),
+                "cov_matrix": res_fail.covarianceMatrix(),
+                "cov_matrix_quality": res_fail.covQual(),
+                "global_correlation": res_fail.globalCorr(),
+                "EDM": res_fail.edm()
                 }
             }
         })
-
     return dict_results
 
 
-def differential_eff_plot(file, binning_pt=(), binning_eta=()):
-    """
-    """
-    if len(binning_pt) == 0:
-        binning_pt = tuple([24., 26., 28., 30., 32., 34., 36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
-    if len(binning_eta) == 0:
-        binning_eta = tuple([round(-2.4 + i*0.1, 2) for i in range(49)])
-
-    histo = ROOT.TH2D("eff_histo", "Efficiency (pt,eta)", len(binning_pt)-1, binning_pt[0], binning_pt[-1], 
-                      len(binning_eta)-1, binning_eta[0], binning_eta[-1])
-
-    with open("indep_eff_results.pkl", "rb") as f:
-        results = pickle.load(f)
-    
-    bin_pt, bin_eta = 0, 0
-
-    for key in results.keys():
-        idx_pt = int(key.split(",")[0])
-        idx_eta = int(key.split(",")[1])
-        eff_val = results[key]["efficiency"][0]
-        histo.Fill((binning_pt[idx_pt-1]+binning_pt[idx_pt])/2, (binning_eta[idx_eta-1]+binning_eta[idx_eta])/2, eff_val)
-
-    c = ROOT.TCanvas()
-    c.cd()
-    histo.Draw("COLZ")
-    c.SaveAs("differential_eff.png")
-
-
-
 if __name__ == '__main__':
-    '''
     file = ROOT.TFile("root_files/tnp_iso_mc.root")
     histo = file.pass_mu_DY_postVFP
     th3_checks(histo)
-    '''
-    with open("indep_eff_results.pkl", "rb") as f:
-        results = pickle.load(f)
-    differential_eff_plot(results)
-
