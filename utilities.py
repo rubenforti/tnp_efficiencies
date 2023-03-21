@@ -182,6 +182,35 @@ def pearson_chi2_eval(histo, pdf, nbins, res):
     print(f"Distance in sigma = {(chi2_obj.getVal()-npars)/chi2_sqrtvar}")
 
 
+def add_result(dict_results, res_pass, res_fail, eff, bin_pt, bin_eta):
+    """
+    """
+    
+    dict_results.update({
+       f"[{bin_pt}, {bin_eta}]" : {
+            "efficiency" : eff,
+            "fit_stat_pass" : {
+                "migrad_status" : res_pass.status(), 
+                "parameters" : res_pass.floatParsFinal(),
+                "cov_matrix" : res_pass.covarianceMatrix(),
+                "cov_matrix_quality" : res_pass.covQual(),
+                "global_correlation" : res_pass.globalCorr(),
+                "EDM" : res_pass.edm()
+                },
+            "fit_stat_fail" : {
+                "migrad_status" : res_fail.status(),
+                "parameters" : res_fail.floatParsFinal(),
+                "cov_matrix" : res_fail.covarianceMatrix(),
+                "cov_matrix_quality" : res_fail.covQual(),
+                "global_correlation" : res_fail.globalCorr(),
+                "EDM" : res_fail.edm()
+                }
+            }
+        })
+
+    return dict_results
+
+
 if __name__ == '__main__':
     file = ROOT.TFile("root_files/tnp_iso_mc.root")
     histo = file.pass_mu_DY_postVFP

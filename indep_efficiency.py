@@ -4,7 +4,7 @@
 import ROOT
 import os
 import pickle
-from utilities import import_Steve_histos, eval_efficiency
+from utilities import import_Steve_histos, eval_efficiency, add_result
 from fit_distribution import fit_without_bkg, fit_with_bkg
 
 
@@ -56,16 +56,19 @@ if __name__ == '__main__':
 
     print(f'Measured efficiency for {t} is: {eff} +- {d_eff}') 
 
-    print("\n\n\n\n")
-    results = {}
-    results.update({ "id" : {"pass":0, "fail":1} })
-
-    p = results["id"]["pass"]
-    # pp = p.floatParsFinal()
     
-    print(f"{p}")
+    results = {}
+    
+    results = add_result(results, res_pass, res_fail, (eff, d_eff), BIN_PT, BIN_ETA)
 
-    '''
-    with open("student_dict.pkl", "wb") as f:
-            pickle.dump(results, f)
-    '''
+
+    with open("indep_eff_results.pkl", "wb") as f:
+        pickle.dump(results, f)
+        f.close()
+    print("RISULTATI SCRITTI SU PICKLE FILE")
+    
+
+    with open("indep_eff_results.pkl", "rb") as f:
+        deserialized_dict = pickle.load(f)
+        print(deserialized_dict)
+    
