@@ -63,7 +63,7 @@ def th3_checks(histo_th3):
 
 
 def import_Steve_histos(type_eff, bin_pt, bin_eta):
-
+    
     if len(bin_pt) == 1:
         bin_pt.append(bin_pt[0])
 
@@ -78,10 +78,10 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
 
     h_pass_data, nev_pass_data = profile_histo(
         f_data.pass_mu_RunGtoH, x, bin_pt, bin_eta, 1)
-    h_pass_data.SetNameTitle(f"Events {type_eff} pass")
+    h_pass_data.SetNameTitle(f"Events {type_eff} pass", f"Events {type_eff} pass")
     h_fail_data, nev_fail_data = profile_histo(
         f_data.fail_mu_RunGtoH, x, bin_pt, bin_eta, 2)
-    h_fail_data.SetNameTitle(f"Events {type_eff} fail")
+    h_fail_data.SetNameTitle(f"Events {type_eff} fail", f"Events {type_eff} fail")
     h_pass_mc, nev_pass_mc = profile_histo(
         f_mc.pass_mu_DY_postVFP, x, bin_pt, bin_eta, 3)
     h_fail_mc, nev_fail_mc = profile_histo(
@@ -92,6 +92,37 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
     histos_mc = (h_fail_mc, h_pass_mc)
 
     return histos_data, histos_mc, nevts, x
+
+
+def llr_test_bkg(histo, pdf):
+    """
+    """
+    
+    pars_set = pdf.getParameters(histo)
+    
+    profiled_var = ROOT.RooRealVar()
+
+    for idx in range(pars_set.getSize()):
+        if pars_set[idx].GetName() == 'nbkg':
+            profiled_var = pars_set[idx]
+
+    null_profiled_var = ROOT.RooRealVar("nbkg", "nbkg", 0, 0, 0)
+    
+    llr_obj = ROOT.RooStats.ProfileLikelihoodCalculator(
+            histo, pdf, ROOT.RooArgSet(profiled_var), 0.05, ROOT.RooArgSet(null_profiled_var))
+    
+
+    test_res = llr_obj.GetHypoTest()
+
+    pval = test_res.NullPValue()
+
+    print(f"p-value for null hypo is: {pval}")
+
+    null = True if pval>0.05 else False
+
+    return null
+
+
 
 
 def makeGaussianHisto():

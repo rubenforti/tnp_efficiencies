@@ -2,14 +2,20 @@
 """
 
 import ROOT
-from utilities import import_Steve_histos, makeAndSavePlot, pearson_chi2_eval
+from utilities import import_Steve_histos, makeAndSavePlot, pearson_chi2_eval, llr_test_bkg
 
 
 def fit_without_bkg(axis, t, histo_data, histo_mc, flags, events_data, saveplot=False):
     """
     """
 
-    id_flag = 'pass' if flags[0] == 1 else 'fail'
+    if 'pass' in histo_data.GetTitle():
+        id_flag = 'pass'
+    elif 'fail' in histo_data.GetTitle():
+        id_flag = 'fail'
+    else:
+        pass   
+
 
     pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", axis, histo_mc)
     mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
@@ -35,7 +41,12 @@ def fit_with_bkg(axis, t, histo_data, histo_mc, pdf_bkg, flags, events_data, sav
     """
     """
 
-    id_flag = 'pass' if flags[0] == 1 else 'fail'
+    if 'pass' in histo_data.GetTitle():
+        id_flag = 'pass'
+    elif 'fail' in histo_data.GetTitle():
+        id_flag = 'fail'
+    else:
+        pass
 
     pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", axis, histo_mc)
     mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
@@ -66,6 +77,10 @@ def fit_with_bkg(axis, t, histo_data, histo_mc, pdf_bkg, flags, events_data, sav
         makeAndSavePlot(axis, histo_data, model, pull=False,
                         name=f"figs/fit_{t}/{id_flag}_{flags[0]}_{flags[1]}.pdf")
 
+    null_bkg = llr_test_bkg(histo_data, model)
+    present_bkg = not null_bkg
+    print(f"Background is accepted? {present_bkg}")
+
     return res
 
 
@@ -93,6 +108,8 @@ if __name__ == '__main__':
 
     res_pass = fit_with_bkg(
         x, t, h_data[idx_cond], h_mc[idx_cond], expo, idx_cond, n_events[0][idx_cond])
+
+
 
     '''
     pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", x, h_mc[idx_cond])

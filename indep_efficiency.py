@@ -3,8 +3,10 @@
 
 import ROOT
 import os
+import pickle
 from utilities import import_Steve_histos, eval_efficiency
 from fit_distribution import fit_without_bkg, fit_with_bkg
+
 
 if __name__ == '__main__':
 
@@ -25,13 +27,10 @@ if __name__ == '__main__':
 
     bins = (BIN_PT, BIN_ETA)
 
-    h_data, h_mc, n_events, x = import_Steve_histos(t, BIN_PT, BIN_ETA)
+    h_data, h_mc, n_events, x = import_Steve_histos(t, [BIN_PT], [BIN_ETA])
 
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
-
-    print(h_data[0].GetName(), h_data[1].GetName())
-    print(h_data[0].GetTitle(), h_data[1].GetTitle())
 
     print(
         f"Num events in data and mc = {n_events[0][idx_cond]}, {n_events[1][idx_cond]}")
@@ -40,14 +39,14 @@ if __name__ == '__main__':
     expo = ROOT.RooExponential("expo", "expo", x, tau)
 
     res_pass = fit_with_bkg(
-        x, t, h_data[1], h_mc[1], expo, bins, n_events[0][1], saveplot=False)
+        x, t, h_data[1], h_mc[1], expo, bins, n_events[0][1], saveplot=True)
     for par in res_pass.floatParsFinal():
         if par.GetName() == 'nsig':
             Npass = par.getVal()
             sigma_Npass = par.getError()
 
     res_fail = fit_with_bkg(
-        x, t, h_data[0], h_mc[0], expo, bins, n_events[0][0], saveplot=False)
+        x, t, h_data[0], h_mc[0], expo, bins, n_events[0][0], saveplot=True)
     for par in res_fail.floatParsFinal():
         if par.GetName() == 'nsig':
             Nfail = par.getVal()
@@ -55,4 +54,18 @@ if __name__ == '__main__':
 
     eff, d_eff = eval_efficiency(Npass, Nfail, sigma_Npass, sigma_Nfail)
 
-    print(f'Measured efficiency for {t} is: {eff} +- {d_eff}')
+    print(f'Measured efficiency for {t} is: {eff} +- {d_eff}') 
+
+    print("\n\n\n\n")
+    results = {}
+    results.update({ "id" : {"pass":0, "fail":1} })
+
+    p = results["id"]["pass"]
+    # pp = p.floatParsFinal()
+    
+    print(f"{p}")
+
+    '''
+    with open("student_dict.pkl", "wb") as f:
+            pickle.dump(results, f)
+    '''
