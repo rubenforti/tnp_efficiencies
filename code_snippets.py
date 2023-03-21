@@ -20,6 +20,33 @@ from utilities import import_pdf_library, import_Steve_histos, makeAndSavePlot
 #    makeAndSavePlot(axis, histo, model, name="provafit_composite.png")
 
 
+'''
+def make_convolution(axis, histo, template_pdf, smearing, nbins=1000, buffer_frac=0.1, int_order=3):
+    """
+    """
+    axis.setBins(1000, "cache")
+    conv_func = ROOT.RooFFTConvPdf("conv", "conv", axis, template_pdf, smearing, int_order)
+    conv_func.setBufferFraction(buffer_frac)
+    name = conv_func.Class_Name()
+    print(name)
+    model = ROOT.RooFFTConvPdf(conv_func)
+
+    return model
+
+
+def add_pdfs(axis, histo, pdf_sig, pdf_bkg, nsig_exp=0, nbkg_exp=0):
+
+    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, histo.numEntries())
+    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, histo.numEntries())
+
+    sum_func = ROOT.RooAddPdf("sum", "sum", [pdf_sig, pdf_bkg], [Nsig, Nbkg])
+
+    model = ROOT.RooAddPdf(sum_func)
+
+    return model
+'''
+
+
 if __name__ == '__main__':
 
     custom_pdfs = ['RooCBExGaussShape',
@@ -30,7 +57,6 @@ if __name__ == '__main__':
     t = type_eff[3]
 
     h_data, h_mc, x = import_Steve_histos(t, [1], [1])
-    
 
     #  -----------------------------------------------------------------------
     # | ~~~~~~~~~~ PDF definition ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
@@ -83,15 +109,17 @@ if __name__ == '__main__':
     print(h_data[0].mean(x))
 
     Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, h_data[0].numEntries())
-    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, h_data[0].numEntries())
+    Nbkg = ROOT.RooRealVar("nbkg", "#background events",
+                           0, h_data[0].numEntries())
 
     sum_func = ROOT.RooAddPdf("sum", "sum", [gauss, pol], [Nsig, Nbkg])
 
     # res = sum_func.fitTo(dh, Save=True)
     # data = sum_func.generate({y}, 10000)
-    
+
     model = ROOT.RooAddPdf(sum_func)
-    model.fitTo(h_data[0], Save=True, Extended=True, Verbose=False, Hesse=False)
+    model.fitTo(h_data[0], Save=True, Extended=True,
+                Verbose=False, Hesse=False)
 
     # makeAndSavePlot(x, h_data[0], model, name="prova_composite.png")
 
@@ -104,7 +132,6 @@ if __name__ == '__main__':
     model.plotOn(frame, Components="pol", LineStyle=':')
     frame.Draw()
     c.SaveAs("figs/prova_gauss_pol.png")
-    
 
     # sum_func.plotOn(frame)
     # model.plotOn(frame, Components="expo", LineStyle=':')
@@ -116,4 +143,3 @@ if __name__ == '__main__':
     #gamma.Print()
     #peak.Print()
     # c.SaveAs("prova.png")
-

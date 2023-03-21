@@ -52,10 +52,12 @@ def th3_checks(histo_th3):
     print(Nbinsx, Nbinsy, Nbinsz)
     histo_x = histo_th3.ProjectionX("histo_mass", 0, -1, 0, -1)
     print(f"Number of events (with uf/of): {histo_x.GetEntries()}")
-    print(f"Number of effective events (with uf/of): {histo_x.GetEffectiveEntries()}")
+    print(
+        f"Number of effective events (with uf/of): {histo_x.GetEffectiveEntries()}")
     histo_x_o = histo_th3.ProjectionX("histo_mass_2", 1, 1, 1, 1)
     print(f"Number of events (without uf/of): {histo_x_o.GetEntries()}")
-    print(f"Number of effective events (without uf/of): {histo_x_o.GetEffectiveEntries()}")
+    print(
+        f"Number of effective events (without uf/of): {histo_x_o.GetEffectiveEntries()}")
     print(f"Integral: {histo_x_o.Integral()}")
     print(f"Weights: {histo_x_o.GetSumOfWeights()}")
 
@@ -64,7 +66,7 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
 
     if len(bin_pt) == 1:
         bin_pt.append(bin_pt[0])
- 
+
     if len(bin_eta) == 1:
         bin_eta.append(bin_eta[0])
 
@@ -76,8 +78,10 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
 
     h_pass_data, nev_pass_data = profile_histo(
         f_data.pass_mu_RunGtoH, x, bin_pt, bin_eta, 1)
+    h_pass_data.SetNameTitle(f"Events {type_eff} pass")
     h_fail_data, nev_fail_data = profile_histo(
         f_data.fail_mu_RunGtoH, x, bin_pt, bin_eta, 2)
+    h_fail_data.SetNameTitle(f"Events {type_eff} fail")
     h_pass_mc, nev_pass_mc = profile_histo(
         f_mc.pass_mu_DY_postVFP, x, bin_pt, bin_eta, 3)
     h_fail_mc, nev_fail_mc = profile_histo(

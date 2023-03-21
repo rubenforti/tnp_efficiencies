@@ -5,38 +5,37 @@ import ROOT
 from utilities import import_Steve_histos, makeAndSavePlot, pearson_chi2_eval
 
 
-'''
-def make_convolution(axis, histo, template_pdf, smearing, nbins=1000, buffer_frac=0.1, int_order=3):
+def fit_without_bkg(axis, t, histo_data, histo_mc, flags, events_data, saveplot=False):
     """
     """
+
+    id_flag = 'pass' if flags[0] == 1 else 'fail'
+
+    pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", axis, histo_mc)
+    mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
+    sigma = ROOT.RooRealVar("sigma", "sigma", 0.5, 0.001, 2)
+    smearing = ROOT.RooGaussian("smearing", "smearing", axis, mean, sigma)
+
     axis.setBins(1000, "cache")
-    conv_func = ROOT.RooFFTConvPdf("conv", "conv", axis, template_pdf, smearing, int_order)
-    conv_func.setBufferFraction(buffer_frac)
-    name = conv_func.Class_Name()
-    print(name)
-    model = ROOT.RooFFTConvPdf(conv_func)
+    conv_func = ROOT.RooFFTConvPdf("conv", "conv", axis, pdf_mc, smearing, 3)
+    conv_func.setBufferFraction(0.1)
 
-    return model
+    res = conv_func.fitTo(histo_data, Extended=True, Save=True)
 
+    pearson_chi2_eval(histo_data, conv_func, histo_data.numEntries(), res)
 
-def add_pdfs(axis, histo, pdf_sig, pdf_bkg, nsig_exp=0, nbkg_exp=0):
+    if saveplot is True:
+        makeAndSavePlot(axis, histo_data, conv_func, pull=False,
+                        name=f"figs/fit_{t}/{id_flag}_{flags[0]}_{flags[1]}.pdf")
 
-    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, histo.numEntries())
-    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, histo.numEntries())
-
-    sum_func = ROOT.RooAddPdf("sum", "sum", [pdf_sig, pdf_bkg], [Nsig, Nbkg])
-
-    model = ROOT.RooAddPdf(sum_func)
-
-    return model
-'''
+    return res
 
 
-def fit_distribution(axis, t, histo_data, histo_mc, pdf_bkg, flag, events_data, saveplot=False):
+def fit_with_bkg(axis, t, histo_data, histo_mc, pdf_bkg, flags, events_data, saveplot=False):
     """
     """
 
-    id_flag = 'pass' if flag==1 else 'fail'
+    id_flag = 'pass' if flags[0] == 1 else 'fail'
 
     pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", axis, histo_mc)
     mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
@@ -64,7 +63,8 @@ def fit_distribution(axis, t, histo_data, histo_mc, pdf_bkg, flag, events_data, 
     pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
 
     if saveplot is True:
-        makeAndSavePlot(axis, histo_data, model, name=f"figs/{t}/fit_{id_flag}_smearing_bkg.pdf", pull=False)
+        makeAndSavePlot(axis, histo_data, model, pull=False,
+                        name=f"figs/fit_{t}/{id_flag}_{flags[0]}_{flags[1]}.pdf")
 
     return res
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     tau = ROOT.RooRealVar("tau", "tau", -10, 0)
     expo = ROOT.RooExponential("expo", "expo", x, tau)
 
-    res_pass = fit_distribution(
+    res_pass = fit_with_bkg(
         x, t, h_data[idx_cond], h_mc[idx_cond], expo, idx_cond, n_events[0][idx_cond])
 
     '''
