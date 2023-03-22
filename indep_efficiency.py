@@ -6,6 +6,7 @@ import os
 import pickle
 from utilities import import_Steve_histos, eval_efficiency, add_result
 from fit_utilities import fit_with_bkg
+from results_utilities import results_manager
 
 
 def indep_efficiency(type, bin_pt, bin_eta, results,
@@ -43,10 +44,9 @@ def indep_efficiency(type, bin_pt, bin_eta, results,
 
     print(f'Measured efficiency for {t} is: {eff} +- {d_eff}')
 
-    updated_results = add_result(results, res_pass, res_fail,
-                                 (eff, d_eff), bin_pt, bin_eta)
+    results.add_result(res_pass, res_fail, (eff, d_eff), bin_pt, bin_eta)
 
-    return updated_results
+    # return updated_results
 
 
 if __name__ == '__main__':
@@ -63,14 +63,12 @@ if __name__ == '__main__':
     id_flag = "fail" if idx_cond == 0 else "pass"
     '''
 
-    results = {}
+    results = results_manager()
 
-    for bin_pt in range(15):
-        for bin_eta in range(48):
-            results = indep_efficiency(t, bin_pt+1, bin_eta+1, results)
+    for bin_pt in range(5):
+        for bin_eta in range(16):
+            indep_efficiency(t, bin_pt+1, bin_eta+1, results)
 
-    with open("indep_eff_results.pkl", "wb") as f:
-        pickle.dump(results, f)
-        f.close()
+    results.write("indep_eff_results.pkl")
 
     print("RISULTATI SCRITTI SU PICKLE FILE")

@@ -13,7 +13,8 @@ def sim_efficiency(type_eff, bin_pt, bin_eta, results,
     """
     """
 
-    h_data, h_mc, n_events, x = import_Steve_histos(type_eff, [bin_pt], [bin_eta])
+    h_data, h_mc, n_events, x = import_Steve_histos(
+        type_eff, [bin_pt], [bin_eta])
 
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
@@ -26,15 +27,13 @@ def sim_efficiency(type_eff, bin_pt, bin_eta, results,
     tau2 = ROOT.RooRealVar("tau2", "tau2", -10, 0)
     expo2 = ROOT.RooExponential("expo2", "expo2", x, tau2)
 
-
     pdf_mc_pass = ROOT.RooHistPdf("pdf_mc_pass", "pdf_mc_pass", x, h_mc[1])
     pdf_mc_fail = ROOT.RooHistPdf("pdf_mc_fail", "pdf_mc_fail", x, h_mc[0])
-
 
     mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
     sigma = ROOT.RooRealVar("sigma", "sigma", 0.5, 0.001, 2)
     smearing = ROOT.RooGaussian("smearing", "smearing", x, mean, sigma)
- 
+
     print(type(h_data))
     print(type(h_data[0]), type(h_data[1]))
 
@@ -44,26 +43,30 @@ def sim_efficiency(type_eff, bin_pt, bin_eta, results,
     conv_fail = ROOT.RooFFTConvPdf("conv", "conv", x, pdf_mc_fail, smearing, 3)
     conv_fail.setBufferFraction(0.1)
 
-
-    Nsig_pass = ROOT.RooRealVar("nsig_p", "#signal events pass", 250, 0, n_events[0][1])
-    Nbkg_pass = ROOT.RooRealVar("nbkg_p", "#background events pass", 0, n_events[0][1])
+    Nsig_pass = ROOT.RooRealVar(
+        "nsig_p", "#signal events pass", 250, 0, n_events[0][1])
+    Nbkg_pass = ROOT.RooRealVar(
+        "nbkg_p", "#background events pass", 0, n_events[0][1])
     f_pass = ROOT.RooRealVar("f_pass", "f_pass", 0, 1)
 
-    Nsig_fail = ROOT.RooRealVar("nsig_f", "#signal events fail", 0, n_events[0][0])
-    Nbkg_fail = ROOT.RooRealVar("nbkg_f", "#background events fail", 0, n_events[0][0])
+    Nsig_fail = ROOT.RooRealVar(
+        "nsig_f", "#signal events fail", 0, n_events[0][0])
+    Nbkg_fail = ROOT.RooRealVar(
+        "nbkg_f", "#background events fail", 0, n_events[0][0])
     f_fail = ROOT.RooRealVar("f_fail", "f_fail", 0, 1)
 
-    sum_pass = ROOT.RooAddPdf("sum_pass", "sum_pass", [conv_pass, expo1], [Nsig_pass, Nbkg_pass])
+    sum_pass = ROOT.RooAddPdf("sum_pass", "sum_pass", [
+                              conv_pass, expo1], [Nsig_pass, Nbkg_pass])
     model_pass = ROOT.RooAddPdf(sum_pass)
-    
-    
-    eff = ROOT.RooRealVar("eff", "eff", 0, 1)
-    minus_eff = ROOT.RooPolyVar("minus_eff", "minus_eff", eff, [0, -1.]) 
-    prod = ROOT.RooProduct("prod", "prod", [minus_eff, Nsig_pass])
-    Nsig_fail_new = ROOT.RooAddition("new_Nsig_fail", "new_Nsig_fail", [Nsig_pass, prod])
-    sum_fail = ROOT.RooAddPdf("sum_fail", "sum_fail", [conv_fail, expo2], [Nsig_fail_new, Nbkg_fail])
-    model_fail = ROOT.RooAddPdf(sum_fail)
 
+    eff = ROOT.RooRealVar("eff", "eff", 0, 1)
+    minus_eff = ROOT.RooPolyVar("minus_eff", "minus_eff", eff, [0, -1.])
+    prod = ROOT.RooProduct("prod", "prod", [minus_eff, Nsig_pass])
+    Nsig_fail_new = ROOT.RooAddition(
+        "new_Nsig_fail", "new_Nsig_fail", [Nsig_pass, prod])
+    sum_fail = ROOT.RooAddPdf("sum_fail", "sum_fail", [conv_fail, expo2], [
+                              Nsig_fail_new, Nbkg_fail])
+    model_fail = ROOT.RooAddPdf(sum_fail)
 
     sample = ROOT.RooCategory("sample", "sample")
     sample.defineType("pass")
@@ -76,21 +79,17 @@ def sim_efficiency(type_eff, bin_pt, bin_eta, results,
         "combData",
         "combined datasets",
         ROOT.RooArgSet(x),
-        Index=sample, Import={"pass":h_data[1], "fail":h_data[0]})
+        Index=sample, Import={"pass": h_data[1], "fail": h_data[0]})
 
     print("Data combination OK")
 
     simPdf = ROOT.RooSimultaneous("simPdf", "simultaneous pdf", sample)
     simPdf.addPdf(model_pass, "pass")
-    simPdf.addPdf(model_fail, "fail") 
-    
-    fitResult = simPdf.fitTo(comb_dataset, Save=True, PrintLevel=-1, Extended=True)
+    simPdf.addPdf(model_fail, "fail")
+
+    fitResult = simPdf.fitTo(comb_dataset, Save=True,
+                             PrintLevel=-1, Extended=True)
     fitResult.Print()
-    
-
-
-
-    
 
     '''
     eff, d_eff = eval_efficiency(Npass, Nfail, sigma_Npass, sigma_Nfail)
