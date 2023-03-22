@@ -136,6 +136,9 @@ def add_result(dict_results, res_pass, res_fail, eff, bin_pt, bin_eta):
 
 
 if __name__ == '__main__':
+    '''
     file = ROOT.TFile("root_files/tnp_iso_mc.root")
     histo = file.pass_mu_DY_postVFP
     th3_checks(histo)
+    '''
+

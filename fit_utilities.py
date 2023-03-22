@@ -80,7 +80,7 @@ def fit_with_bkg(axis, t, histo_data, histo_mc, pdf_bkg, bins_pt_eta,
 
     model = ROOT.RooAddPdf(sum_func)
 
-    res = model.fitTo(histo_data, Extended=True, Save=True)
+    res = model.fitTo(histo_data, Extended=True, Save=True, PrintLevel=-1)
 
     pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
 

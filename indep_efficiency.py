@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     for bin_pt in range(15):
         for bin_eta in range(48):
-            results = indep_efficiency(t, [bin_pt+1], [bin_eta+1], results)
+            results = indep_efficiency(t, bin_pt+1, bin_eta+1, results)
 
     with open("indep_eff_results.pkl", "wb") as f:
         pickle.dump(results, f)
