@@ -64,6 +64,24 @@ non dà problemi), ma per snellire il codice sarebbe comodo poter gestire in que
 modo anche le pdfs
 
 
+22/03/2023
+----------
+
+Effettuato fit simultaneo sulle due distribuzioni, facendo entrare il parametro
+efficienza tramite la conversione Nsig_fail = (1-eff)*Nsig_pass
+
+Il risultato del fit sul bin [1,1] è consistente con quello trovato con fit
+indipendenti: eff = 0.9113 +- 0.0055
+Va capito se e come implementare una statistica di GOF per questi fit simultanei
+
+Situazione del Picke file: al momento per ogni bin viene salvata efficienza (val.
+stimato ed errore) e risultati dei fit sui due dataset.
+Implementata una classe che andrà a contenere le funzioni per gestire fondamentalmente
+tutto: in particolare, va migliorato e utilizzato il metodo che restituisce i bin
+nei quali il fit è stato problematico
+
+
+
 
 
 
@@ -72,16 +90,17 @@ modo anche le pdfs
 
 COSE DA FARE A BREVE
 --------------------
-  - Controllare che nel profileX si prendano i giusti bin di (pt,eta)
-  - Check generale del trattamento degli histos 3D
-  - Serializzare la procedura di fit per "iso" su più bin
-  - Studiare il background MC fornito da Rajarshi ("iso" events with same charge)
+  - Studiare il background MC fornito da Rajarshi ("iso" events with same charge):
+    i dataset pass e fail vanno studiati indipendentemente? E a tal proposito non
+    si possono utilizzare i dataset dei dati veri (più popolati)?
 
 
 IDEE PER MIGLIORAMENTI
 ----------------------
-  - LLR test sul parametro Nbkg (con H0: Nbkg=0), per testare l'ipotesi di assenza
-    di fondo
+  - LLR test sul parametro Nbkg (con H0: Nbkg=0): implementare una funzione opzionale
+    che, in caso il test sia passato (con alpha=0.05), effettua un nuovo fit senza
+    l'ipotesi di bkg
   - Fit simultaneo tra pass e fail ANCHE sui mc: in questo modo si potrebbe
-    stimare contemporaneamente le efficienze e gli scale factors (a monte  va
-    capito come ricavare questi parametri da un fit simultaneo)
+    stimare contemporaneamente le efficienze e gli scale factors  -> che pdf si
+    utilizzerebbe per fittare i mc? A botta verrebbe da dire la stessa che sui dati,
+    quindi con smearing (senza bkg), posto che si farebbe tutto simultaneo. 
