@@ -41,7 +41,7 @@ def profile_histo(histo_th3, axis, bin_pt, bin_eta, flag):
     roohist = ROOT.RooDataHist(
         f"roohist_{flag}", f"roohist_{flag}", [x], Import=histo_th1)
     print(f"Num RooDataHist entries = {roohist.numEntries()}")
-    return roohist, histo_th1.GetEffectiveEntries()
+    return roohist, histo_th1.Integral(1, 80)
 
 
 def th3_checks(histo_th3):
@@ -141,4 +141,3 @@ if __name__ == '__main__':
     histo = file.pass_mu_DY_postVFP
     th3_checks(histo)
     '''
-

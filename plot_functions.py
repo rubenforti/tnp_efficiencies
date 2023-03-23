@@ -4,6 +4,8 @@
 import sys
 import pickle
 import ROOT
+from array import array
+from results_utilities import res_manager_indep
 
 
 def makeAndSavePlot(axis, data, function, name='prova.png', title="Histo", pull=False):
@@ -32,29 +34,32 @@ def makeAndSavePlot(axis, data, function, name='prova.png', title="Histo", pull=
     c.SaveAs(name)
 
 
-def differential_eff_plot(file, binning_pt=(), binning_eta=()):
+def differential_eff_plot(filename, binning_pt=(), binning_eta=()):
     """
     """
     if len(binning_pt) == 0:
-        binning_pt = tuple([24., 26., 28., 30., 32., 34.,
+        binning_pt = array('d', [24., 26., 28., 30., 32., 34.,
                            36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
     if len(binning_eta) == 0:
-        binning_eta = tuple([round(-2.4 + i*0.1, 2) for i in range(49)])
+        binning_eta = array('d', [round(-2.4 + i*0.1, 2) for i in range(49)])
 
-    histo = ROOT.TH2D("eff_histo", "Efficiency (pt,eta)", len(binning_pt)-1, binning_pt[0], binning_pt[-1],
-                      len(binning_eta)-1, binning_eta[0], binning_eta[-1])
+    histo = ROOT.TH2D("eff_histo", "Efficiency (pt,eta)", len(binning_pt)-1, binning_pt,
+                      len(binning_eta)-1, binning_eta)
 
-    with open("indep_eff_results.pkl", "rb") as f:
-        results = pickle.load(f)
+    results = res_manager_indep()
+    results.open(filename)
+
+    res_dict = results.dictionary()
 
     idx_pt, idx_eta = 0, 0
 
-    for key in results.keys():
+    for key in res_dict.keys():
         idx_pt = int(key.split(",")[0])
         idx_eta = int(key.split(",")[1])
-        eff_val = results[key]["efficiency"][0]
+        eff = res_dict[key]["efficiency"]
+        # print(eff[0], eff[1])
         histo.Fill((binning_pt[idx_pt-1]+binning_pt[idx_pt])/2,
-                   (binning_eta[idx_eta-1]+binning_eta[idx_eta])/2, eff_val)
+                   (binning_eta[idx_eta-1]+binning_eta[idx_eta])/2, eff[0])
 
     c = ROOT.TCanvas()
     c.cd()
@@ -63,6 +68,5 @@ def differential_eff_plot(file, binning_pt=(), binning_eta=()):
 
 
 if __name__ == '__main__':
-    with open("indep_eff_results.pkl", "rb") as f:
-        results = pickle.load(f)
-    differential_eff_plot(results)
+
+    differential_eff_plot("indep_eff_results.pkl")

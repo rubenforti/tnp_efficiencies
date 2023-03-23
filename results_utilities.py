@@ -4,7 +4,7 @@
 import pickle
 
 
-class results_manager:
+class res_manager_indep:
     """
     """
 
@@ -62,6 +62,9 @@ class results_manager:
             else:
                 print(f'  {key} | {eff}  ')
 
+    def dictionary(self):
+        return self._dict_results
+
     def view_fits_status(self):
         """
         """
@@ -110,3 +113,72 @@ class results_manager:
                     print(f"Problematic bin:  {key}")
 
         return bins
+
+
+class res_manager_sim:
+    """
+    """
+
+    def __init__(self):
+        """
+        """
+        self._dict_results = {}
+
+    def add_result(self, res, bin_pt, bin_eta):
+        """
+        """
+        eff = 0
+        for par in res.floatParsFinal():
+            if par.GetName() == 'efficiency':
+                eff = par.getVal()
+                d_eff = par.getError()
+
+        new_res = {f"{bin_pt},{bin_eta}": {
+            "efficiency": (eff, d_eff),
+            "migrad_status": res.status(),
+            "parameters": res.floatParsFinal(),
+            "cov_matrix": res.covarianceMatrix(),
+            "cov_matrix_quality": res.covQual(),
+            "global_correlation": res.globalCorr(),
+            "EDM": res.edm()
+            }
+        }
+        self._dict_results.update(new_res)
+
+    def open(self, filename):
+        """
+        """
+        with open(filename, "rb") as file:
+            self._dict_results = pickle.load(file)
+
+    def write(self, filename):
+        """
+        """
+        with open(filename, "wb") as file:
+            pickle.dump(self._dict_results, file)
+            file.close()
+
+    def view_efficiencies(self, bin_pt=0, bin_eta=0):
+        """
+        """
+        print(" Bins | Efficiency")
+        for key in self._dict_results.keys():
+            eff = self._dict_results[key]["efficiency"]
+            if eff > 1:
+                print(f'  {key} | {eff}  !!!')
+            else:
+                print(f'  {key} | {eff}  ')
+
+    def dictionary(self):
+        return self._dict_results
+
+
+if __name__ == '__main__':
+
+    filename = 'indep_eff_results.pkl'
+
+    res = results_manager()
+
+    res.open(filename)
+
+    res.view_fits_status()

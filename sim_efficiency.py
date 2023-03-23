@@ -4,12 +4,15 @@
 import ROOT
 import os
 import pickle
-from utilities import import_Steve_histos, eval_efficiency, add_result
-from fit_utilities import fit_with_bkg
+from utilities import import_Steve_histos
+from results_utilities import res_manager_sim
 
 
 def sim_efficiency(type_eff, bin_pt, bin_eta, results,
-                   test_bkg=False, saveplots=False):
+                   same_smearing=True,
+                   test_bkg=False,
+                   enable_mcfit=False,
+                   saveplots=False):
     """
     """
 
@@ -19,69 +22,72 @@ def sim_efficiency(type_eff, bin_pt, bin_eta, results,
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
 
-    bins = (bin_pt, bin_eta)
+    # Backgrounds
+    # -----------
+    tau_p = ROOT.RooRealVar("tau_p", "tau_p", -10, 0)
+    expo_p = ROOT.RooExponential("expo_p", "expo_p", x, tau_p)
+    tau_f = ROOT.RooRealVar("tau_f", "tau_f", -10, 0)
+    expo_f = ROOT.RooExponential("expo_f", "expo_f", x, tau_f)
 
-    tau1 = ROOT.RooRealVar("tau1", "tau1", -10, 0)
-    expo1 = ROOT.RooExponential("expo1", "expo1", x, tau1)
-
-    tau2 = ROOT.RooRealVar("tau2", "tau2", -10, 0)
-    expo2 = ROOT.RooExponential("expo2", "expo2", x, tau2)
-
+    # PDFs from MC datasets
+    # ---------------------
     pdf_mc_pass = ROOT.RooHistPdf("pdf_mc_pass", "pdf_mc_pass", x, h_mc[1])
     pdf_mc_fail = ROOT.RooHistPdf("pdf_mc_fail", "pdf_mc_fail", x, h_mc[0])
 
+    # Smearing functions
+    # ------------------
     mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
     sigma = ROOT.RooRealVar("sigma", "sigma", 0.5, 0.001, 2)
-    smearing = ROOT.RooGaussian("smearing", "smearing", x, mean, sigma)
+    smear = ROOT.RooGaussian("smear", "smear", x, mean, sigma)
+    if same_smearing is not True:
+        mean_f = ROOT.RooRealVar("mean_f", "mean_f", 0, -2, 2)
+        sigma_f = ROOT.RooRealVar("sigma_f", "sigma_f", 0.5, 0.001, 2)
+        smear_fail = ROOT.RooGaussian(
+            "smear_fail", "smear_fail", x, mean_f, sigma_f)
+    else:
+        smear_fail = smear
 
-    print(type(h_data))
-    print(type(h_data[0]), type(h_data[1]))
-
+    # Convolutions with FFT
+    # ---------------------
     x.setBins(1000, "cache")
-    conv_pass = ROOT.RooFFTConvPdf("conv", "conv", x, pdf_mc_pass, smearing, 3)
+    conv_pass = ROOT.RooFFTConvPdf("conv", "conv", x, pdf_mc_pass, smear, 3)
     conv_pass.setBufferFraction(0.1)
-    conv_fail = ROOT.RooFFTConvPdf("conv", "conv", x, pdf_mc_fail, smearing, 3)
+    conv_fail = ROOT.RooFFTConvPdf(
+        "conv", "conv", x, pdf_mc_fail, smear_fail, 3)
     conv_fail.setBufferFraction(0.1)
 
-    Nsig_pass = ROOT.RooRealVar(
-        "nsig_p", "#signal events pass", 250, 0, n_events[0][1])
+    exp_ntot = n_events[0][0]+n_events[1][1]
+    Nsig_tot = ROOT.RooRealVar("Nsig_tot", "#signal events total", exp_ntot,
+                               0, exp_ntot+3*ROOT.TMath.Sqrt(exp_ntot))
+    efficiency = ROOT.RooRealVar("efficiency", "efficiency", 0, 1)
+
+    Nsig_pass = ROOT.RooProduct(
+        "Nsig_pass", "Nsig_pass", [efficiency, Nsig_tot])
     Nbkg_pass = ROOT.RooRealVar(
-        "nbkg_p", "#background events pass", 0, n_events[0][1])
-    f_pass = ROOT.RooRealVar("f_pass", "f_pass", 0, 1)
+            "nbkg_p", "#background events pass", 0, n_events[0][1])
 
-    Nsig_fail = ROOT.RooRealVar(
-        "nsig_f", "#signal events fail", 0, n_events[0][0])
-    Nbkg_fail = ROOT.RooRealVar(
-        "nbkg_f", "#background events fail", 0, n_events[0][0])
-    f_fail = ROOT.RooRealVar("f_fail", "f_fail", 0, 1)
-
-    sum_pass = ROOT.RooAddPdf("sum_pass", "sum_pass", [
-                              conv_pass, expo1], [Nsig_pass, Nbkg_pass])
+    sum_pass = ROOT.RooAddPdf("sum_pass", "sum_pass",
+                              [conv_pass, expo_p], [Nsig_pass, Nbkg_pass])
     model_pass = ROOT.RooAddPdf(sum_pass)
 
-    eff = ROOT.RooRealVar("eff", "eff", 0, 1)
-    minus_eff = ROOT.RooPolyVar("minus_eff", "minus_eff", eff, [0, -1.])
-    prod = ROOT.RooProduct("prod", "prod", [minus_eff, Nsig_pass])
-    Nsig_fail_new = ROOT.RooAddition(
-        "new_Nsig_fail", "new_Nsig_fail", [Nsig_pass, prod])
-    sum_fail = ROOT.RooAddPdf("sum_fail", "sum_fail", [conv_fail, expo2], [
-                              Nsig_fail_new, Nbkg_fail])
+    one_minus_eff = ROOT.RooPolyVar(
+        "one_minus_eff", "one_minus_eff", efficiency, [1, -1.])
+    Nsig_fail = ROOT.RooProduct("prod", "prod", [one_minus_eff, Nsig_tot])
+
+    Nbkg_fail = ROOT.RooRealVar(
+        "nbkg_f", "#background events fail", 0, n_events[0][0])
+
+    sum_fail = ROOT.RooAddPdf("sum_fail", "sum_fail",
+                              [conv_fail, expo_f], [Nsig_fail, Nbkg_fail])
     model_fail = ROOT.RooAddPdf(sum_fail)
 
     sample = ROOT.RooCategory("sample", "sample")
     sample.defineType("pass")
     sample.defineType("fail")
 
-    toy_data_pass = model_pass.generate({x}, 10000)
-    toy_data_fail = model_fail.generate({x}, 10000)
-
     comb_dataset = ROOT.RooDataHist(
-        "combData",
-        "combined datasets",
-        ROOT.RooArgSet(x),
-        Index=sample, Import={"pass": h_data[1], "fail": h_data[0]})
-
-    print("Data combination OK")
+        "combData", "combined datasets", ROOT.RooArgSet(x), Index=sample,
+        Import={"pass": h_data[1], "fail": h_data[0]})
 
     simPdf = ROOT.RooSimultaneous("simPdf", "simultaneous pdf", sample)
     simPdf.addPdf(model_pass, "pass")
@@ -89,18 +95,8 @@ def sim_efficiency(type_eff, bin_pt, bin_eta, results,
 
     fitResult = simPdf.fitTo(comb_dataset, Save=True,
                              PrintLevel=-1, Extended=True)
-    fitResult.Print()
 
-    '''
-    eff, d_eff = eval_efficiency(Npass, Nfail, sigma_Npass, sigma_Nfail)
-
-    print(f'Measured efficiency for {type_eff} is: {eff} +- {d_eff}')
-
-    updated_results = add_result(results, res_pass, res_fail,
-                                 (eff, d_eff), bin_pt, bin_eta)
-
-    return updated_results
-    '''
+    results.add_result(fitResult, bin_pt, bin_eta)
 
 
 if __name__ == '__main__':
@@ -117,15 +113,13 @@ if __name__ == '__main__':
     id_flag = "fail" if idx_cond == 0 else "pass"
     '''
 
-    results = {}
+    results = res_manager_sim()
 
-    # for bin_pt in range(15):
-    # for bin_eta in range(48):
-    sim_efficiency(t, 1, 1, results)
+    for bin_pt in range(15):
+        for bin_eta in range(48):
+            sim_efficiency(t, bin_pt+1, bin_eta+1,
+                           results, same_smearing=False)
 
-    '''
-    with open("simult_eff_results.pkl", "wb") as f:
-        pickle.dump(results, f)
-        f.close()
-    '''
+    results.write("simult_eff_results.pkl")
+
     print("RISULTATI SCRITTI SU PICKLE FILE")
