@@ -30,9 +30,15 @@ def profile_histo(histo_th3, axis, bin_pt, bin_eta, flag):
     from the TH3 given as input.
     """
 
+    if len(bin_pt) == 1:
+        bin_pt.append(bin_pt[0])
+
+    if len(bin_eta) == 1:
+        bin_eta.append(bin_eta[0])
+
     # Option "e" has to be activated? Not clear how "errors are computed"
     histo_th1 = histo_th3.ProjectionX(
-        f"histo_mass_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1])
+        f"Histo_mass_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1])
 
     nbins = histo_th1.GetNbinsX()
 
@@ -70,12 +76,6 @@ def th3_checks(histo_th3):
 
 
 def import_Steve_histos(type_eff, bin_pt, bin_eta):
-
-    if len(bin_pt) == 1:
-        bin_pt.append(bin_pt[0])
-
-    if len(bin_eta) == 1:
-        bin_eta.append(bin_eta[0])
 
     x = ROOT.RooRealVar("x", "TP M_{inv}", 50, 130, unit="GeV/c^2")
 
