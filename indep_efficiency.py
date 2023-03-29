@@ -10,7 +10,7 @@ from results_utilities import res_manager_indep
 
 
 def indep_efficiency(type, bin_pt, bin_eta, results,
-                     test_bkg=False, saveplots=False):
+                     test_bkg=False, saveplots=False, verbose=-1):
     """
     """
 
@@ -25,7 +25,7 @@ def indep_efficiency(type, bin_pt, bin_eta, results,
     expo = ROOT.RooExponential("expo", "expo", x, tau)
 
     res_pass = fit_with_bkg(x, type, h_data[1], h_mc[1], expo, bins,
-                            n_events[0][1], saveplot=saveplots)
+                            n_events[0][1], saveplot=saveplots, verb=verbose)
 
     for par in res_pass.floatParsFinal():
         if par.GetName() == 'nsig':
@@ -33,7 +33,7 @@ def indep_efficiency(type, bin_pt, bin_eta, results,
             sigma_Npass = par.getError()
 
     res_fail = fit_with_bkg(x, type, h_data[0], h_mc[0], expo, bins,
-                            n_events[0][0], saveplot=saveplots)
+                            n_events[0][0], saveplot=saveplots, verb=verbose)
 
     for par in res_fail.floatParsFinal():
         if par.GetName() == 'nsig':
@@ -42,8 +42,10 @@ def indep_efficiency(type, bin_pt, bin_eta, results,
 
     eff, d_eff = eval_efficiency(Npass, Nfail, sigma_Npass, sigma_Nfail)
 
-    # print(f'Measured efficiency for {t} is: {eff} +- {d_eff}')
-
+    print(f'Measured efficiency for {t} is: {eff} +- {d_eff}')
+    print(res_pass.status(), res_fail.status())
+    print(res_pass.covQual(), res_fail.covQual())
+    print(res_pass.edm(), res_fail.edm())
     results.add_result(res_pass, res_fail, (eff, d_eff), bin_pt, bin_eta)
 
     # return updated_results
@@ -65,10 +67,19 @@ if __name__ == '__main__':
 
     results = res_manager_indep()
 
-    for bin_pt in range(15):
-        for bin_eta in range(48):
-            indep_efficiency(t, bin_pt+1, bin_eta+1, results)
+    pt_sel = [1]
+    eta_sel = [24]
 
-    results.write("indep_eff_results.pkl")
+    for pt in pt_sel:
+        for eta in eta_sel:
+            indep_efficiency(t, pt, eta, results, saveplots=True, verbose=0)
+    '''
+    for bin_pt in range(1, 2):
+        for bin_eta in range(1, 49):
+            indep_efficiency(t, bin_pt, bin_eta, results)
+    '''
 
-    print("RISULTATI SCRITTI SU PICKLE FILE")
+    probs = results.problematic_bins('all')
+    print(f'NUM PROBLEMI = {len(probs)}')
+    # results.write("indep_eff_results.pkl")
+    # print("RISULTATI SCRITTI SU PICKLE FILE")

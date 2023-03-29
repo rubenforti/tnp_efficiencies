@@ -8,7 +8,8 @@ from array import array
 from results_utilities import res_manager_indep
 
 
-def makeAndSavePlot(axis, data, function, name='prova.png', title="Histo", pull=False):
+def makeAndSavePlot(axis, data, function, bkg_name='expo',
+                    name='prova.png', title="Histo", pull=False):
 
     c = ROOT.TCanvas()
     if pull is True:
@@ -18,9 +19,14 @@ def makeAndSavePlot(axis, data, function, name='prova.png', title="Histo", pull=
     ROOT.gPad.SetLeftMargin(0.15)
     frame = axis.frame(Title=title+' '+str(axis))
     data.plotOn(frame)
+    function.plotOn(frame)
+    function.plotOn(frame, Components=bkg_name, LineColor='kRed')
+    '''
     for comp in function.getComponents():
         print(comp.GetName())
         function.plotOn(frame, Components=comp, LineStyle=':')
+        idx += 1
+    '''
     function.plotOn(frame)
     frame.Draw()
 
@@ -64,9 +70,9 @@ def differential_eff_plot(filename, binning_pt=(), binning_eta=()):
     c = ROOT.TCanvas()
     c.cd()
     histo.Draw("COLZ")
-    c.SaveAs("differential_eff.png")
+    c.SaveAs("differential_eff_sim.png")
 
 
 if __name__ == '__main__':
 
-    differential_eff_plot("indep_eff_results.pkl")
+    differential_eff_plot("simult_eff_results.pkl")

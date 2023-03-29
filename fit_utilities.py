@@ -21,7 +21,8 @@ def fit_convolution(axis, histo, template_pdf, smearing, nbins=1000, buffer_frac
     return model, res
 
 
-def fit_without_bkg(axis, t, histo_data, histo_mc, bins_pt_eta, events_data, saveplot=False):
+def fit_without_bkg(axis, t, histo_data, histo_mc, bins_pt_eta, events_data,
+                    saveplot=False, verb=-1):
     """
     """
 
@@ -41,7 +42,8 @@ def fit_without_bkg(axis, t, histo_data, histo_mc, bins_pt_eta, events_data, sav
     conv_func = ROOT.RooFFTConvPdf("conv", "conv", axis, pdf_mc, smearing, 3)
     conv_func.setBufferFraction(0.1)
 
-    res = conv_func.fitTo(histo_data, Extended=True, Save=True)
+    res = conv_func.fitTo(histo_data, Extended=True,
+                          Save=True, PrintLevel=verb)
 
     pearson_chi2_eval(histo_data, conv_func, histo_data.numEntries(), res)
 
@@ -53,7 +55,7 @@ def fit_without_bkg(axis, t, histo_data, histo_mc, bins_pt_eta, events_data, sav
 
 
 def fit_with_bkg(axis, t, histo_data, histo_mc, pdf_bkg, bins_pt_eta,
-                 events_data, test_bkg=False, saveplot=False):
+                 events_data, test_bkg=False, saveplot=False, verb=-1):
     """
     """
 
@@ -65,22 +67,24 @@ def fit_with_bkg(axis, t, histo_data, histo_mc, pdf_bkg, bins_pt_eta,
         pass
 
     pdf_mc = ROOT.RooHistPdf("pdf_mc", "pdf_mc", axis, histo_mc)
-    mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
-    sigma = ROOT.RooRealVar("sigma", "sigma", 0.5, 0.001, 2)
+    mean = ROOT.RooRealVar("mean", "mean", 0., -10, 10)
+    sigma = ROOT.RooRealVar("sigma", "sigma", 1, 0.05, 10)
     smearing = ROOT.RooGaussian("smearing", "smearing", axis, mean, sigma)
 
-    axis.setBins(1000, "cache")
+    axis.setBins(10000, "cache")
     conv_func = ROOT.RooFFTConvPdf("conv", "conv", axis, pdf_mc, smearing, 3)
-    conv_func.setBufferFraction(0.1)
+    conv_func.setBufferFraction(0.5)
 
-    Nsig = ROOT.RooRealVar("nsig", "#signal events", 0, events_data)
-    Nbkg = ROOT.RooRealVar("nbkg", "#background events", 0, events_data)
+    Nsig = ROOT.RooRealVar("nsig", "#signal events",  events_data, 0,
+                           events_data + 4*ROOT.TMath.Sqrt(events_data))
+    Nbkg = ROOT.RooRealVar("nbkg", "#background events",
+                           0.005*events_data, -0., 0.5*events_data)
 
     sum_func = ROOT.RooAddPdf("sum", "sum", [conv_func, pdf_bkg], [Nsig, Nbkg])
 
     model = ROOT.RooAddPdf(sum_func)
 
-    res = model.fitTo(histo_data, Extended=True, Save=True, PrintLevel=-1)
+    res = model.fitTo(histo_data, Extended=True, Save=True, PrintLevel=verb)
 
     pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
 

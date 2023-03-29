@@ -34,14 +34,20 @@ def profile_histo(histo_th3, axis, bin_pt, bin_eta, flag):
     histo_th1 = histo_th3.ProjectionX(
         f"histo_mass_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1])
 
+    nbins = histo_th1.GetNbinsX()
+
     xAxis = histo_th1.GetXaxis()
     x = ROOT.RooRealVar("x", "x", xAxis.GetXmin(),
                         xAxis.GetXmax(), unit="GeV/c^2")
     print(f"Num TH1 entries = {histo_th1.GetEntries()}")
     roohist = ROOT.RooDataHist(
         f"roohist_{flag}", f"roohist_{flag}", [x], Import=histo_th1)
-    print(f"Num RooDataHist entries = {roohist.numEntries()}")
-    return roohist, histo_th1.Integral(1, 80)
+    if roohist.numEntries() != nbins:
+        print('**********************************')
+        print('ERRORE NEL NUMERO DI BIN IMPORTATI')
+        print('**********************************')
+
+    return roohist, histo_th1.Integral(1, nbins)
 
 
 def th3_checks(histo_th3):

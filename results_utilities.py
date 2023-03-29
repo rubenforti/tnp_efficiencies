@@ -75,9 +75,9 @@ class res_manager_indep:
             covq_p = res[key]["fit_stat_pass"]["cov_matrix_quality"]
             edm = res[key]["fit_stat_pass"]["EDM"]
             print(f"  {key} |  {migr_p}      {covq_p}      {edm}")
-            migr_p = res[key]["fit_stat_pass"]["migrad_status"]
-            covq_f = res[key]["fit_stat_pass"]["cov_matrix_quality"]
-            edm = res[key]["fit_stat_pass"]["EDM"]
+            migr_p = res[key]["fit_stat_fail"]["migrad_status"]
+            covq_f = res[key]["fit_stat_fail"]["cov_matrix_quality"]
+            edm = res[key]["fit_stat_fail"]["EDM"]
             print(f"  {key} |  {migr_p}      {covq_f}      {edm}")
             print("    ")
 
@@ -91,26 +91,31 @@ class res_manager_indep:
             migr_p = res[key]["fit_stat_pass"]["migrad_status"]
             covq_p = res[key]["fit_stat_pass"]["cov_matrix_quality"]
             edm_p = res[key]["fit_stat_pass"]["EDM"]
-            migr_p = res[key]["fit_stat_fail"]["migrad_status"]
+            migr_f = res[key]["fit_stat_fail"]["migrad_status"]
             covq_f = res[key]["fit_stat_fail"]["cov_matrix_quality"]
             edm_f = res[key]["fit_stat_fail"]["EDM"]
+
+            if conditions == 'all':
+                conditions = ['eff', 'migrad', 'covqual', 'edm']
 
             cond_list = []
 
             if 'eff' in conditions:
-                cond_list.append((eff[0] < 0) or (
-                    eff[0] > 1) or (eff[1] > 1e-2))
+                cond_list.append(eff[0] > 0 and eff[0] < 1)
             if 'migrad' in conditions:
-                cond_migrad = False
+                cond_list.append(migr_p == 0 and migr_f == 0)
             if 'covqual' in conditions:
-                cond_covm = False
+                cond_list.append(covq_p == 3 and covq_f == 3)
             if 'edm' in conditions:
-                cond_list.append((edm_p > 1e-2) or (edm_f > 1e-2))
+                cond_list.append(edm_p < 1e-2 and edm_f < 1e-2)
 
+            fails = 0
             for cond in cond_list:
-                if cond:
-                    bins.append(key)
-                    print(f"Problematic bin:  {key}")
+                fails = fails+1 if cond is not True else fails
+
+            if fails != 0:
+                bins.append(key)
+                print(f"Bin  {key}  has  {fails}  problem(s)")
 
         return bins
 
@@ -177,8 +182,10 @@ if __name__ == '__main__':
 
     filename = 'indep_eff_results.pkl'
 
-    res = results_manager()
+    res = res_manager_indep()
 
     res.open(filename)
 
-    res.view_fits_status()
+    probs = res.problematic_bins('migrad')
+
+    print(len(probs))
