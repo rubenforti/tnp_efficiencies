@@ -103,17 +103,6 @@ def import_Steve_histos(type_eff, bin_pt, bin_eta):
     return histos_data, histos_mc, nevts, x
 
 
-def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
-    """
-    """
-    eff = npass/(npass+nfail)
-    var1 = ((1-npass)**2)*(sigma_npass**2)
-    var2 = (npass**2)*(sigma_nfail**2)
-    sigma_eff = ROOT.TMath.Sqrt(var1+var2)/((npass+nfail)**2)
-
-    return eff, sigma_eff
-
-
 def add_result(dict_results, res_pass, res_fail, eff, bin_pt, bin_eta):
     """
     """

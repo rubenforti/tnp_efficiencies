@@ -9,7 +9,7 @@ from fit_utilities import fit_with_bkg
 from results_utilities import res_manager_indep
 
 
-def indep_efficiency(type, bin_pt, bin_eta, results,
+def indep_efficiency(workspace, bin_pt, bin_eta, results,
                      test_bkg=False, saveplots=False, verbose=-1):
     """
     """
