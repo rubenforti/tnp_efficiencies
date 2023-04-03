@@ -74,12 +74,46 @@ Il risultato del fit sul bin [1,1] è consistente con quello trovato con fit
 indipendenti: eff = 0.9113 +- 0.0055
 Va capito se e come implementare una statistica di GOF per questi fit simultanei
 
-Situazione del Picke file: al momento per ogni bin viene salvata efficienza (val.
+Situazione del Pickle file: al momento per ogni bin viene salvata efficienza (val.
 stimato ed errore) e risultati dei fit sui due dataset.
 Implementata una classe che andrà a contenere le funzioni per gestire fondamentalmente
 tutto: in particolare, va migliorato e utilizzato il metodo che restituisce i bin
 nei quali il fit è stato problematico
 
+
+31/03/2023
+----------
+
+Pickle file sistemato anche per i fit simultanei. La classe che gestisce il
+file è stata corretta e sono state inserite le condizoni
+        "migrad==0" && "covQual==3" && "edm < 10^-4"
+per dire se un fit su un bin è riuscito.
+
+WORKSPACE: inizializzato un oggetto RooWorkspace per tenere traccia di tutte le
+PDF utilizzate su ogni bin. Da chiarire ancora esattamente come gestire l'oggetto
+costruito perché le pdf non sono sovrascrivibili: questo può essere un limite
+poiché l'idea era costruire delle pdf standard per ogni bin e poi salvarle e nel
+caso modificarle. Forse la cosa migliore è salvare solo le pdf che soddisfano
+le condizioni sopra e poi aggiungere via via le pdf corrette
+
+
+02/04/2023
+----------
+
+Funziona l'operazione di aggiornare il ws con una PDF attraverso una funzione
+python e successivamente estrarre tale PDF (senza sfruttare i "return" di python
+che per le RooPdf non funzionano). Questo può essere utile in futuro, anche se
+al momento costruire volta volta la pdf e fare il fit è più comodo, perché così
+si salvano solo le pdf già utilizzate (che contengono quindi tutti i parametri
+di fit)
+
+
+
+------------
+DA SISTEMARE: serializzare i fit su indep_efficiency_new (da rinominare) e sistemare
+come vengono salvate le pdf nel ws: ora come ora i controlli avvengono SEPARATAMENTE
+(il che pensandoci può anche andar bene)
+s
 
 
 
@@ -90,17 +124,21 @@ nei quali il fit è stato problematico
 
 COSE DA FARE A BREVE
 --------------------
-  - Studiare il background MC fornito da Rajarshi ("iso" events with same charge):
-    i dataset pass e fail vanno studiati indipendentemente? E a tal proposito non
-    si possono utilizzare i dataset dei dati veri (più popolati)?
-
+  - Fit simultaneo tra pass e fail ANCHE sui mc: in questo modo si potrebbe
+    stimare contemporaneamente eff_mc e scale factors; sui MC si fitta la pdf_mc,
+    tenendo floating la normalizzazione.
+  - Iso with same charge dataset:
+        - Studio generale: confrontare le distribuzioni dei dati rispetto al
+          montecarlo in macro-bin di (pt,eta)
+        - Studio particolare: per ogni bin valutare quanta parte del fondo visto
+          nei dati è attribuibile a fondi di QCD (che sono ben rappresentati da
+          questo dataset, in questo step). Spoiler: non saranno molti, la maggior
+          parte sarà data da decadimenti non prompt.
 
 IDEE PER MIGLIORAMENTI
 ----------------------
   - LLR test sul parametro Nbkg (con H0: Nbkg=0): implementare una funzione opzionale
     che, in caso il test sia passato (con alpha=0.05), effettua un nuovo fit senza
     l'ipotesi di bkg
-  - Fit simultaneo tra pass e fail ANCHE sui mc: in questo modo si potrebbe
-    stimare contemporaneamente le efficienze e gli scale factors  -> che pdf si
-    utilizzerebbe per fittare i mc? A botta verrebbe da dire la stessa che sui dati,
-    quindi con smearing (senza bkg), posto che si farebbe tutto simultaneo. 
+  - Per i bin (pt,eta) difficoltosi: si può dividere il dataset in due, fare fit
+    separati e vedere se la distribuzione della DIFFERENZA dei PULL è centrata in zero

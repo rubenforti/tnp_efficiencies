@@ -8,6 +8,13 @@ from utilities import import_Steve_histos
 from results_utilities import res_manager_sim
 
 
+def fit_on_bin(type_eff, workspace, cond, bin, test_bkg=False, verb=-1):
+    """
+    """
+
+
+
+
 def sim_efficiency(type_eff, bin_pt, bin_eta, results,
                    same_smearing=True,
                    test_bkg=False,
