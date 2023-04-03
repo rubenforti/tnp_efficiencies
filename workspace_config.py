@@ -47,7 +47,7 @@ def ws_init(type_eff, bins_pt, bins_eta, bins_mass):
     w = ROOT.RooWorkspace("w")
 
     x = ROOT.RooRealVar(
-        "x", "TP M_{inv}", bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+        "x", "TP M_inv", bins_mass[0], bins_mass[-1], unit="GeV/c^2")
     w.Import(x)
 
     # Import of the 3D histograms
@@ -100,7 +100,11 @@ if __name__ == '__main__':
 
     binning_mass = array('d', [50 + i for i in range(81)])
 
-    w = ws_init('iso', binning_pt, binning_eta, binning_mass)
+    w = ws_init('iso', [1, 1], binning_eta, binning_mass)
+    ws_init_std_pdf(w)
+    w.writeToFile(f"root_files/iso_workspace.root")
+
+    w.Print()
 
     '''
     f = ROOT.TFile("root_files/iso_workspace.root")
