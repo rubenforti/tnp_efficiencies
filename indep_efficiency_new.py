@@ -33,7 +33,7 @@ def indep_efficiency(type_eff, bins_pt, bins_eta, results,
             print(" ")
             if status != 0:
                 print(f"Bin {bin_pt},{bin_eta} has {status} problems!")
-            if verbose != 0 or status != 0:
+            if verbose != 0 or status != 0 or status == 0:
                 print(res_pass.status(), res_fail.status())
                 print(res_pass.covQual(), res_fail.covQual())
                 print(res_pass.edm(), res_fail.edm())

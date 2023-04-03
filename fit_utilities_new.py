@@ -48,10 +48,11 @@ def fit_with_bkg(type_eff, cond, bin, test_bkg=False, verb=-1,):
     """
     file_ws = ROOT.TFile(f"root_files/{type_eff}_workspace.root")
     workspace = file_ws.Get("w")
-    # workspace_init_std_pdf(workspace)
 
-    axis = ROOT.RooRealVar(workspace["x"], "x")
-    axis.SetTitle(f"TP M_inv  {cond} ({bin[0]}, {bin[1]})")
+    ws_init_std_pdf(workspace, cond, bin)
+
+    axis = workspace[f"x_{cond}_({bin[0]},{bin[1]})"]
+    # axis.SetTitle(f"TP M_inv  {cond} ({bin[0]}, {bin[1]})")
     print(type(axis))
 
     '''
@@ -67,22 +68,26 @@ def fit_with_bkg(type_eff, cond, bin, test_bkg=False, verb=-1,):
 
         histo_data = workspace[f"Minv_data_{cond}_({bin[0]},{bin[1]})"]
 
-        model = workspace[f'PDF_{cond}_({bin[0]},{bin[1]})']
+        model = ROOT.RooAddPdf(workspace[f'PDF_{cond}_({bin[0]},{bin[1]})'],
+                               f'PDF_{cond}_({bin[0]},{bin[1]})_copy')
 
         axis.setBins(10000, "cache")
 
     elif type(workspace[f'PDF_{cond}_({bin[0]},{bin[1]})']) is ROOT.TObject:
 
+        '''
         histo_data = ROOT.RooDataHist(workspace[f"Minv_data_{cond}_({bin[0]},{bin[1]})"],
                                       f"Minv_data_{cond}_({bin[0]},{bin[1]})_copy")
         histo_mc = ROOT.RooDataHist(workspace[f"Minv_mc_{cond}_({bin[0]},{bin[1]})"],
                                     f"Minv_mc_{cond}_({bin[0]},{bin[1]})_copy")
-
+        '''
+        histo_data = workspace[f"Minv_data_{cond}_({bin[0]},{bin[1]})"]
+        histo_mc = workspace[f"Minv_mc_{cond}_({bin[0]},{bin[1]})"]
         pdf_mc = ROOT.RooHistPdf(
             f"pdf_mc_{cond}_({bin[0]}_{bin[1]})", "pdf_mc", axis, histo_mc)
 
-        smearing = workspace["gaus_smearing"]
-        background = workspace["expo_bkg"]
+        smearing = workspace[f"gaus_smearing_{cond}_({bin[0]},{bin[1]})"]
+        background = workspace[f"expo_bkg_{cond}_({bin[0]},{bin[1]})"]
 
         axis.setBins(10000, "cache")
         conv_func = ROOT.RooFFTConvPdf(f"conv_{cond}_({bin[0]}_{bin[1]})", "Convolution",

@@ -46,19 +46,21 @@ def ws_init(type_eff, bins_pt, bins_eta, bins_mass):
 
     w = ROOT.RooWorkspace("w")
 
-    x = ROOT.RooRealVar(
-        "x", "TP M_inv", bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-    w.Import(x)
-
     # Import of the 3D histograms
     f_data = ROOT.TFile(f"root_files/tnp_{type_eff}_data.root")
     f_mc = ROOT.TFile(f"root_files/tnp_{type_eff}_mc.root")
 
     for i in range(1, len(bins_pt)):
         for j in range(1, len(bins_eta)):
-            histos_pass = get_roohist((f_data, f_mc), x, i, j, 'pass')
-            histos_fail = get_roohist((f_data, f_mc), x, i, j, 'fail')
+            x_pass = ROOT.RooRealVar(f"x_pass_({i},{j})", "TP M_inv",
+                                     bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+            x_fail = ROOT.RooRealVar(f"x_fail_({i},{j})", "TP M_inv",
+                                     bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+            histos_pass = get_roohist((f_data, f_mc), x_pass, i, j, 'pass')
+            histos_fail = get_roohist((f_data, f_mc), x_fail, i, j, 'fail')
             # Datasets are written in this order: data_pass, mc_pass, data_fail, mc_fail
+            w.Import(x_pass)
+            w.Import(x_fail)
             w.Import(histos_pass[0])
             w.Import(histos_pass[1])
             w.Import(histos_fail[0])
@@ -69,25 +71,27 @@ def ws_init(type_eff, bins_pt, bins_eta, bins_mass):
     return w
 
 
-def ws_init_std_pdf(workspace):
+def ws_init_std_pdf(workspace, cond, bin):
     """
     """
 
-    axis = workspace["x"]
+    axis = workspace[f"x_{cond}_({bin[0]},{bin[1]})"]
 
     # Gaussian smearing
     # -----------------
-    mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
-    sigma = ROOT.RooRealVar("sigma", "sigma", 0.5, 0.001, 2)
-    gaussian = ROOT.RooGaussian(
-        "gaus_smearing", "gaussian smearing", axis, mean, sigma)
+    mean = ROOT.RooRealVar(
+        f"mean_{cond}_({bin[0]},{bin[1]})", "mean", 0, -2, 2)
+    sigma = ROOT.RooRealVar(
+        f"sigma_{cond}_({bin[0]},{bin[1]})", "sigma", 0.5, 0.001, 2)
+    gaussian = ROOT.RooGaussian(f"gaus_smearing_{cond}_({bin[0]},{bin[1]})",
+                                "gaussian smearing", axis, mean, sigma)
     workspace.Import(gaussian)
 
     # Exponential bkg
     # ---------------
-    tau = ROOT.RooRealVar("tau", "tau", -10, 0)
-    expo_bkg = ROOT.RooExponential(
-        "expo_bkg", "exponential background", axis, tau)
+    tau = ROOT.RooRealVar(f"tau_{cond}_({bin[0]},{bin[1]})", "tau", -10, 0)
+    expo_bkg = ROOT.RooExponential(f"expo_bkg_{cond}_({bin[0]},{bin[1]})",
+                                   "exponential background", axis, tau)
     workspace.Import(expo_bkg)
 
 
@@ -101,7 +105,7 @@ if __name__ == '__main__':
     binning_mass = array('d', [50 + i for i in range(81)])
 
     w = ws_init('iso', [1, 1], binning_eta, binning_mass)
-    ws_init_std_pdf(w)
+    # ws_init_std_pdf(w)
     w.writeToFile(f"root_files/iso_workspace.root")
 
     w.Print()
