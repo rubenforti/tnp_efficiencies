@@ -30,12 +30,12 @@ class res_manager_indep:
         """
 
         for par in res_pass.floatParsFinal():
-            if par.GetName() == 'nsig':
+            if par.GetName() == f'nsig_pass_({bin_pt},{bin_eta})':
                 Npass = par.getVal()
                 sigma_Npass = par.getError()
 
         for par in res_fail.floatParsFinal():
-            if par.GetName() == 'nsig':
+            if par.GetName() == f'nsig_fail_({bin_pt},{bin_eta})':
                 Nfail = par.getVal()
                 sigma_Nfail = par.getError()
 
@@ -146,7 +146,7 @@ class res_manager_indep:
         if 'covqual' in conditions:
             cond_list.append(covq_p == 3 and covq_f == 3)
         if 'edm' in conditions:
-            cond_list.append(edm_p < 1e-2 and edm_f < 1e-2)
+            cond_list.append(edm_p < 1e-4 and edm_f < 1e-4)
 
         nfails = 0
         for cond in cond_list:

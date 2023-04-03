@@ -129,7 +129,7 @@ dmypy.json
 .pyre/
 
 # Root files
-root_files/
+# root_files/
 
 # Operative macros in PDFs library
 libCpp/*.C
