@@ -104,7 +104,7 @@ if __name__ == '__main__':
 
     binning_mass = array('d', [50 + i for i in range(81)])
 
-    w = ws_init('iso', binning_pt, binning_eta, binning_mass)
+    w = ws_init('iso', [1,1], [1,1], binning_mass)
     # ws_init_std_pdf(w)
     w.writeToFile(f"root_files/iso_workspace.root")
 

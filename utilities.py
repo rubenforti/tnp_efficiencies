@@ -2,6 +2,7 @@
 """
 
 import sys
+import os
 import pickle
 import ROOT
 
@@ -9,10 +10,13 @@ import ROOT
 def import_pdf_library(*functions):
     """
     """
+    current_path = os.path.dirname(__file__)
+
     for function in functions:
         header_incl = ' #include "libCpp/'+function+'.h"'
-        sourcefile = 'libCpp/'+function+'.cc'
+        sourcefile = os.path.join(current_path, 'libCpp', f'{function}.cc')
 
+        print(sourcefile)
         ctrl_head = ROOT.gInterpreter.Declare(header_incl)
         ctrl_source = ROOT.gSystem.CompileMacro(sourcefile, opt="ks")
 

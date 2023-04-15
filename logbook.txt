@@ -6,7 +6,6 @@
 
 14/03/2023
 ----------
-
 Pulizia degli scripts esistenti e costruzione delle funzioni di import degli
 istogrammi.
 
@@ -24,7 +23,6 @@ Fit results:
 
 15/03/2023
 ----------
-
 Funzione generale di import: dati i due file con gli istogrammi, fa il profile
 lungo l'asse x e ritorna le seguenti q.tà:
     - Histos_data: tupla (fail, pass) di RooDataHist
@@ -48,7 +46,6 @@ es. l'integrazione sul bin) è da fare.
 
 16/03/2023
 ----------
-
 Rimodulata la struttura dei file: adesso "fit_distrib" contiene la funzione che
 effettua un fit (comprendente smearing e bkg) su una distribuzione; il modulo
 "independent_fit" invece fa i fit sulle due distribuzioni e calcola l'efficienza.
@@ -66,7 +63,6 @@ modo anche le pdfs
 
 22/03/2023
 ----------
-
 Effettuato fit simultaneo sulle due distribuzioni, facendo entrare il parametro
 efficienza tramite la conversione Nsig_fail = (1-eff)*Nsig_pass
 
@@ -83,7 +79,6 @@ nei quali il fit è stato problematico
 
 31/03/2023
 ----------
-
 Pickle file sistemato anche per i fit simultanei. La classe che gestisce il
 file è stata corretta e sono state inserite le condizoni
         "migrad==0" && "covQual==3" && "edm < 10^-4"
@@ -99,7 +94,6 @@ le condizioni sopra e poi aggiungere via via le pdf corrette
 
 02/04/2023
 ----------
-
 Funziona l'operazione di aggiornare il ws con una PDF attraverso una funzione
 python e successivamente estrarre tale PDF (senza sfruttare i "return" di python
 che per le RooPdf non funzionano). Questo può essere utile in futuro, anche se
@@ -108,12 +102,25 @@ si salvano solo le pdf già utilizzate (che contengono quindi tutti i parametri
 di fit)
 
 
+03-04/04/2023
+----------
+Come "test di robustezza" per i fit (indep) su ogni bin mi era venuta l'idea di
+far ripartire la minimizzazione dal punto già trovato. Questo può rivelarsi problematico
+poiché per certi parametri la step-size della prima (nuova) iterazione può andare
+oltre il limite della variabile stessa (v. Nbkg che spesso è ~ 0). Quindi o si
+impone un controllo sulla step-size ogni volta (agendo su Minuit2) oppure non si
+fa tutto sto lavoro, che poi non è che serva a molto.
 
-------------
-DA SISTEMARE: serializzare i fit su indep_efficiency_new (da rinominare) e sistemare
-come vengono salvate le pdf nel ws: ora come ora i controlli avvengono SEPARATAMENTE
-(il che pensandoci può anche andar bene)
-s
+Una cosa invece che può servire è salvare le pdf di INIT in ogni step. Il problema
+qui è che queste si modificano col fit, quindi va implementato un sistema efficiente
+per effettuare la copia
+
+
+16/04/2023
+----------
+
+
+
 
 
 
@@ -122,18 +129,22 @@ s
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-COSE DA FARE A BREVE
---------------------
-  - Fit simultaneo tra pass e fail ANCHE sui mc: in questo modo si potrebbe
-    stimare contemporaneamente eff_mc e scale factors; sui MC si fitta la pdf_mc,
-    tenendo floating la normalizzazione.
-  - Iso with same charge dataset:
-        - Studio generale: confrontare le distribuzioni dei dati rispetto al
-          montecarlo in macro-bin di (pt,eta)
-        - Studio particolare: per ogni bin valutare quanta parte del fondo visto
-          nei dati è attribuibile a fondi di QCD (che sono ben rappresentati da
-          questo dataset, in questo step). Spoiler: non saranno molti, la maggior
-          parte sarà data da decadimenti non prompt.
+TO-DO LIST
+----------
+
+- Implementare la CMSSHAPE come background
+
+- Fit simultaneo tra pass e fail ANCHE sui mc: in questo modo si potrebbe
+  stimare contemporaneamente eff_mc e scale factors; sui MC si fitta la pdf_mc,
+  tenendo floating la normalizzazione.
+
+- Iso with same charge dataset:
+    - Studio generale: confrontare le distribuzioni dei dati rispetto al
+      montecarlo in macro-bin di (pt,eta)
+    - Studio particolare: per ogni bin valutare quanta parte del fondo visto
+      nei dati è attribuibile ai diversi tipi di fondi: QCD (rappresentati da
+      dataset "samecharge"), drell-Yan non prompt ecc.
+
 
 IDEE PER MIGLIORAMENTI
 ----------------------

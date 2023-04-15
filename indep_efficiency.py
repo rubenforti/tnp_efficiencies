@@ -7,10 +7,12 @@ import os
 import sys
 from results_utilities import res_manager_indep
 from stat_functions import pearson_chi2_eval, llr_test_bkg
+from plot_functions import makeAndSavePlot
+from utilities import import_pdf_library
 from array import array
 
 
-def fit_on_bin(type_eff, workspace, cond, bin, test_bkg=False, verb=-1):
+def fit_on_bin(type_eff, workspace, cond, bin, bkg, test_bkg=False, verb=-1):
     """
     """
 
@@ -24,26 +26,6 @@ def fit_on_bin(type_eff, workspace, cond, bin, test_bkg=False, verb=-1):
         print("Fit with existing PDF not implemented yet!")
         sys.exit()
 
-        '''
-        init_pdf = workspace[f'PDF_{cond}_({bin[0]},{bin[1]})']
-
-        model = ROOT.RooAddPdf(init_pdf, f"{init_pdf.GetName()}_NEW")
-
-        res = model.fitTo(histo_data, Extended=True,
-                          Save=True, PrintLevel=verb)
-
-        print("PARAMETERS AFTER FIT")
-        pars = model.getParameters(histo_data)
-        pars.Print("v")
-
-        pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
-
-        if res.status() == 0 and res.covQual() == 3 and res.edm() < 1e-4:
-            workspace.Import(model, RenameAllNodes='NEW',
-                             RenameAllVariables='NEW')
-            workspace.writeToFile(f"root_files/{type_eff}_workspace.root")
-        '''
-
     elif type(workspace[f'PDF_{cond}_({bin[0]},{bin[1]})']) is ROOT.TObject:
 
         pdf_mc = ROOT.RooHistPdf(f"pdf_mc_{cond}_({bin[0]},{bin[1]})",
@@ -56,9 +38,30 @@ def fit_on_bin(type_eff, workspace, cond, bin, test_bkg=False, verb=-1):
         smearing = ROOT.RooGaussian(f"gaus_smearing_{cond}_({bin[0]},{bin[1]})",
                                     "gaussian smearing", axis, mean, sigma)
 
-        tau = ROOT.RooRealVar(f"tau_{cond}_({bin[0]},{bin[1]})", "tau", -10, 0)
-        background = ROOT.RooExponential(f"expo_bkg_{cond}_({bin[0]},{bin[1]})",
-                                         "exponential background", axis, tau)
+        if bkg == 'expo':
+            tau = ROOT.RooRealVar(
+                f"tau_{cond}_({bin[0]},{bin[1]})", "tau", -10, 0)
+            background = ROOT.RooExponential(
+                f"expo_bkg_{cond}_({bin[0]},{bin[1]})",
+                "exponential background", axis, tau)
+
+        elif bkg == 'cmsshape':
+            alpha = ROOT.RooRealVar(
+                f"alpha_{cond}_({bin[0]},{bin[1]})", "alpha", 45, 10, 60)
+            beta = ROOT.RooRealVar(
+                f"beta_{cond}_({bin[0]},{bin[1]})", "beta", 6, 0, 10)
+            gamma = ROOT.RooRealVar(
+                f"gamma_{cond}_({bin[0]},{bin[1]})", "gamma", 2, 0, 20)
+            peak = ROOT.RooRealVar(
+                f"peak_{cond}_({bin[0]},{bin[1]})", "peak", 10, 0, 25)
+
+            background = ROOT.RooCMSShape(
+                f"cmsshape_bkg_{cond}_({bin[0]},{bin[1]})",
+                "CMSShape background", axis, alpha, beta, gamma, peak)
+
+        else:
+            print("BKG shape given is not implemented! Retry with 'expo' or 'cmsshape'")
+            sys.exit()
 
         axis.setBins(10000, "cache")
         conv_func = ROOT.RooFFTConvPdf(f"conv_{cond}_({bin[0]}_{bin[1]})",
@@ -86,6 +89,8 @@ def fit_on_bin(type_eff, workspace, cond, bin, test_bkg=False, verb=-1):
 
         if res.status() == 0 and res.covQual() == 3 and res.edm() < 1e-4:
             workspace.Import(model)
+            # sum_func.SetName(f"PDF_{cond}_({bin[0]}_{bin[1]})_init")
+            # workspace.Import(sum_func)
 
     else:
         print("******\nERROR in PDF types\n*******")
@@ -96,16 +101,14 @@ def fit_on_bin(type_eff, workspace, cond, bin, test_bkg=False, verb=-1):
         present_bkg = not null_bkg
         print(f"Background is accepted? {present_bkg}")
 
-    '''
     if verb != -1:
         makeAndSavePlot(axis, histo_data, model, pull=False,
-                        name=f"figs/fit_{t}/{flag}_{bin[0]}_{bin[1]}.pdf")
-    '''
+                        name=f"{cond}_{bin[0]}_{bin[1]}.pdf")
 
     return res
 
 
-def independent_efficiency(type_eff, bins_pt, bins_eta, results,
+def independent_efficiency(type_eff, bins_pt, bins_eta, results, background,
                            test_bkg=False, verbose=-1):
     """
     """
@@ -119,9 +122,9 @@ def independent_efficiency(type_eff, bins_pt, bins_eta, results,
     for bin_pt in bins_pt:
         for bin_eta in bins_eta:
             res_pass = fit_on_bin(type_eff, ws, 'pass', (bin_pt, bin_eta),
-                                  test_bkg=test_bkg, verb=verbose)
+                                  background, test_bkg=test_bkg, verb=verbose)
             res_fail = fit_on_bin(type_eff, ws, 'fail', (bin_pt, bin_eta),
-                                  test_bkg=test_bkg, verb=verbose)
+                                  background, test_bkg=test_bkg, verb=verbose)
 
             results.add_result(res_pass, res_fail, bin_pt, bin_eta)
             status = results.check_fit_status(
@@ -145,17 +148,18 @@ if __name__ == '__main__':
     t0 = time.time()
     custom_pdfs = ['RooCBExGaussShape',
                    'RooDoubleCBFast', 'RooCMSShape', 'my_double_CB']
-    # import_pdf_library(custom_pdfs[2])
+    import_pdf_library(custom_pdfs[2])
 
     type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
     t = type_eff[3]
 
     results = res_manager_indep()
 
-    bins_pt = array('I', [num for num in range(1, 16)])
-    bins_eta = array('I', [num for num in range(1, 49)])
+    bins_pt = array('I', [num for num in range(1, 2)])
+    bins_eta = array('I', [num for num in range(1, 2)])
 
-    independent_efficiency(t, bins_pt, bins_eta, results, verbose=-1)
+    independent_efficiency(t, bins_pt, bins_eta,
+                           'cmsshape', results, verbose=0)
 
     '''
     file_ws = ROOT.TFile(f"root_files/{t}_workspace.root")
