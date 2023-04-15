@@ -5,6 +5,16 @@ import ROOT
 import pickle
 
 
+def fit_quality(res):
+    """
+    """
+    check_migrad = (res.status() == 0)
+    check_covm = (res.covQual() == 3)
+    check_edm = (res.edm() < 1e-4)
+
+    return bool(check_migrad*check_covm*check_edm)
+
+
 def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
     """
     """
@@ -25,46 +35,54 @@ class res_manager_indep:
         """
         self._dict_results = {}
 
-    def add_result(self, res_pass, res_fail, bin_pt, bin_eta):
+    def add_result(self, res_pass, res_fail, bin_pt, bin_eta, check=False):
         """
         """
 
-        for par in res_pass.floatParsFinal():
-            if par.GetName() == f'nsig_pass_({bin_pt},{bin_eta})':
-                Npass = par.getVal()
-                sigma_Npass = par.getError()
+        if check is True:
+            goodfit = bool(fit_quality(res_pass)*fit_quality(res_fail))
+            print(goodfit)
+        else:
+            goodfit = True
 
-        for par in res_fail.floatParsFinal():
-            if par.GetName() == f'nsig_fail_({bin_pt},{bin_eta})':
-                Nfail = par.getVal()
-                sigma_Nfail = par.getError()
+        if (goodfit is True) and (f"{bin_pt},{bin_eta}" not in self._dict_results):
+            for par in res_pass.floatParsFinal():
+                if par.GetName() == f'nsig_pass_({bin_pt},{bin_eta})':
+                    Npass = par.getVal()
+                    sigma_Npass = par.getError()
+            for par in res_fail.floatParsFinal():
+                if par.GetName() == f'nsig_fail_({bin_pt},{bin_eta})':
+                    Nfail = par.getVal()
+                    sigma_Nfail = par.getError()
+            eff, d_eff = eval_efficiency(
+                Npass, Nfail, sigma_Npass, sigma_Nfail)
 
-        eff, d_eff = eval_efficiency(
-            Npass, Nfail, sigma_Npass, sigma_Nfail)
+            print(f'Measured efficiency is: {eff} +- {d_eff}')
 
-        print(f'Measured efficiency is: {eff} +- {d_eff}')
-
-        new_res = {f"{bin_pt},{bin_eta}": {
-            "efficiency": (eff, d_eff),
-            "fit_stat_pass": {
-                "migrad_status": res_pass.status(),
-                "parameters": res_pass.floatParsFinal(),
-                "cov_matrix": res_pass.covarianceMatrix(),
-                "cov_matrix_quality": res_pass.covQual(),
-                "global_correlation": res_pass.globalCorr(),
-                "EDM": res_pass.edm()
-                },
-            "fit_stat_fail": {
-                "migrad_status": res_fail.status(),
-                "parameters": res_fail.floatParsFinal(),
-                "cov_matrix": res_fail.covarianceMatrix(),
-                "cov_matrix_quality": res_fail.covQual(),
-                "global_correlation": res_fail.globalCorr(),
-                "EDM": res_fail.edm()
+            new_res = {
+                f"{bin_pt},{bin_eta}": {
+                    "efficiency": (eff, d_eff),
+                    "fit_stat_pass": {
+                        "migrad_status": res_pass.status(),
+                        "parameters": res_pass.floatParsFinal(),
+                        "cov_matrix": res_pass.covarianceMatrix(),
+                        "cov_matrix_quality": res_pass.covQual(),
+                        "global_correlation": res_pass.globalCorr(),
+                        "EDM": res_pass.edm()
+                        },
+                    "fit_stat_fail": {
+                        "migrad_status": res_fail.status(),
+                        "parameters": res_fail.floatParsFinal(),
+                        "cov_matrix": res_fail.covarianceMatrix(),
+                        "cov_matrix_quality": res_fail.covQual(),
+                        "global_correlation": res_fail.globalCorr(),
+                        "EDM": res_fail.edm()
+                        }
+                    }
                 }
-            }
-        }
-        self._dict_results.update(new_res)
+            self._dict_results.update(new_res)
+        else:
+            pass
 
     def open(self, filename):
         """
@@ -109,6 +127,7 @@ class res_manager_indep:
         """
         res = self._dict_results
         print(" Bins | mig  covQual  EDM")
+        print("     ")
         for key in res.keys():
             migr_p = res[key]["fit_stat_pass"]["migrad_status"]
             covq_p = res[key]["fit_stat_pass"]["cov_matrix_quality"]
