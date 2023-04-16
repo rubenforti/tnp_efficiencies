@@ -138,13 +138,8 @@ if __name__ == '__main__':
 
     binning_mass = array('d', [50 + i for i in range(81)])
 
-<<<<<<< Updated upstream
-    w = ws_init('iso', [1,1], [1,1], binning_mass)
+    w = ws_init('iso', [1, 1], [1, 1], binning_mass)
     # ws_init_std_pdf(w)
-=======
-    w = ws_init('iso', [1, 1], binning_eta, binning_mass)
-    ws_std_variables(w)
->>>>>>> Stashed changes
     w.writeToFile(f"root_files/iso_workspace.root")
 
     w.Print()
