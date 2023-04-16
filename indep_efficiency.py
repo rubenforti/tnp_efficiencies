@@ -32,7 +32,7 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
                                  "pdf_mc", axis, histo_mc)
 
         mean = ROOT.RooRealVar(
-            f"mean_{cond}_({bin[0]},{bin[1]})_", "mean", 0, -2, 2)
+            f"mean_{cond}_({bin[0]},{bin[1]})", "mean", 0, -2, 2)
         sigma = ROOT.RooRealVar(
             f"sigma_{cond}_({bin[0]},{bin[1]})", "sigma", 2, 0.2, 5)
 
@@ -48,13 +48,13 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
 
         elif bkg_pdf == 'cmsshape':
             alpha = ROOT.RooRealVar(
-                f"alpha_{cond}_({bin[0]},{bin[1]})", "alpha", 45, 10, 60)
+                f"alpha_{cond}_({bin[0]},{bin[1]})", "alpha", 10, -30, 55)
             beta = ROOT.RooRealVar(
-                f"beta_{cond}_({bin[0]},{bin[1]})", "beta", 6, 0, 10)
+                f"beta_{cond}_({bin[0]},{bin[1]})", "beta", 6, 0.2, 10)
             gamma = ROOT.RooRealVar(
-                f"gamma_{cond}_({bin[0]},{bin[1]})", "gamma", 2, 0, 20)
+                f"gamma_{cond}_({bin[0]},{bin[1]})", "gamma", 18, 12, 25)
             peak = ROOT.RooRealVar(
-                f"peak_{cond}_({bin[0]},{bin[1]})", "peak", 10, 0, 25)
+                f"peak_{cond}_({bin[0]},{bin[1]})", "peak", 0, -10, 10)
 
             background = ROOT.RooCMSShape(
                 f"cmsshape_bkg_{cond}_({bin[0]},{bin[1]})",
@@ -76,7 +76,7 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
             events_data, 0.5*events_data, events_data + 5*ROOT.TMath.Sqrt(events_data))
         Nbkg = ROOT.RooRealVar(
             f"nbkg_{cond}_({bin[0]},{bin[1]})", "#background events",
-            0.0001*events_data, 0., 0.15*events_data)
+           0.01*events_data, 0.0, 0.2*events_data)
 
         sum_func = ROOT.RooAddPdf(f"sum_{cond}_({bin[0]}_{bin[1]})", "Signal+Bkg",
                                   [conv_func, background], [Nsig, Nbkg])
@@ -171,7 +171,7 @@ if __name__ == '__main__':
     t0 = time.time()
     custom_pdfs = ['RooCBExGaussShape',
                    'RooDoubleCBFast', 'RooCMSShape', 'my_double_CB']
-    # import_pdf_library(custom_pdfs[2])
+    import_pdf_library(custom_pdfs[2])
 
     type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
     t = type_eff[3]
