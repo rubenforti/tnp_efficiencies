@@ -56,6 +56,9 @@ def ws_init(type_eff, bins_pt, bins_eta, bins_mass):
 
     for i in range(1, len(bins_pt)):
         for j in range(1, len(bins_eta)):
+
+            x_sim = ROOT.RooRealVar(f"x_sim_({i},{j})", "TP M_inv",
+                                    bins_mass[0], bins_mass[-1], unit="GeV/c^2")
             x_pass = ROOT.RooRealVar(f"x_pass_({i},{j})", "TP M_inv",
                                      bins_mass[0], bins_mass[-1], unit="GeV/c^2")
             x_fail = ROOT.RooRealVar(f"x_fail_({i},{j})", "TP M_inv",
@@ -63,6 +66,7 @@ def ws_init(type_eff, bins_pt, bins_eta, bins_mass):
             histos_pass = get_roohist((f_data, f_mc), x_pass, i, j, 'pass')
             histos_fail = get_roohist((f_data, f_mc), x_fail, i, j, 'fail')
             # Datasets are written in this order: data_pass, mc_pass, data_fail, mc_fail
+            w.Import(x_sim)
             w.Import(x_pass)
             w.Import(x_fail)
             w.Import(histos_pass[0])

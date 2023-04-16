@@ -36,15 +36,15 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
         sigma = ROOT.RooRealVar(
             f"sigma_{cond}_({bin[0]},{bin[1]})", "sigma", 2, 0.2, 5)
 
-        smearing = ROOT.RooGaussian(f"gaus_smearing_{cond}_({bin[0]},{bin[1]})",
-                                    "gaussian smearing", axis, mean, sigma)
+        smearing = ROOT.RooGaussian(f"smearing_{cond}_({bin[0]},{bin[1]})",
+                                    f"Gaussian smearing", axis, mean, sigma)
 
         if bkg_pdf == 'expo':
             tau = ROOT.RooRealVar(
                 f"tau_{cond}_({bin[0]},{bin[1]})", "tau", -1e-3, -2, 0.0)
             background = ROOT.RooExponential(
                 f"expo_bkg_{cond}_({bin[0]},{bin[1]})",
-                "exponential background", axis, tau)
+                "Exponential background", axis, tau)
 
         elif bkg_pdf == 'cmsshape':
             alpha = ROOT.RooRealVar(
@@ -66,7 +66,7 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
 
         axis.setBins(10000, "cache")
         conv_func = ROOT.RooFFTConvPdf(f"conv_{cond}_({bin[0]}_{bin[1]})",
-                                       "Convolution", axis, pdf_mc, smearing, 3)
+                                       f"Convolution {cond}", axis, pdf_mc, smearing, 3)
         conv_func.setBufferFraction(0.5)
 
         events_data = histo_data.sumEntries()
@@ -76,7 +76,7 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
             events_data, 0.5*events_data, events_data + 5*ROOT.TMath.Sqrt(events_data))
         Nbkg = ROOT.RooRealVar(
             f"nbkg_{cond}_({bin[0]},{bin[1]})", "#background events",
-           0.01*events_data, 0.0, 0.2*events_data)
+            0.01*events_data, 0.0, 0.2*events_data)
 
         sum_func = ROOT.RooAddPdf(f"sum_{cond}_({bin[0]}_{bin[1]})", "Signal+Bkg",
                                   [conv_func, background], [Nsig, Nbkg])
