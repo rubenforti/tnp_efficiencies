@@ -129,6 +129,7 @@ per effettuare la copia
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+<<<<<<< Updated upstream
 TO-DO LIST
 ----------
 
@@ -145,6 +146,21 @@ TO-DO LIST
       nei dati è attribuibile ai diversi tipi di fondi: QCD (rappresentati da
       dataset "samecharge"), drell-Yan non prompt ecc.
 
+=======
+COSE DA FARE A BREVE
+--------------------
+  - Sistemare fit indep, provando anche la CMSShape
+  - Fit simultaneo tra pass e fail ANCHE sui mc: come PDF dei mc si usa una
+    RooExtendPdf e si fa la trasformazione eff -> (sf)*(eff_mc)
+  -
+  - Iso with same charge dataset:
+        - Studio generale: confrontare le distribuzioni dei dati rispetto al
+          montecarlo in macro-bin di (pt,eta)
+        - Studio particolare: per ogni bin valutare quanta parte del fondo visto
+          nei dati è attribuibile a fondi di QCD (che sono ben rappresentati da
+          questo dataset, in questo step). La stima del fondo va fatta sul set
+          dei dati sameCharge
+>>>>>>> Stashed changes
 
 IDEE PER MIGLIORAMENTI
 ----------------------

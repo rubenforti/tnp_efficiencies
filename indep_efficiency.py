@@ -23,8 +23,31 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg, test_bkg=False, verb=-1):
 
     if type(workspace[f'PDF_{cond}_({bin[0]},{bin[1]})']) is ROOT.RooAddPdf:
 
+        '''
         print("Fit with existing PDF not implemented yet!")
         sys.exit()
+<<<<<<< Updated upstream
+=======
+        '''
+
+        init_pdf = workspace[f'PDF_{cond}_({bin[0]},{bin[1]})']
+
+        model = ROOT.RooAddPdf(init_pdf, f"{init_pdf.GetName()}_copy")
+
+        res = model.fitTo(histo_data, Extended=True,
+                          Save=True, PrintLevel=verb)
+
+        print("PARAMETERS AFTER FIT")
+        pars = model.getParameters(histo_data)
+        pars.Print("v")
+
+        pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
+
+        if res.status() == 0 and res.covQual() == 3 and res.edm() < 1e-4:
+            workspace.Import(model, RenameAllNodes='NEW',
+                             RenameAllVariables='NEW')
+            workspace.writeToFile(f"root_files/{type_eff}_workspace.root")
+>>>>>>> Stashed changes
 
     elif type(workspace[f'PDF_{cond}_({bin[0]},{bin[1]})']) is ROOT.TObject:
 
@@ -139,7 +162,7 @@ def independent_efficiency(type_eff, bins_pt, bins_eta, results, background,
                 print(res_pass.edm(), res_fail.edm())
                 print(' ')
 
-    ws.Print()
+    #ws.Print()
     ws.writeToFile(f"root_files/{type_eff}_workspace.root")
 
 
@@ -156,10 +179,16 @@ if __name__ == '__main__':
     results = res_manager_indep()
 
     bins_pt = array('I', [num for num in range(1, 2)])
+<<<<<<< Updated upstream
     bins_eta = array('I', [num for num in range(1, 2)])
 
     independent_efficiency(t, bins_pt, bins_eta,
                            'cmsshape', results, verbose=0)
+=======
+    bins_eta = array('I', [num for num in range(4, 5)])
+
+    independent_efficiency(t, bins_pt, bins_eta, results, verbose=0)
+>>>>>>> Stashed changes
 
     '''
     file_ws = ROOT.TFile(f"root_files/{t}_workspace.root")
@@ -171,9 +200,10 @@ if __name__ == '__main__':
     print(f'NUM PROBLEMI = {len(probs)}')
     print(" ")
 
+    '''
     results.write("indep_eff_results.pkl")
     print("RISULTATI SCRITTI SU PICKLE FILE")
-
+    '''
     t1 = time.time()
 
     print(f"TEMPO = {t1-t0}")

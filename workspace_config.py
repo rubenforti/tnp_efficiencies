@@ -46,6 +46,10 @@ def ws_init(type_eff, bins_pt, bins_eta, bins_mass):
 
     w = ROOT.RooWorkspace("w")
 
+    x = ROOT.RooRealVar(
+        "x", "TP M_inv", bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+    w.Import(x)
+
     # Import of the 3D histograms
     f_data = ROOT.TFile(f"root_files/tnp_{type_eff}_data.root")
     f_mc = ROOT.TFile(f"root_files/tnp_{type_eff}_mc.root")
@@ -71,6 +75,36 @@ def ws_init(type_eff, bins_pt, bins_eta, bins_mass):
     return w
 
 
+def ws_std_variables(workspace):
+    """
+    """
+
+    # Variables for gaussian smearing
+    # -------------------------------
+    mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
+    sigma = ROOT.RooRealVar("sigma", "sigma", 0.5, 0.001, 2)
+    workspace.Import(mean)
+    workspace.Import(sigma)
+
+    #  Variable for exponential bkg
+    # -----------------------------
+    tau = ROOT.RooRealVar("tau", "tau", -10, 0)
+    workspace.Import(tau)
+
+    '''
+    # Variables for cmsshape bkg
+    # --------------------------
+    alpha = ROOT.RooRealVar("alpha", "alpha")
+    beta = ROOT.RooRealVar("beta", "beta")
+    gamma = ROOT.RooRealVar("gamma", "gamma")
+    peak = ROOT.RooRealVar("peak", "peak")
+    workspace.Import(alpha)
+    workspace.Import(beta)
+    workspace.Import(gamma)
+    workspace.Import(peak)
+    '''
+
+
 def ws_init_std_pdf(workspace, cond, bin):
     """
     """
@@ -82,7 +116,7 @@ def ws_init_std_pdf(workspace, cond, bin):
     mean = ROOT.RooRealVar(
         f"mean_{cond}_({bin[0]},{bin[1]})", "mean", 0, -2, 2)
     sigma = ROOT.RooRealVar(
-        f"sigma_{cond}_({bin[0]},{bin[1]})", "sigma", 0.5, 0.001, 2)
+        f"sigma_{cond}_({bin[0]},{bin[1]})", "sigma", 0.5, 0.001, 3)
     gaussian = ROOT.RooGaussian(f"gaus_smearing_{cond}_({bin[0]},{bin[1]})",
                                 "gaussian smearing", axis, mean, sigma)
     workspace.Import(gaussian)
@@ -104,8 +138,13 @@ if __name__ == '__main__':
 
     binning_mass = array('d', [50 + i for i in range(81)])
 
+<<<<<<< Updated upstream
     w = ws_init('iso', [1,1], [1,1], binning_mass)
     # ws_init_std_pdf(w)
+=======
+    w = ws_init('iso', [1, 1], binning_eta, binning_mass)
+    ws_std_variables(w)
+>>>>>>> Stashed changes
     w.writeToFile(f"root_files/iso_workspace.root")
 
     w.Print()
