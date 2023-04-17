@@ -113,11 +113,12 @@ fa tutto sto lavoro, che poi non è che serva a molto.
 
 Una cosa invece che può servire è salvare le pdf di INIT in ogni step. Il problema
 qui è che queste si modificano col fit, quindi va implementato un sistema efficiente
-per effettuare la copia
+per effettuare la copia  -->  non serve, infatti dato che viene salvato il "RooFitResult"
+di ogni fit, questo contiene da sé i valori iniziali dei parametri (metodo "floatParsInit")
 
 
-16/04/2023
-----------
+15-16/04/2023
+-------------
 Sistemata la sintassi della funzione che gestisce i diversi fit indipendenti e
 aggiornata e ottimizzata la funzione di fit simultaneo (a 2 template). La cosa forse
 più saggia adesso è fare una funzione comoda in un modulo a parte ("fit_manager")
@@ -132,6 +133,16 @@ definita positiva...)
 la possibilità di fare un test al bkg in questi casi?
 
 
+17/04/2023
+----------
+Presi i valori iniziali della cmsshape dal programma di Marco, dove però questa
+viene implementata SOLO NEI FAIL (per iso).
+Effettuata prova sul bin (1,1): con i parametri iniziali del programma vecchio
+il fit soddisfa le tre condizioni imposte finora ma ci sono TRE PARAMETRI AL LIMITE
+(alpha_pass, beta_pass, beta_fail). Questo è un problema? Se sì bisogna implementare
+un sistema che segnali quando queste cose avvengono (credo si possa fare attivando
+minos e vedendo se questo dà un certo tipo di errore)
+
 
 
 
@@ -145,6 +156,14 @@ TO-DO LIST
 ----------
 
 - Implementare la CMSSHAPE come background
+
+- Costruire un modulo che permetta di gestire in modo efficiente i diversi cicli
+  di fit
+
+- Aggiornare la classe results per i fit simultanei
+
+- Trovare il modo di salvarsi le pdf iniziali nel workspace. Vedere se a tale
+  scopo può essere utile il metodo "factory"
 
 - Fit simultaneo tra pass e fail ANCHE sui mc: come PDF dei mc si usa una
   RooExtendPdf e si fa la trasformazione eff -> (sf)*(eff_mc)

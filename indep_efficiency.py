@@ -34,27 +34,27 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
         mean = ROOT.RooRealVar(
             f"mean_{cond}_({bin[0]},{bin[1]})", "mean", 0, -2, 2)
         sigma = ROOT.RooRealVar(
-            f"sigma_{cond}_({bin[0]},{bin[1]})", "sigma", 2, 0.2, 5)
+            f"sigma_{cond}_({bin[0]},{bin[1]})", "sigma", 2, 0.1, 5)
 
         smearing = ROOT.RooGaussian(f"smearing_{cond}_({bin[0]},{bin[1]})",
                                     f"Gaussian smearing", axis, mean, sigma)
 
         if bkg_pdf == 'expo':
             tau = ROOT.RooRealVar(
-                f"tau_{cond}_({bin[0]},{bin[1]})", "tau", -1e-3, -2, 0.0)
+                f"tau_{cond}_({bin[0]},{bin[1]})", "tau", -0.1, -2, 0.0)
             background = ROOT.RooExponential(
                 f"expo_bkg_{cond}_({bin[0]},{bin[1]})",
                 "Exponential background", axis, tau)
 
         elif bkg_pdf == 'cmsshape':
             alpha = ROOT.RooRealVar(
-                f"alpha_{cond}_({bin[0]},{bin[1]})", "alpha", 10, -30, 55)
+                f"alpha_{cond}_({bin[0]},{bin[1]})", "alpha", 60.0, 40.0, 130.0)
             beta = ROOT.RooRealVar(
-                f"beta_{cond}_({bin[0]},{bin[1]})", "beta", 6, 0.2, 10)
+                f"beta_{cond}_({bin[0]},{bin[1]})", "beta", 5.0, 0.1, 40.0)
             gamma = ROOT.RooRealVar(
-                f"gamma_{cond}_({bin[0]},{bin[1]})", "gamma", 18, 12, 25)
+                f"gamma_{cond}_({bin[0]},{bin[1]})", "gamma", 0.1, 0, 1)
             peak = ROOT.RooRealVar(
-                f"peak_{cond}_({bin[0]},{bin[1]})", "peak", 0, -10, 10)
+                f"peak_{cond}_({bin[0]},{bin[1]})", "peak", 90.0)  # 88.0, 92.0)
 
             background = ROOT.RooCMSShape(
                 f"cmsshape_bkg_{cond}_({bin[0]},{bin[1]})",
@@ -76,7 +76,7 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
             events_data, 0.5*events_data, events_data + 5*ROOT.TMath.Sqrt(events_data))
         Nbkg = ROOT.RooRealVar(
             f"nbkg_{cond}_({bin[0]},{bin[1]})", "#background events",
-            0.01*events_data, 0.0, 0.2*events_data)
+            0.001*events_data, 0.0, 0.4*events_data)
 
         sum_func = ROOT.RooAddPdf(f"sum_{cond}_({bin[0]}_{bin[1]})", "Signal+Bkg",
                                   [conv_func, background], [Nsig, Nbkg])
@@ -87,11 +87,13 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
                           Save=True, PrintLevel=verb)
         res.SetName(f"results_{cond}_({bin[0]},{bin[1]})")
 
-        pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
+        # pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
 
+        '''
         if fit_quality(res) is True:
             workspace.Import(model)
             workspace.Import(res)
+        '''
 
     else:
         print("******\nERROR in PDF types\n*******")
@@ -110,18 +112,18 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
     return res
 
 
-def independent_efficiency(type_eff, bins, results, direct_mode=True,
-                           test_bkg=False, verbose=-1):
+def independent_efficiency(type_eff, bins, results, bin_combinations=True,
+                           test_bkg=False, verbose=0):
     """
     """
 
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
 
-    file_ws = ROOT.TFile(f"root_files/{type_eff}_workspace.root")
+    file_ws = ROOT.TFile(f"root_files/{type_eff}_workspace_prova.root")
     ws = file_ws.Get("w")
 
-    if direct_mode is True:
+    if bin_combinations is True:
         bins_pt = []
         bins_eta = []
         for i in range(len(bins[0])):
@@ -132,7 +134,7 @@ def independent_efficiency(type_eff, bins, results, direct_mode=True,
     else:
         bins_list = bins
 
-    bkg_pdf = 'expo'
+    bkg_pdf = 'cmsshape'
 
     Nproblems = 0
 
@@ -197,7 +199,7 @@ if __name__ == '__main__':
     '''
 
     bins = (bins_pt, bins_eta)
-    independent_efficiency(t, bins, results, direct_mode=True, verbose=0)
+    independent_efficiency(t, bins, results, bin_combinations=True, verbose=1)
 
     '''
     file_ws = ROOT.TFile(f"root_files/{t}_workspace.root")

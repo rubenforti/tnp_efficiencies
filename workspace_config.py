@@ -2,6 +2,7 @@
 """
 
 import ROOT
+import sys
 from array import array
 
 
@@ -37,7 +38,7 @@ def get_roohist(histos, axis, bin_pt, bin_eta, flag):
     return (roohist_data, roohist_mc)
 
 
-def ws_init(type_eff, bins_pt, bins_eta, bins_mass):
+def ws_init(type_eff, type_analysis, bins_pt, bins_eta, bins_mass):
     """
     Initializes a RooWorkspace with the dataset corresponding to a given
     efficiency step. The objects stored are RooDataHist of TP inv. mass in
@@ -57,18 +58,28 @@ def ws_init(type_eff, bins_pt, bins_eta, bins_mass):
     for i in range(1, len(bins_pt)):
         for j in range(1, len(bins_eta)):
 
-            x_sim = ROOT.RooRealVar(f"x_sim_({i},{j})", "TP M_inv",
-                                    bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-            x_pass = ROOT.RooRealVar(f"x_pass_({i},{j})", "TP M_inv",
-                                     bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-            x_fail = ROOT.RooRealVar(f"x_fail_({i},{j})", "TP M_inv",
-                                     bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-            histos_pass = get_roohist((f_data, f_mc), x_pass, i, j, 'pass')
-            histos_fail = get_roohist((f_data, f_mc), x_fail, i, j, 'fail')
+            if type_analysis == 'indep':
+                x_pass = ROOT.RooRealVar(f"x_pass_({i},{j})", "TP M_inv",
+                                         bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+                x_fail = ROOT.RooRealVar(f"x_fail_({i},{j})", "TP M_inv",
+                                         bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+                axis = (x_fail, x_pass)
+                w.Import(x_pass)
+                w.Import(x_fail)
+
+            elif type_analysis == 'sim':
+                x_sim = ROOT.RooRealVar(f"x_sim_({i},{j})", "TP M_inv",
+                                        bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+                axis = (x_sim, x_sim)
+
+            else:
+                print("INVALID ANALYSIS TYPE")
+                sys.exit()
+
+            histos_pass = get_roohist((f_data, f_mc), axis[1], i, j, 'pass')
+            histos_fail = get_roohist((f_data, f_mc), axis[0], i, j, 'fail')
+
             # Datasets are written in this order: data_pass, mc_pass, data_fail, mc_fail
-            w.Import(x_sim)
-            w.Import(x_pass)
-            w.Import(x_fail)
             w.Import(histos_pass[0])
             w.Import(histos_pass[1])
             w.Import(histos_fail[0])
@@ -135,6 +146,12 @@ def ws_init_std_pdf(workspace, cond, bin):
 
 if __name__ == '__main__':
 
+    type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
+    t = type_eff[3]
+
+    types_analysis = ["indep", "sim"]
+    an = types_analysis[1]
+
     binning_pt = array('d', [24., 26., 28., 30., 32., 34.,
                        36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
 
@@ -142,9 +159,9 @@ if __name__ == '__main__':
 
     binning_mass = array('d', [50 + i for i in range(81)])
 
-    w = ws_init('iso', [1, 1], [1, 1], binning_mass)
+    w = ws_init(t, an, [1, 1], [1, 1], binning_mass)
     # ws_init_std_pdf(w)
-    w.writeToFile(f"root_files/iso_workspace.root")
+    w.writeToFile(f"root_files/{t}_workspace_{an}.root")
 
     w.Print()
 
