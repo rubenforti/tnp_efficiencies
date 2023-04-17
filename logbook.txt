@@ -143,6 +143,15 @@ il fit soddisfa le tre condizioni imposte finora ma ci sono TRE PARAMETRI AL LIM
 un sistema che segnali quando queste cose avvengono (credo si possa fare attivando
 minos e vedendo se questo dà un certo tipo di errore)
 
+Questione cmsshape: la classe scritta custom eredita da RooAbsPdf, quindi ha già
+tutti i metodi "fondamentali" di una pdf in roofit. Costruendo la pdf coi parametri
+iniziali impostati, generando 10000 dati con tale distribuzione e effettuando un
+fit tenendo libera la normalizzazione (--> RooExtendedTerm, da moltiplicare alla
+cmsshape) si ottiene che il numero stimato è 10000+-100, quindi perfettamente in
+accordo con una fluttuazione poissoniana del numero di eventi. Se ne deduce che
+la normalizzazione non è il problema, cioè questa viene fatta correttamente ogni
+vlta all'interno della minimizzazione --> GIUSTO?
+
 
 
 
