@@ -11,6 +11,20 @@ from stat_functions import pearson_chi2_eval, llr_test_bkg
 from utilities import import_pdf_library
 
 
+def enableBinIntegrator(func, num_bins):
+    """
+    Force numeric integration and do this numeric integration with the
+    RooBinIntegrator, which sums the function values at the bin centers.
+    (from RooFit tutorial rf614)
+    """
+    custom_config = ROOT.RooNumIntConfig(func.getIntegratorConfig())
+    custom_config.method1D().setLabel("RooBinIntegrator")
+    custom_config.getConfigSection(
+        "RooBinIntegrator").setRealValue("numBins", num_bins)
+    func.setIntegratorConfig(custom_config)
+    func.forceNumInt(True)
+
+
 def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1):
     """
     """
@@ -26,7 +40,10 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
         histo_data = workspace[f"Minv_data_{cond}_({bin[0]},{bin[1]})"]
         histo_mc = workspace[f"Minv_mc_{cond}_({bin[0]},{bin[1]})"]
 
+        NBINS = 15000
         axis = workspace[f"x_{cond}_({bin[0]},{bin[1]})"]
+        axis.setBins(NBINS, "cache")
+        axis.setRange("fitRange", 50, 130)
 
         pdf_mc = ROOT.RooHistPdf(f"pdf_mc_{cond}_({bin[0]},{bin[1]})",
                                  "pdf_mc", axis, histo_mc)
@@ -37,34 +54,34 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
             f"sigma_{cond}_({bin[0]},{bin[1]})", "sigma", 2, 0.1, 5)
 
         smearing = ROOT.RooGaussian(f"smearing_{cond}_({bin[0]},{bin[1]})",
-                                    f"Gaussian smearing", axis, mean, sigma)
+                                    "Gaussian smearing", axis, mean, sigma)
 
-        if bkg_pdf == 'expo':
+        if (bkg_pdf == 'expo') or (bkg_pdf == 'mixed' and cond == 'pass'):
             tau = ROOT.RooRealVar(
                 f"tau_{cond}_({bin[0]},{bin[1]})", "tau", -0.1, -2, 0.0)
             background = ROOT.RooExponential(
                 f"expo_bkg_{cond}_({bin[0]},{bin[1]})",
                 "Exponential background", axis, tau)
 
-        elif bkg_pdf == 'cmsshape':
+        elif bkg_pdf == 'cmsshape' or (bkg_pdf == 'mixed' and cond == 'fail'):
             alpha = ROOT.RooRealVar(
                 f"alpha_{cond}_({bin[0]},{bin[1]})", "alpha", 60.0, 40.0, 130.0)
             beta = ROOT.RooRealVar(
-                f"beta_{cond}_({bin[0]},{bin[1]})", "beta", 5.0, 0.1, 40.0)
+                f"beta_{cond}_({bin[0]},{bin[1]})", "beta", 0.2, 0.01, 40.0)
             gamma = ROOT.RooRealVar(
                 f"gamma_{cond}_({bin[0]},{bin[1]})", "gamma", 0.1, 0, 1)
             peak = ROOT.RooRealVar(
-                f"peak_{cond}_({bin[0]},{bin[1]})", "peak", 90.0)  # 88.0, 92.0)
+                f"peak_{cond}_({bin[0]},{bin[1]})", "peak", 90.0)  # ,88.0, 92.0)
 
             background = ROOT.RooCMSShape(
                 f"cmsshape_bkg_{cond}_({bin[0]},{bin[1]})",
                 "CMSShape background", axis, alpha, beta, gamma, peak)
+            # enableBinIntegrator(background, axis.numBins())
 
         else:
             print("BKG shape given is not implemented! Retry with 'expo' or 'cmsshape'")
             sys.exit()
 
-        axis.setBins(10000, "cache")
         conv_func = ROOT.RooFFTConvPdf(f"conv_{cond}_({bin[0]}_{bin[1]})",
                                        f"Convolution {cond}", axis, pdf_mc, smearing, 3)
         conv_func.setBufferFraction(0.5)
@@ -77,14 +94,23 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
         Nbkg = ROOT.RooRealVar(
             f"nbkg_{cond}_({bin[0]},{bin[1]})", "#background events",
             0.001*events_data, 0.0, 0.4*events_data)
+        
+        Ntot = ROOT.RooAddition(f"ntot_{cond}_({bin[0]},{bin[1]})", "#total events", [Nsig, Nbkg])
 
         sum_func = ROOT.RooAddPdf(f"sum_{cond}_({bin[0]}_{bin[1]})", "Signal+Bkg",
                                   [conv_func, background], [Nsig, Nbkg])
 
         model = ROOT.RooAddPdf(sum_func, f'PDF_{cond}_({bin[0]},{bin[1]})')
 
-        res = model.fitTo(histo_data, Extended=True,
-                          Save=True, PrintLevel=verb)
+        res = model.fitTo(histo_data,
+                          Extended=True,
+                          ExternalConstraints=ROOT.RooArgSet(f"ntot_{cond}_({bin[0]},{bin[1]})"),
+                          Range='fitRange',
+                          Minimizer="Minuit2",
+                          # IntegrateBins=(1.0/NBINS),
+                          Save=True,
+                          PrintLevel=verb)
+
         res.SetName(f"results_{cond}_({bin[0]},{bin[1]})")
 
         # pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
@@ -120,7 +146,7 @@ def independent_efficiency(type_eff, bins, results, bin_combinations=True,
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
 
-    file_ws = ROOT.TFile(f"root_files/{type_eff}_workspace_prova.root")
+    file_ws = ROOT.TFile(f"root_files/{type_eff}_workspace_indep.root")
     ws = file_ws.Get("w")
 
     if bin_combinations is True:
@@ -134,7 +160,7 @@ def independent_efficiency(type_eff, bins, results, bin_combinations=True,
     else:
         bins_list = bins
 
-    bkg_pdf = 'cmsshape'
+    bkg_pdf = 'expo'
 
     Nproblems = 0
 

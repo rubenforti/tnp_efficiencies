@@ -21,6 +21,8 @@ def get_roohist(histos, axis, bin_pt, bin_eta, flag):
         h_data = histos[0].fail_mu_RunGtoH
         h_mc = histos[1].fail_mu_DY_postVFP
 
+    axis.setBins(5000, "cache")
+
     th1_data = h_data.ProjectionX(
         f"Histo_data_{flag}", bin_pt, bin_pt, bin_eta, bin_eta)
     th1_mc = h_mc.ProjectionX(
@@ -150,7 +152,7 @@ if __name__ == '__main__':
     t = type_eff[3]
 
     types_analysis = ["indep", "sim"]
-    an = types_analysis[1]
+    an = types_analysis[0]
 
     binning_pt = array('d', [24., 26., 28., 30., 32., 34.,
                        36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
@@ -159,7 +161,7 @@ if __name__ == '__main__':
 
     binning_mass = array('d', [50 + i for i in range(81)])
 
-    w = ws_init(t, an, [1, 1], [1, 1], binning_mass)
+    w = ws_init(t, an, [1, 1], binning_eta, binning_mass)
     # ws_init_std_pdf(w)
     w.writeToFile(f"root_files/{t}_workspace_{an}.root")
 
