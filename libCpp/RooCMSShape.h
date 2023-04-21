@@ -10,13 +10,13 @@
  *   Kalanand Mishra, Fermilab - kalanand@fnal.gov
  *
  * Description:
- *   Defines a probability density function which has exponential decay 
- *   distribution at high mass beyond the pole position (say, Z peak)  
- *   but turns over (i.e., error function) at low mass due to threshold 
- *   effect. We use this to model the background shape in Z->ll invariant 
+ *   Defines a probability density function which has exponential decay
+ *   distribution at high mass beyond the pole position (say, Z peak)
+ *   but turns over (i.e., error function) at low mass due to threshold
+ *   effect. We use this to model the background shape in Z->ll invariant
  *   mass.
  * History:
- *   
+ *
  *
  *****************************************************************************/
 
@@ -43,7 +43,12 @@ public:
   inline virtual TObject* clone(const char* newname) const { return new RooCMSShape(*this,newname); }
   inline ~RooCMSShape() {}
   Double_t evaluate() const ;
-  
+
+  Int_t getAnalyticalIntegral(RooArgSet& allVars, RooArgSet& analVars,
+                              const char* rangeName=nullptr) const ;
+
+  double analyticalIntegral(Int_t code, const char* rangeName=nullptr) const ;
+
 
   ClassDef(RooCMSShape,2);
 
@@ -54,7 +59,7 @@ protected:
   RooRealProxy beta ;
   RooRealProxy gamma ;
   RooRealProxy peak ;
-  
+
 };
- 
+
 #endif
