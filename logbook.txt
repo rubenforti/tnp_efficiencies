@@ -146,11 +146,23 @@ minos e vedendo se questo dà un certo tipo di errore)
 Questione cmsshape: la classe scritta custom eredita da RooAbsPdf, quindi ha già
 tutti i metodi "fondamentali" di una pdf in roofit. Costruendo la pdf coi parametri
 iniziali impostati, generando 10000 dati con tale distribuzione e effettuando un
-fit tenendo libera la normalizzazione (--> RooExtendedTerm, da moltiplicare alla
-cmsshape) si ottiene che il numero stimato è 10000+-100, quindi perfettamente in
-accordo con una fluttuazione poissoniana del numero di eventi. Se ne deduce che
-la normalizzazione non è il problema, cioè questa viene fatta correttamente ogni
-vlta all'interno della minimizzazione --> GIUSTO?
+fit tenendo libera la normalizzazione (con RooExtendPdf), si ottiene che il numero
+stimato è 10000+-100, quindi perfettamente in accordo con una fluttuazione poissoniana
+del numero di eventi. Se ne deduce che la normalizzazione non è il problema, cioè
+questa viene fatta correttamente ogni volta all'interno della minimizzazione
+
+
+20/04/2023
+----------
+Quanto detto sopra è vero con l'algoritmo MINUIT. Se si imposta invece MINUIT2 le
+cose si fanno più complicate e bisogna gestire accuratamente gli integrali numerici.
+Se viene impostato il metodo dei trapezi, si ha una convergenza in un tempo ragionevole
+richiedendo SOLO 12/15 STEPS, e inoltre il minimo che viene trovato non è quello
+globale, poiché la normalizzazione stimata è totalmente diversa da quella attesa
+e l'edm è ordine 50.
+Se si imposta il metodo "bin center" si può aumentare il numero dei bin (e quindi
+dei calcoli) fino a ordine 1000, ma il minimo trovato soffre delle stesse patologie
+di quello descritto sopra.
 
 
 

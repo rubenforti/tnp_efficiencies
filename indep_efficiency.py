@@ -40,7 +40,7 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
         histo_data = workspace[f"Minv_data_{cond}_({bin[0]},{bin[1]})"]
         histo_mc = workspace[f"Minv_mc_{cond}_({bin[0]},{bin[1]})"]
 
-        NBINS = 15000
+        NBINS = 10000
         axis = workspace[f"x_{cond}_({bin[0]},{bin[1]})"]
         axis.setBins(NBINS, "cache")
         axis.setRange("fitRange", 50, 130)
@@ -67,9 +67,9 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
             alpha = ROOT.RooRealVar(
                 f"alpha_{cond}_({bin[0]},{bin[1]})", "alpha", 60.0, 40.0, 130.0)
             beta = ROOT.RooRealVar(
-                f"beta_{cond}_({bin[0]},{bin[1]})", "beta", 0.2, 0.01, 40.0)
+                f"beta_{cond}_({bin[0]},{bin[1]})", "beta", 5.0, 0.01, 40.0)
             gamma = ROOT.RooRealVar(
-                f"gamma_{cond}_({bin[0]},{bin[1]})", "gamma", 0.1, 0, 1)
+                f"gamma_{cond}_({bin[0]},{bin[1]})", "gamma", 0.1, 0, 0.2)
             peak = ROOT.RooRealVar(
                 f"peak_{cond}_({bin[0]},{bin[1]})", "peak", 90.0)  # ,88.0, 92.0)
 
@@ -94,8 +94,9 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
         Nbkg = ROOT.RooRealVar(
             f"nbkg_{cond}_({bin[0]},{bin[1]})", "#background events",
             0.001*events_data, 0.0, 0.4*events_data)
-        
-        Ntot = ROOT.RooAddition(f"ntot_{cond}_({bin[0]},{bin[1]})", "#total events", [Nsig, Nbkg])
+
+        Ntot = ROOT.RooAddition(
+            f"ntot_{cond}_({bin[0]},{bin[1]})", "#total events", [Nsig, Nbkg])
 
         sum_func = ROOT.RooAddPdf(f"sum_{cond}_({bin[0]}_{bin[1]})", "Signal+Bkg",
                                   [conv_func, background], [Nsig, Nbkg])
@@ -104,9 +105,10 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
 
         res = model.fitTo(histo_data,
                           Extended=True,
-                          ExternalConstraints=ROOT.RooArgSet(f"ntot_{cond}_({bin[0]},{bin[1]})"),
+                          # ExternalConstraints=ROOT.RooArgSet(
+                          # f"ntot_{cond}_({bin[0]},{bin[1]})"),
                           Range='fitRange',
-                          Minimizer="Minuit2",
+                          # Minimizer="Minuit2",
                           # IntegrateBins=(1.0/NBINS),
                           Save=True,
                           PrintLevel=verb)
@@ -130,10 +132,12 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
         present_bkg = not null_bkg
         print(f"Background is accepted? {present_bkg}")
 
+    '''
     if verb != -1:
         makeAndSavePlot(axis, histo_data, model,
                         bkg_name=background.GetName(), pull=False,
                         name=f"{cond}_{bin[0]}_{bin[1]}.pdf")
+    '''
 
     return res
 
@@ -146,7 +150,7 @@ def independent_efficiency(type_eff, bins, results, bin_combinations=True,
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
 
-    file_ws = ROOT.TFile(f"root_files/{type_eff}_workspace_indep.root")
+    file_ws = ROOT.TFile(f"root_files/ws/{type_eff}_workspace_indep.root")
     ws = file_ws.Get("w")
 
     if bin_combinations is True:
@@ -160,7 +164,7 @@ def independent_efficiency(type_eff, bins, results, bin_combinations=True,
     else:
         bins_list = bins
 
-    bkg_pdf = 'expo'
+    bkg_pdf = 'cmsshape'
 
     Nproblems = 0
 

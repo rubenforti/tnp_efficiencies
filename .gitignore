@@ -137,3 +137,7 @@ libCpp/*.C
 # Accessory files generated in PDFs library loading
 libCpp/*.pcm
 libCpp/*.d
+
+
+# Datasets
+root_files/datasets/
