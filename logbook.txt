@@ -152,8 +152,8 @@ del numero di eventi. Se ne deduce che la normalizzazione non è il problema, ci
 questa viene fatta correttamente ogni volta all'interno della minimizzazione
 
 
-20/04/2023
-----------
+20-21/04/2023
+-------------
 Quanto detto sopra è vero con l'algoritmo MINUIT. Se si imposta invece MINUIT2 le
 cose si fanno più complicate e bisogna gestire accuratamente gli integrali numerici.
 Se viene impostato il metodo dei trapezi, si ha una convergenza in un tempo ragionevole
@@ -163,6 +163,47 @@ e l'edm è ordine 50.
 Se si imposta il metodo "bin center" si può aumentare il numero dei bin (e quindi
 dei calcoli) fino a ordine 1000, ma il minimo trovato soffre delle stesse patologie
 di quello descritto sopra.
+
+In generale, sia per il metodo "bincenter" sia per quello dei trapezi, il numero
+di steps non corrisponde al numero totale di punti in cui ècalcolata la funzione
+Per i trapezi infatti il numero di punti � ~2^(Nsteps), cosa che spiega perché
+oltre 10-12 steps i calcoli non finiscono mai
+
+TROVATA LA FORMULA PER L'INTEGRALE ANALITICO, grazie a WolframAlpha. Viene implementata
+nella classe col metodo "analyticalIntegral", controllato da "getAnalyticalIntegral".
+I template di questi due metodi sono stati presi dal codice sorgente della Breit-Wigner.
+Minuit dovrebbe andare in automatico a cercare questi due metodi a ogni ciclo 
+per
+normalizzare la pdf, che di per s� (come esce da "evaluate") non ènormalizzata.
+
+
+23-24/04/2023
+-------------
+CMSShape fatta girare sul bin (1,1) del dataset iso con Minuit2. Con la configurazione 
+precedente si verificava un problema che riguardava dei "bin in eccesso" che venivano 
+creati automaticamente. Probabilmente era una questione legata alla creazione del 
+buffer per la FFT (vedi "prepareFFTBinning"), per la quale Minuit2 si lamentava,
+al contrario di Minuit. Il problema èstato risoltocambiando strategia al buffer,
+da "Extend" a "Mirror", che mi sembra la pi� corretta (in generale DA RIVEDERE
+COSA SIGNIFICANO, non mi èchiarissimo)
+
+In questo modo il fit gira, ma si ottengono valori di EDM praticamente sempre
+maggiori di 1 (di sicuro mai ordine 10^-5). Lo status del minimizer èquindi
+sempre 3, mentre la covQual si riesce a far tornare =3.
+
+Le cose cambiano peròse si fa un "pre-fit" con Minuit (con anche impostazioni
+blande e senza porre controlli) e solo successivamente si gira con Minuit2.
+Potrebbe essere un procedimento corretto? Alla fine èun trucco per indirizzare
+convenientemente Minuit2 verso il minimo, che altrimenti sembra non si riesca
+a trovare.
+Da notare comunque che le NLL ottenute con il pre-fit e senza sono molto vicine...
+potrebbe quindi essere piùun "vizio di forma" di Minuit2 che altro... (???)
+
+
+
+
+
+
 
 
 

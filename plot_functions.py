@@ -19,11 +19,11 @@ def makeAndSavePlot(axis, data, function, bkg_name='expo',
     ROOT.gPad.SetLeftMargin(0.15)
     frame = axis.frame(Title=title+' '+str(axis))
     data.plotOn(frame)
-    function.plotOn(frame)
-    [function.plotOn(frame, Components=comp, LineColor='kRed')
-     for comp in function.getComponents() if comp.GetName() == bkg_name]
+    function.plotOn(frame, LineColor='kBlue')
+    #[function.plotOn(frame, Components=comp, LineColor='kRed')
+     #for comp in function.getComponents() if comp.GetName() == bkg_name]
 
-    function.plotOn(frame)
+    function.plotOn(frame, LineColor='kBlue')
     frame.Draw()
 
     if pull:

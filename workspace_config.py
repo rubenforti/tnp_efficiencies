@@ -21,7 +21,7 @@ def get_roohist(histos, axis, bin_pt, bin_eta, flag):
         h_data = histos[0].fail_mu_RunGtoH
         h_mc = histos[1].fail_mu_DY_postVFP
 
-    axis.setBins(5000, "cache")
+    #axis.setBins(5000, "cache")
 
     th1_data = h_data.ProjectionX(
         f"Histo_data_{flag}", bin_pt, bin_pt, bin_eta, bin_eta)
@@ -30,11 +30,11 @@ def get_roohist(histos, axis, bin_pt, bin_eta, flag):
 
     print(f"Num TH1 entries = {th1_data.Integral()}")
 
-    roohist_data = ROOT.RooDataHist(f"Minv_data_{flag}_({bin_pt},{bin_eta})",
-                                    f"Minv_data_{flag}({bin_pt},{bin_eta})",
+    roohist_data = ROOT.RooDataHist(f"Minv_data_{flag}_({bin_pt}|{bin_eta})",
+                                    f"Minv_data_{flag}({bin_pt}|{bin_eta})",
                                     [axis], Import=th1_data)
-    roohist_mc = ROOT.RooDataHist(f"Minv_mc_{flag}_({bin_pt},{bin_eta})",
-                                  f"Minv_mc_{flag}_({bin_pt},{bin_eta})",
+    roohist_mc = ROOT.RooDataHist(f"Minv_mc_{flag}_({bin_pt}|{bin_eta})",
+                                  f"Minv_mc_{flag}_({bin_pt}|{bin_eta})",
                                   [axis], Import=th1_mc)
 
     return (roohist_data, roohist_mc)
@@ -54,23 +54,25 @@ def ws_init(type_eff, type_analysis, bins_pt, bins_eta, bins_mass):
     w.Import(x)
 
     # Import of the 3D histograms
-    f_data = ROOT.TFile(f"root_files/tnp_{type_eff}_data.root")
-    f_mc = ROOT.TFile(f"root_files/tnp_{type_eff}_mc.root")
+    f_data = ROOT.TFile(f"root_files/datasets/tnp_{type_eff}_data.root")
+    f_mc = ROOT.TFile(f"root_files/datasets/tnp_{type_eff}_mc.root")
 
     for i in range(1, len(bins_pt)):
         for j in range(1, len(bins_eta)):
 
             if type_analysis == 'indep':
-                x_pass = ROOT.RooRealVar(f"x_pass_({i},{j})", "TP M_inv",
+                x_pass = ROOT.RooRealVar(f"x_pass_({i}|{j})", "TP M_inv",
                                          bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-                x_fail = ROOT.RooRealVar(f"x_fail_({i},{j})", "TP M_inv",
+
+                x_fail = ROOT.RooRealVar(f"x_fail_({i}|{j})", "TP M_inv",
                                          bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+
                 axis = (x_fail, x_pass)
                 w.Import(x_pass)
                 w.Import(x_fail)
 
             elif type_analysis == 'sim':
-                x_sim = ROOT.RooRealVar(f"x_sim_({i},{j})", "TP M_inv",
+                x_sim = ROOT.RooRealVar(f"x_sim_({i}|{j})", "TP M_inv",
                                         bins_mass[0], bins_mass[-1], unit="GeV/c^2")
                 axis = (x_sim, x_sim)
 
@@ -134,14 +136,14 @@ def ws_init_std_pdf(workspace, cond, bin):
         f"mean_{cond}_({bin[0]},{bin[1]})", "mean", 0, -2, 2)
     sigma = ROOT.RooRealVar(
         f"sigma_{cond}_({bin[0]},{bin[1]})", "sigma", 0.5, 0.001, 3)
-    gaussian = ROOT.RooGaussian(f"gaus_smearing_{cond}_({bin[0]},{bin[1]})",
+    gaussian = ROOT.RooGaussian(f"gaus_smearing_{cond}_({bin[0]}|{bin[1]})",
                                 "gaussian smearing", axis, mean, sigma)
     workspace.Import(gaussian)
 
     # Exponential bkg
     # ---------------
     tau = ROOT.RooRealVar(f"tau_{cond}_({bin[0]},{bin[1]})", "tau", -10, 0)
-    expo_bkg = ROOT.RooExponential(f"expo_bkg_{cond}_({bin[0]},{bin[1]})",
+    expo_bkg = ROOT.RooExponential(f"expo_bkg_{cond}_({bin[0]}|{bin[1]})",
                                    "exponential background", axis, tau)
     workspace.Import(expo_bkg)
 
@@ -161,9 +163,9 @@ if __name__ == '__main__':
 
     binning_mass = array('d', [50 + i for i in range(81)])
 
-    w = ws_init(t, an, [1, 1], binning_eta, binning_mass)
+    w = ws_init(t, an, [1, 1], [1, 1], binning_mass)
     # ws_init_std_pdf(w)
-    w.writeToFile(f"root_files/{t}_workspace_{an}.root")
+    w.writeToFile(f"root_files/ws/{t}_workspace_{an}.root")
 
     w.Print()
 
