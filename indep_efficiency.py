@@ -5,13 +5,13 @@ import ROOT
 import time
 import os
 import sys
-from results_utilities import res_manager_indep, fit_quality
+from results_utils import res_manager_indep
 from plot_functions import makeAndSavePlot
-from stat_functions import pearson_chi2_eval, llr_test_bkg
-from utilities import import_pdf_library
+from utilities import import_pdf_library, fit_quality, pearson_chi2_eval, llr_test_bkg
 
 
-def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1):
+def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False,
+               verb=-1, figs=False):
     """
     """
 
@@ -27,11 +27,12 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
         histo_mc = workspace[f"Minv_mc_{cond}_({bin[0]}|{bin[1]})"]
 
         axis = ROOT.RooRealVar(workspace[f"x_{cond}_({bin[0]}|{bin[1]})"])
-      
+
         axis.setRange("fitRange", 50, 130)
-        
+
         NBINS = 8000
-        binning = ROOT.RooUniformBinning(axis.getRange("fitRange")[0], axis.getRange("fitRange")[1], NBINS)
+        binning = ROOT.RooUniformBinning(axis.getRange(
+            "fitRange")[0], axis.getRange("fitRange")[1], NBINS)
         axis.setBinning(binning, "cache")
 
         pdf_mc = ROOT.RooHistPdf(f"pdf_mc_{cond}_({bin[0]}|{bin[1]})",
@@ -76,7 +77,6 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
         conv_func.setBufferStrategy(2)
         # conv_func.prepareFFTBinning(axis)
 
-
         events_data = histo_data.sumEntries()
 
         Nsig = ROOT.RooRealVar(
@@ -90,7 +90,7 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
                                   [conv_func, background], [Nsig, Nbkg])
 
         model = ROOT.RooAddPdf(sum_func, f'PDF_{cond}_({bin[0]}|{bin[1]}')
-        
+
         '''
         res0 = model.fitTo(histo_data,
                            Extended=True,
@@ -115,7 +115,6 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
                           Save=True,
                           PrintLevel=verb)
 
-
         res.SetName(f"results_{cond}_({bin[0]}|{bin[1]})")
 
         # pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
@@ -135,12 +134,10 @@ def fit_on_bin(type_eff, workspace, cond, bin, bkg_pdf, test_bkg=False, verb=-1)
         present_bkg = not null_bkg
         print(f"Background is accepted? {present_bkg}")
 
-    
-    if verb != -1:
+    if figs is True:
         makeAndSavePlot(axis, histo_data, model,
                         bkg_name=background.GetName(), pull=False,
                         name=f"{cond}_{bin[0]}_{bin[1]}.png")
-    
 
     return res
 
@@ -152,12 +149,11 @@ def independent_efficiency(type_eff, bins, results, bin_combinations=True,
 
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
-    
+
     ROOT.Math.MinimizerOptions.SetDefaultTolerance(2e-2)
     ROOT.Math.MinimizerOptions.SetDefaultMaxIterations(100000)
     ROOT.Math.MinimizerOptions.SetDefaultErrorDef(0.5)
     ROOT.Math.MinimizerOptions.SetDefaultStrategy(2)
-    
 
     file_ws = ROOT.TFile(f"root_files/ws/{type_eff}_workspace_indep.root")
     ws = file_ws.Get("w")

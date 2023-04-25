@@ -2,27 +2,26 @@
 """
 import ROOT
 import sys
-# import pickle
-
+import pickle
 from array import array
 from results_utilities import res_manager_indep
 
 
-def makeAndSavePlot(axis, data, function, bkg_name='expo',
-                    name='prova.png', title="Histo", pull=False):
-
+def plot_distr_with_fit(axis, data, function, bkg_name='expo',
+                        name='prova.png', pull=True):
+    """
+    """
     c = ROOT.TCanvas()
     if pull is True:
         c.Divide(2)
 
     c.cd(1)
     ROOT.gPad.SetLeftMargin(0.15)
-    frame = axis.frame(Title=title+' '+str(axis))
+    frame = axis.frame(Title=axis.getTitle())
     data.plotOn(frame)
-    function.plotOn(frame, LineColor='kBlue')
-    #[function.plotOn(frame, Components=comp, LineColor='kRed')
-     #for comp in function.getComponents() if comp.GetName() == bkg_name]
-
+    # function.plotOn(frame, LineColor='kBlue')
+    [function.plotOn(frame, Components=comp, LineColor='kRed')
+        for comp in function.getComponents() if comp.GetName() == bkg_name]
     function.plotOn(frame, LineColor='kBlue')
     frame.Draw()
 
@@ -30,17 +29,17 @@ def makeAndSavePlot(axis, data, function, bkg_name='expo',
         c.cd(2)
         ROOT.gPad.SetLeftMargin(0.15)
         hpull = frame.pullHist()
-        frame2 = axis.frame(Title="Residual Distribution")
+        frame2 = axis.frame(Title="Pull Distribution")
         frame2.addPlotable(hpull, "P")
         frame2.Draw()
     c.SaveAs(name)
 
 
-def differential_efficiency(filename, binning_pt=(), binning_eta=()):
+def plot_differential_efficiency(filename, binning_pt=(), binning_eta=()):
     """
     """
 
-    file = ROOT.TFile.Open("root_files/iso_indep_eff.root", "RECREATE")
+    file = ROOT.TFile.Open("root_files/iso_indep_eff.root", "READ")
 
     if len(binning_pt) == 0:
         binning_pt = array('d', [24., 26., 28., 30., 32., 34.,
@@ -87,6 +86,5 @@ def differential_efficiency(filename, binning_pt=(), binning_eta=()):
 
 
 if __name__ == '__main__':
-    print("EO")
 
-    differential_efficiency("results/indep_eff_results.pkl")
+    plot_differential_efficiency("results/indep_eff_results.pkl")
