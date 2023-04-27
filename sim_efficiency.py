@@ -44,7 +44,7 @@ def simultaneous_efficiency(type_eff, bin, bkg_pdf,
         "fitRange")[0], axis.getRange("fitRange")[1], NBINS)
     axis.setBinning(binning, "cache")
 
-    h_data, pdf_mc = [0, 0], [0, 0]
+    h_data, h_mc, pdf_mc = [0, 0], [0, 0], [0, 0]
 
     smearing, conv_pdf = [0, 0], [0, 0]
 
@@ -63,6 +63,8 @@ def simultaneous_efficiency(type_eff, bin, bkg_pdf,
 
         h_data[idx] = workspace[f"Minv_data_{cond}_({bin[0]},{bin[1]})"]
         print(type(h_data[idx]))
+
+        h_mc[idx] = workspace[f"Minv_data_{cond}_({bin[0]},{bin[1]})"]
 
         pdf_mc[idx] = ROOT.RooHistPdf(
             f"pdf_mc_{cond}_({bin[0]},{bin[1]})", f"pdf_mc_{cond}",
@@ -137,16 +139,51 @@ def simultaneous_efficiency(type_eff, bin, bkg_pdf,
             ROOT.RooRealVar(
                 f"peak_fail_({bin[0]}|{bin[1]})", "PEAK", 90.0))
 
+    # ------------------------------
+    #  Model for extended fit on MC
+    # ------------------------------
+    if enable_mcfit:
+        expected_ntot_mc = h_mc[1].sumEntries() + h_mc[0].sumEntries()
+        Nmc_tot = ROOT.RooRealVar(
+            f"Nmc_tot_({bin[0]}|{bin[1]})", "N_mc Total",
+            expected_ntot_mc, 0, expected_ntot_mc+4*ROOT.TMath.Sqrt(expected_ntot_mc))
+        eff_mc = ROOT.RooRealVar(
+            f"efficiency_mc_({bin[0]}|{bin[1]})", "Efficiency MC", 0, 1)
+
+        Nmc_pass = ROOT.RooProduct(
+                f"Nmc_pass_({bin[0]},{bin[1]})", "Nmc pass", [eff_mc, Nmc_tot])
+
+        one_minus_eff_mc = ROOT.RooPolyVar(
+            f"one_minus_eff_mc_({bin[0]}|{bin[1]})", "1 - efficiency (mc)",
+            eff_mc, [1, -1.])
+        Nmc_fail = ROOT.RooProduct(
+                f"Nmc_fail_({bin[0]}|{bin[1]})", "Nmc fail", [one_minus_eff_mc, Nmc_tot])
+
+        model_mc_pass = ROOT.RooExtendPdf(
+            f"mc_pass_ext_({bin[0]}|{bin[1]})",
+            "MC extended pass", pdf_mc[1], Nmc_pass)
+        model_mc_fail = ROOT.RooExtendPdf(
+            f"mc_fail_ext_({bin[0]}|{bin[1]})",
+            "MC extended fail", pdf_mc[0], Nmc_fail)
+
     # -----------------------
     #  Model for PASS events
     # -----------------------
     expected_ntot = h_data[1].sumEntries() + h_data[0].sumEntries()
     Nsig_tot = ROOT.RooRealVar(
-        f"Nsig_tot_({bin[0]}|{bin[1]})", "Nsig Toral",
+        f"Nsig_tot_({bin[0]}|{bin[1]})", "Nsig Total",
         expected_ntot, 0, expected_ntot+4*ROOT.TMath.Sqrt(expected_ntot))
 
-    efficiency = ROOT.RooRealVar(
-        f"efficiency_({bin[0]}|{bin[1]})", "Efficiency", 0, 1)
+    if enable_mcfit:
+        scale_factor = ROOT.RooRealVar(
+            f"scale_factor_({bin[0]}|{bin[1]})", "Scale factor", 0, 2)
+
+        efficiency = ROOT.RooProduct(f"efficiency_({bin[0]}|{bin[1]})",
+                                     "Efficiency", [scale_factor, eff_mc])
+
+    else:
+        efficiency = ROOT.RooRealVar(f"efficiency_({bin[0]}|{bin[1]})",
+                                     "Efficiency", 0, 1)
 
     Nsig_pass = ROOT.RooProduct(
             f"Nsig_pass_({bin[0]},{bin[1]})", "Nsig pass", [efficiency, Nsig_tot])
@@ -164,7 +201,6 @@ def simultaneous_efficiency(type_eff, bin, bkg_pdf,
     # -----------------------
     one_minus_eff = ROOT.RooPolyVar(f"one_minus_eff_({bin[0]}|{bin[1]})",
                                     "1 - efficiency", efficiency, [1, -1.])
-
     Nsig_fail = ROOT.RooProduct(
             f"Nsig_fail_({bin[0]}|{bin[1]})", "Nsig fail", [one_minus_eff, Nsig_tot])
     Nbkg_fail = ROOT.RooRealVar(
@@ -183,20 +219,30 @@ def simultaneous_efficiency(type_eff, bin, bkg_pdf,
             f"sample_({bin[0]}{bin[1]})", "Composite sample")
     sample.defineType("pass")
     sample.defineType("fail")
-
-    comb_dataset = ROOT.RooDataHist(
-            f"combData_({bin[0]}|{bin[1]})", "Combined datasets", ROOT.RooArgSet(
-                axis),
-            Index=sample, Import={"pass": h_data[1], "fail": h_data[0]})
+    if enable_mcfit:
+        sample.defineType("mc_pass")
+        sample.defineType("mc_fail")
+        comb_dataset = ROOT.RooDataHist(
+                f"combData_({bin[0]}|{bin[1]})", "Combined datasets",
+                ROOT.RooArgSet(axis), Index=sample,
+                Import={"pass": h_data[1], "fail": h_data[0], "mc_pass": h_mc[1], "mc_fail": h_mc[0]})
+    else:
+        comb_dataset = ROOT.RooDataHist(
+                f"combData_({bin[0]}|{bin[1]})", "Combined datasets",
+                ROOT.RooArgSet(axis), Index=sample,
+                Import={"pass": h_data[1], "fail": h_data[0]})
 
     simPdf = ROOT.RooSimultaneous(
             f"simPdf_({bin[0]},{bin[1]})", "Simultaneous pdf", sample)
     simPdf.addPdf(model_pass, "pass")
     simPdf.addPdf(model_fail, "fail")
+    if enable_mcfit:
+        simPdf.addPdf(model_mc_pass, "mc_pass")
+        simPdf.addPdf(model_mc_fail, "mc_fail")
 
     res = simPdf.fitTo(comb_dataset,
                        Extended=True,
-                       Range='fitRange',
+                       # Range='fitRange',
                        # ExternalConstraints=ROOT.RooArgSet("nexp"),
                        # BatchMode=False,
                        # Offset=True,
