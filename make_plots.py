@@ -4,10 +4,10 @@ import ROOT
 import sys
 import pickle
 from array import array
-from results_utilities import res_manager_indep
+from results_utils import results_manager
 
 
-def plot_distr_with_fit(axis, data, function, bkg_name='expo',
+def plot_distr_with_fit(axis, data, function, bkg_name='',
                         name='prova.png', pull=True):
     """
     """
@@ -17,11 +17,13 @@ def plot_distr_with_fit(axis, data, function, bkg_name='expo',
 
     c.cd(1)
     ROOT.gPad.SetLeftMargin(0.15)
-    frame = axis.frame(Title=axis.getTitle())
+    frame = axis.frame(Title=axis.GetTitle())
     data.plotOn(frame)
     # function.plotOn(frame, LineColor='kBlue')
+    '''
     [function.plotOn(frame, Components=comp, LineColor='kRed')
         for comp in function.getComponents() if comp.GetName() == bkg_name]
+    '''
     function.plotOn(frame, LineColor='kBlue')
     frame.Draw()
 

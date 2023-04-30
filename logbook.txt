@@ -165,39 +165,80 @@ dei calcoli) fino a ordine 1000, ma il minimo trovato soffre delle stesse patolo
 di quello descritto sopra.
 
 In generale, sia per il metodo "bincenter" sia per quello dei trapezi, il numero
-di steps non corrisponde al numero totale di punti in cui ècalcolata la funzione
-Per i trapezi infatti il numero di punti � ~2^(Nsteps), cosa che spiega perché
+di steps non corrisponde al numero totale di punti in cui è calcolata la funzione
+Per i trapezi infatti il numero di punti è ~2^(Nsteps), cosa che spiega perché
 oltre 10-12 steps i calcoli non finiscono mai
 
 TROVATA LA FORMULA PER L'INTEGRALE ANALITICO, grazie a WolframAlpha. Viene implementata
 nella classe col metodo "analyticalIntegral", controllato da "getAnalyticalIntegral".
 I template di questi due metodi sono stati presi dal codice sorgente della Breit-Wigner.
-Minuit dovrebbe andare in automatico a cercare questi due metodi a ogni ciclo 
+Minuit dovrebbe andare in automatico a cercare questi due metodi a ogni ciclo
 per
-normalizzare la pdf, che di per s� (come esce da "evaluate") non ènormalizzata.
+normalizzare la pdf, che di per sé (come esce da "evaluate") non è normalizzata.
 
 
 23-24/04/2023
 -------------
-CMSShape fatta girare sul bin (1,1) del dataset iso con Minuit2. Con la configurazione 
-precedente si verificava un problema che riguardava dei "bin in eccesso" che venivano 
-creati automaticamente. Probabilmente era una questione legata alla creazione del 
+CMSShape fatta girare sul bin (1,1) del dataset iso con Minuit2. Con la configurazione
+precedente si verificava un problema che riguardava dei "bin in eccesso" che venivano
+creati automaticamente. Probabilmente era una questione legata alla creazione del
 buffer per la FFT (vedi "prepareFFTBinning"), per la quale Minuit2 si lamentava,
-al contrario di Minuit. Il problema èstato risoltocambiando strategia al buffer,
-da "Extend" a "Mirror", che mi sembra la pi� corretta (in generale DA RIVEDERE
-COSA SIGNIFICANO, non mi èchiarissimo)
+al contrario di Minuit. Il problema èstato risolto cambiando strategia al buffer,
+da "Extend" a "Mirror", che mi sembra la pi� corretta (in generale DA RIVEDERE
+COSA SIGNIFICANO, non mi è chiarissimo)
 
 In questo modo il fit gira, ma si ottengono valori di EDM praticamente sempre
 maggiori di 1 (di sicuro mai ordine 10^-5). Lo status del minimizer èquindi
 sempre 3, mentre la covQual si riesce a far tornare =3.
 
-Le cose cambiano peròse si fa un "pre-fit" con Minuit (con anche impostazioni
+Le cose cambiano però se si fa un "pre-fit" con Minuit (con anche impostazioni
 blande e senza porre controlli) e solo successivamente si gira con Minuit2.
-Potrebbe essere un procedimento corretto? Alla fine èun trucco per indirizzare
+Potrebbe essere un procedimento corretto? Alla fine è un trucco per indirizzare
 convenientemente Minuit2 verso il minimo, che altrimenti sembra non si riesca
 a trovare.
 Da notare comunque che le NLL ottenute con il pre-fit e senza sono molto vicine...
 potrebbe quindi essere piùun "vizio di forma" di Minuit2 che altro... (???)
+
+
+26/04/2023
+----------
+Prove di fit con MINUIT2 sui background del bin (1,1)
+
+Impostazioni di partenza:
+    range: default
+    bins_fft = 2000
+    buffer_fraction = 0.5 (strategy 2)
+    normRange: no
+    MaxCalls: 10000
+    MaxIterations: 10000
+    tolerance=2e-2
+    min_strategy = 2
+    SMEARING:   Mean: 0,-2,2    Sigma: 2,0.1,5
+    BKG: no
+----------> "top-level p.d.f evaluates to zero"
+            3, 3, 1e-9
+
+* MaxCalls -> 100000
+----------> "top-level p.d.f evaluates to NaN", "p.d.f value is Not-a-Number",
+            "p.d.f normalization integral is zero or negative"
+            0, 3, 1e-4
+
+* buffer_fraction = 0.1 (strategy 2)
+----------> "top-level p.d.f evaluates to zero",
+            3, 3, 1e-8
+
+
+Visti questi problemi, si fanno delle prove con prova_cmsshape.py (tenendo fisso il
+dataset generato). La cosa strana che succede è che a volte, ripetendo il fit con gli stessi
+parametri, il valore di edm finale cambi in modo importante (1e-5 -> ~0.1).
+Questo succede quando è chiamato un valore custom di TOLERANCE. Se si commenta
+quel comando dovrebbe andare tutto bene
+
+Tutto questo però SOLO SE i parametri iniziali coincidono con i parametri con cui
+i dati sono stati generati!!!!!! Se si sposta anche di poco il valore di un parametro
+iniziale (es. beta: 5.0->5.5) l'edm non scende più sotto ~0.1 e anzi gran parte delle
+volte ha valori ordine 10/100
+
 
 
 
