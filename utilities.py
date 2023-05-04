@@ -27,6 +27,17 @@ def import_pdf_library(*functions):
             print("ERROR in sourcefile compiling and loading")
             sys.exit()
 
+def pearson_chi2_eval(histo, pdf, nbins, res):
+    """
+    """
+    ndof = nbins - res.floatParsFinal().getSize()
+    print(ndof)
+
+    chi2_obj = ROOT.RooChi2Var("chi2", "chi2", pdf, histo)
+    chi2_val = chi2_obj.getVal() 
+
+    return chi2_val, ndof
+
 
 def fit_quality(res):
     """
@@ -36,6 +47,15 @@ def fit_quality(res):
     check_edm = (res.edm() < 1e-4)
 
     return bool(check_migrad*check_covm*check_edm)
+
+def fit_quality_old(res, chi2stat):
+    """
+    """
+    check_migrad = (res.status() == 0 or res.status() == 1)
+    check_covm = (res.covQual() == 3)
+    check_chi2 = (chi2stat[0] - chi2stat[1] < 10*((2*chi2stat[1])**0.5))
+
+    return bool(check_migrad*check_covm*check_chi2)
 
 
 def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
@@ -47,19 +67,6 @@ def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
     sigma_eff = ROOT.TMath.Sqrt(var1+var2)/((npass+nfail)**2)
 
     return eff, sigma_eff
-
-
-def pearson_chi2_eval(histo, pdf, nbins, res):
-    """
-    """
-    npars = nbins - res.floatParsFinal().getSize()
-    print(npars)
-    chi2_sqrtvar = (2*npars)**(1/2.)
-    print(f"Expected chi2 pars: mu={npars}, sqrt(var)={chi2_sqrtvar}")
-
-    chi2_obj = ROOT.RooChi2Var("chi2", "chi2", pdf, histo, Verbose=False)
-    print(f"Measured chi2 = {chi2_obj.getVal()}")
-    print(f"Distance in sigma = {(chi2_obj.getVal()-npars)/chi2_sqrtvar}")
 
 
 def llr_test_bkg(histo, pdf, alpha=0.05):

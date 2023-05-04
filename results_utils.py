@@ -16,7 +16,7 @@ class results_manager:
         self._dict_results = {}
         self._analysis = type_estimate
 
-    def open(self, filename):
+    def op(self, filename):
         with open(filename, "rb") as file:
             self._dict_results = pickle.load(file)
 
@@ -28,13 +28,13 @@ class results_manager:
     def dictionary(self):
         return self._dict_results
 
-    def add_result(self, bin_pt, bin_eta, check=False, *res):
+    def add_result(self, bin_pt, bin_eta, *res, check=False):
         """
         """
         if check is True:
             quality = 1
             for result in res:
-                quality *= result
+                quality = quality*fit_quality(result)
             goodfit = bool(quality)
             print(goodfit)
         else:
@@ -92,7 +92,7 @@ class results_manager:
         else:
             pass
 
-    def view_efficiency(self, bin_pt=0, bin_eta=0):
+    def view_efficiencies(self, bin_pt=0, bin_eta=0):
         """
         HAS TO BE EXTENDED FOR SIMULTANEOUS FITS
         """

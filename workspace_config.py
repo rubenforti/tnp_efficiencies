@@ -30,7 +30,7 @@ def get_roohist(histos, axis, bin_pt, bin_eta, flag):
 
     roohist_data = ROOT.RooDataHist(f"Minv_data_{flag}_({bin_pt}|{bin_eta})",
                                     f"Minv_data_{flag}({bin_pt}|{bin_eta})",
-                                    ROOT.RooArgList(axis), th1_data)         
+                                    ROOT.RooArgList(axis), th1_data)
     roohist_mc = ROOT.RooDataHist(f"Minv_mc_{flag}_({bin_pt}|{bin_eta})",
                                   f"Minv_mc_{flag}_({bin_pt}|{bin_eta})",
                                   ROOT.RooArgList(axis), th1_mc)
@@ -91,9 +91,10 @@ def ws_init(type_eff, type_analysis, bins_pt, bins_eta, bins_mass):
 
     return w
 
+
 '''
 def ws_std_variables(workspace):
-   
+
     # Variables for gaussian smearing
     # -------------------------------
     mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
@@ -106,7 +107,7 @@ def ws_std_variables(workspace):
     tau = ROOT.RooRealVar("tau", "tau", -10, 0)
     workspace.Import(tau)
 
-   
+
     # Variables for cmsshape bkg
     # --------------------------
     alpha = ROOT.RooRealVar("alpha", "alpha")
@@ -117,11 +118,11 @@ def ws_std_variables(workspace):
     workspace.Import(beta)
     workspace.Import(gamma)
     workspace.Import(peak)
-   
+
 
 
 def ws_init_std_pdf(workspace, cond, bin):
-   
+
     axis = workspace[f"x_{cond}_({bin[0]},{bin[1]})"]
 
     # Gaussian smearing
@@ -158,12 +159,13 @@ if __name__ == '__main__':
 
     binning_mass = array('d', [50 + i for i in range(81)])
 
-    w = ws_init(t, an, [1, 1], [1, 1], binning_mass)
+    w = ws_init(t, an, [1, 1], binning_eta, binning_mass)
     # ws_init_std_pdf(w)
-    w.writeToFile(f"root_files/ws/{t}_workspace_{an}.root")
+    # w.writeToFile(f"root_files/ws/ws_{t}_{an}_expo.root")
+    w.writeToFile(f"root_files/{t}_workspace.root")
 
     w.Print()
-    
+
     '''
     x = ROOT.RooRealVar(w.var("x_pass_(1|1)"))
     frame = x.frame()

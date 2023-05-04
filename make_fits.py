@@ -6,23 +6,17 @@ import os
 import sys
 import time
 from results_utils import results_manager
-from indep_efficiency import fit_on_bin
+from indep_efficiency import indep_eff_fits
 from sim_efficiency import simultaneous_efficiency
-from utilities import import_pdf_library, fit_quality, pearson_chi2_eval, llr_test_bkg
+from utilities import import_pdf_library, fit_quality, fit_quality_old
 
 
-def make_fits(type_eff, type_estimate, bins, bin_combinations=True,
-              bkg_pdf='expo', test_bkg=False,
+def make_fits(type_eff, type_estimate, bins, bin_combinations, bkg_pdf='expo', test_bkg=False,
               fit_verbosity=-1, savefigs=False):
     """
     """
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
-
-    ROOT.Math.MinimizerOptions.SetDefaultTolerance(2e-2)
-    ROOT.Math.MinimizerOptions.SetDefaultMaxIterations(100000)
-    ROOT.Math.MinimizerOptions.SetDefaultErrorDef(0.5)
-    ROOT.Math.MinimizerOptions.SetDefaultStrategy(2)
 
     if bin_combinations is True:
         bins_pt = []
@@ -34,12 +28,12 @@ def make_fits(type_eff, type_estimate, bins, bin_combinations=True,
         bins_list = [bins_pt, bins_eta]
     else:
         bins_list = bins
+    
+    print(bins_list)
 
     file_ws = ROOT.TFile(
-        f"root_files/ws/{type_eff}_workspace_{type_estimate}.root", "READ")
+        f"root_files/{type_eff}_workspace.root")
     ws = file_ws.Get("w")
-
-    bkg_pdf = 'mixed'
 
     Nproblems = 0
 
@@ -47,20 +41,20 @@ def make_fits(type_eff, type_estimate, bins, bin_combinations=True,
         bin_pt, bin_eta = bins_list[0][idx], bins_list[1][idx]
 
         if type_estimate == 'indep':
-            res_pass = fit_on_bin(type_eff, ws, 'pass', (bin_pt, bin_eta),
-                                  bkg_pdf, test_bkg=test_bkg,
-                                  verb=fit_verbosity, figs=savefigs)
-            res_fail = fit_on_bin(type_eff, ws, 'fail', (bin_pt, bin_eta),
-                                  bkg_pdf, test_bkg=test_bkg,
-                                  verb=fit_verbosity, figs=savefigs)
+            res_pass, res_fail = indep_eff_fits(type_eff, "indep", ws, (bin_pt, bin_eta), bkg_pdf,
+                                                test_bkg=False, refit_numbkg=True, 
+                                                verb=fit_verbosity, figs=savefigs)
             # results.add_result(res_pass, res_fail, bin_pt, bin_eta, check=True)
             status = bool(fit_quality(res_pass)*fit_quality(res_fail))
 
         elif type_estimate == 'sim':
-            results = simultaneous_efficiency(
-                type_eff, bin, bkg_pdf, same_smearing=False, test_bkg=False,
-                enable_mcfit=False, verb=fit_verbosity, figs=savefigs)
+            results = simultaneous_efficiency(type_eff, "indep", ws, (bin_pt, bin_eta), bkg_pdf, 
+                                              test_bkg=False, same_smearing=False, enable_mcfit=False, 
+                                              verb=fit_verbosity, figs=savefigs)
             status = fit_quality(results)
+        else:
+            print("Wrong fit strategy! Closing the program")
+            sys.exit()
 
         if status is False:
             print(f"\nBin {bin_pt},{bin_eta} has problems!\n")
@@ -95,14 +89,15 @@ if __name__ == '__main__':
     types_efficiencies = ("sa", "global", "ID", "iso", "trigger", "veto")
     type_eff = types_efficiencies[3]
 
-    type_estimate = 'simult_simple'
+    type_analysis = 'indep'
 
     bkg_pdf = 'expo'
 
     bins_pt = [num for num in range(1, 2)]
-    bins_eta = [num for num in range(1, 2)]
+    bins_eta = [num for num in range(1, 10)]
+    bin_combinations = True
 
-    # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------------
 
     '''
     bin_keys = results.get_problematic_bins()
@@ -118,17 +113,18 @@ if __name__ == '__main__':
     '''
 
     bins = (bins_pt, bins_eta)
-    make_fits(type_eff, type_estimate, bins, bkg_pdf,
-              direct_mode=True, verbose=0)
+    make_fits(type_eff, type_analysis, bins, bin_combinations, bkg_pdf, fit_verbosity=0, savefigs=False)
 
     '''
     file_ws = ROOT.TFile(f"root_files/{t}_workspace.root")
     ws = file_ws.Get("w")
     ws.Print()
     '''
+    '''
     results = results_manager()
     results.open(f"results/{type_eff}_results_{type_estimate}.pkl")
     results.view_efficiencies()
+    '''
 
     #print("RISULTATI SCRITTI SU PICKLE FILE")
 
