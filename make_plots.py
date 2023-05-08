@@ -2,29 +2,99 @@
 """
 import ROOT
 import sys
+import os
 import pickle
 from array import array
 from results_utils import results_manager
 
 
-def plot_distr_with_fit(axis, data, function, bkg_name='',
-                        name='prova.png', pull=True):
+
+def plot_pass_and_fail(axis, data, function, bkg_pdf,
+                       name='prova.png', pull=False):
     """
     """
+
+    path = os.path.dirname(__file__)
+    ROOT.gSystem.cd(path)
+
+    c = ROOT.TCanvas()
+    c.Divide(2)
+
+    c.cd(1)
+    ROOT.gPad.SetLeftMargin(0.15)
+    frame1 = axis[1].frame(ROOT.RooFit.Title("PASS"))
+    data[1].plotOn(frame1)
+    
+    function[1].plotOn(frame1, ROOT.RooFit.LineColor(4)) 
+    
+    for comp1 in function[1].getComponents():
+        if comp1.GetName() == bkg_pdf[1]:
+            bkg_set = ROOT.RooArgSet(comp1)
+            function[1].plotOn(frame1,
+                ROOT.RooFit.Components(bkg_set),
+                ROOT.RooFit.LineColor(2),
+                ROOT.RooFit.LineStyle(ROOT.kDashed))
+    
+    frame1.Draw()
+
+    c.cd(2)
+    ROOT.gPad.SetLeftMargin(0.15)
+    frame0 = axis[0].frame(ROOT.RooFit.Title("FAIL"))
+    data[0].plotOn(frame0)
+    
+    function[0].plotOn(frame0, ROOT.RooFit.LineColor(4)) 
+    
+    for comp0 in function[0].getComponents():
+        if comp0.GetName() == bkg_pdf[0]:
+            bkg_set = ROOT.RooArgSet(comp0)
+            function[0].plotOn(frame0,
+                ROOT.RooFit.Components(bkg_set),
+                ROOT.RooFit.LineColor(2),
+                ROOT.RooFit.LineStyle(ROOT.kDashed))
+            
+    frame0.Draw()
+
+    c.SaveAs(name)
+
+
+
+
+
+
+
+
+
+
+def plot_distr_with_fit(axis, data, function, bkg_pdf,
+                        name='prova.png', pull=False):
+    """
+    """
+
+    path = os.path.dirname(__file__)
+    ROOT.gSystem.cd(path)
+
     c = ROOT.TCanvas()
     if pull is True:
         c.Divide(2)
 
     c.cd(1)
     ROOT.gPad.SetLeftMargin(0.15)
-    frame = axis.frame(Title=axis.GetTitle())
+    frame = axis.frame(ROOT.RooFit.Title("TITLE"))
     data.plotOn(frame)
-    # function.plotOn(frame, LineColor='kBlue')
-    '''
-    [function.plotOn(frame, Components=comp, LineColor='kRed')
-        for comp in function.getComponents() if comp.GetName() == bkg_name]
-    '''
-    function.plotOn(frame, LineColor='kBlue')
+    
+    function.plotOn(frame, ROOT.RooFit.LineColor(4))
+        
+    
+    for comp in function.getComponents():
+        if comp.GetName() == bkg_pdf:
+            bkg_set = ROOT.RooArgSet(comp)
+            function.plotOn(frame,
+                ROOT.RooFit.Components(bkg_set),
+                ROOT.RooFit.LineColor(2),
+                ROOT.RooFit.LineStyle(ROOT.kDashed))
+    
+    #function.plotOn(frame, ROOT.RooCmdArg("LineColor", 4))
+    # bkg_pdf.plotOn(frame, ROOT.RooCmdArg("LineColor", 2))
     frame.Draw()
 
     if pull:
@@ -37,11 +107,11 @@ def plot_distr_with_fit(axis, data, function, bkg_name='',
     c.SaveAs(name)
 
 
-def plot_differential_efficiency(filename, binning_pt=(), binning_eta=()):
+def plot_results(filename, results, binning_pt=(), binning_eta=()):
     """
     """
 
-    file = ROOT.TFile.Open("root_files/iso_indep_eff.root", "READ")
+    file = ROOT.TFile.Open("root_files/iso_indep_eff.root", "UPDATE")
 
     if len(binning_pt) == 0:
         binning_pt = array('d', [24., 26., 28., 30., 32., 34.,
@@ -51,15 +121,14 @@ def plot_differential_efficiency(filename, binning_pt=(), binning_eta=()):
 
     ROOT.gStyle.SetOptStat("n")
 
-    results = res_manager_indep()
-    results.open(filename)
     res_dict = results.dictionary()
 
     idx_pt, idx_eta = 0, 0
 
-    histo = ROOT.TH2D("eff_histo", "Efficiency (pt,eta)", len(binning_pt)-1, binning_pt,
+    
+    h_eff = ROOT.TH2D("efficiency_histo", "Efficiency (pt,eta)", len(binning_pt)-1, binning_pt,
                       len(binning_eta)-1, binning_eta)
-    histo_err = ROOT.TH2D(
+    h_deff = ROOT.TH2D(
         "eff_error_histo", "Relative error on efficiency (pt,eta)",
         len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
 
@@ -68,22 +137,22 @@ def plot_differential_efficiency(filename, binning_pt=(), binning_eta=()):
         idx_eta = int(key.split(",")[1])
         eff = res_dict[key]["efficiency"]
         # print(eff[0], eff[1])
-        histo.SetBinContent(idx_pt, idx_eta, eff[0])
-        histo.SetBinError(idx_pt, idx_eta, eff[1])
-        histo_err.SetBinContent(idx_pt, idx_eta, eff[1]/eff[0])
+        h_eff.SetBinContent(idx_pt, idx_eta, eff[0])
+        h_eff.SetBinError(idx_pt, idx_eta, eff[1])
+        h_deff.SetBinContent(idx_pt, idx_eta, 100.0*eff[1]/eff[0])
 
     c1 = ROOT.TCanvas()
     c1.cd()
-    histo.Draw("COLZ")
+    h_eff.Draw("COLZ")
     c1.SaveAs("differential_eff_indep.png")
 
     c2 = ROOT.TCanvas()
     c2.cd()
-    histo_err.Draw("COLZ")
+    h_deff.Draw("COLZ")
     c2.SaveAs("differential_eff_indep_errors.png")
 
     file.Write("eff_histo")
-    # file.Write("eff_error_histo")
+    file.Write("eff_error_histo")
     file.Close()
 
 

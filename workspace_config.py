@@ -38,7 +38,7 @@ def get_roohist(histos, axis, bin_pt, bin_eta, flag):
     return (roohist_data, roohist_mc)
 
 
-def ws_init(type_eff, type_analysis, bins_pt, bins_eta, bins_mass):
+def ws_init(filenames, type_eff, type_analysis, bins_pt, bins_eta, bins_mass):
     """
     Initializes a RooWorkspace with the dataset corresponding to a given
     efficiency step. The objects stored are RooDataHist of TP inv. mass in
@@ -52,8 +52,8 @@ def ws_init(type_eff, type_analysis, bins_pt, bins_eta, bins_mass):
     w.Import(x)
 
     # Import of the 3D histograms
-    f_data = ROOT.TFile(f"root_files/datasets/tnp_{type_eff}_data.root")
-    f_mc = ROOT.TFile(f"root_files/datasets/tnp_{type_eff}_mc.root")
+    f_data = ROOT.TFile(filenames[0])
+    f_mc = ROOT.TFile(filenames[1])
 
     for i in range(1, len(bins_pt)):
         for j in range(1, len(bins_eta)):
@@ -87,61 +87,9 @@ def ws_init(type_eff, type_analysis, bins_pt, bins_eta, bins_mass):
             w.Import(histos_fail[0])
             w.Import(histos_fail[1])
 
-    w.writeToFile(f"root_files/{type_eff}_workspace.root")
 
     return w
 
-
-'''
-def ws_std_variables(workspace):
-
-    # Variables for gaussian smearing
-    # -------------------------------
-    mean = ROOT.RooRealVar("mean", "mean", 0, -2, 2)
-    sigma = ROOT.RooRealVar("sigma", "sigma", 0.5, 0.001, 2)
-    workspace.Import(mean)
-    workspace.Import(sigma)
-
-    #  Variable for exponential bkg
-    # -----------------------------
-    tau = ROOT.RooRealVar("tau", "tau", -10, 0)
-    workspace.Import(tau)
-
-
-    # Variables for cmsshape bkg
-    # --------------------------
-    alpha = ROOT.RooRealVar("alpha", "alpha")
-    beta = ROOT.RooRealVar("beta", "beta")
-    gamma = ROOT.RooRealVar("gamma", "gamma")
-    peak = ROOT.RooRealVar("peak", "peak")
-    workspace.Import(alpha)
-    workspace.Import(beta)
-    workspace.Import(gamma)
-    workspace.Import(peak)
-
-
-
-def ws_init_std_pdf(workspace, cond, bin):
-
-    axis = workspace[f"x_{cond}_({bin[0]},{bin[1]})"]
-
-    # Gaussian smearing
-    # -----------------
-    mean = ROOT.RooRealVar(
-        f"mean_{cond}_({bin[0]},{bin[1]})", "mean", 0, -2, 2)
-    sigma = ROOT.RooRealVar(
-        f"sigma_{cond}_({bin[0]},{bin[1]})", "sigma", 0.5, 0.001, 3)
-    gaussian = ROOT.RooGaussian(f"gaus_smearing_{cond}_({bin[0]}|{bin[1]})",
-                                "gaussian smearing", axis, mean, sigma)
-    workspace.Import(gaussian)
-
-    # Exponential bkg
-    # ---------------
-    tau = ROOT.RooRealVar(f"tau_{cond}_({bin[0]},{bin[1]})", "tau", -10, 0)
-    expo_bkg = ROOT.RooExponential(f"expo_bkg_{cond}_({bin[0]}|{bin[1]})",
-                                   "exponential background", axis, tau)
-    workspace.Import(expo_bkg)
-'''
 
 
 if __name__ == '__main__':
@@ -152,30 +100,17 @@ if __name__ == '__main__':
     types_analysis = ["indep", "sim"]
     an = types_analysis[0]
 
-    binning_pt = array('d', [24., 26., 28., 30., 32., 34.,
-                       36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
+    binning_pt = array('d', [24., 26., 28., 30., 32., 34., 36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
 
     binning_eta = array('d', [round(-2.4 + i*0.1, 2) for i in range(49)])
 
-    binning_mass = array('d', [50 + i for i in range(81)])
+    binning_mass = array('d', [60 + i for i in range(61)])
 
-    w = ws_init(t, an, [1, 1], binning_eta, binning_mass)
-    # ws_init_std_pdf(w)
-    # w.writeToFile(f"root_files/ws/ws_{t}_{an}_expo.root")
-    w.writeToFile(f"root_files/{t}_workspace.root")
+    filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
+    filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
 
-    w.Print()
 
-    '''
-    x = ROOT.RooRealVar(w.var("x_pass_(1|1)"))
-    frame = x.frame()
-    datahist = w.data("Minv_data_pass_(1|1)")
-    print(datahist.sumEntries())
-    datahist.plotOn(frame)
-    frame.Draw()
-    '''
+    w = ws_init((filename_data, filename_mc), t, an, binning_pt, binning_eta, binning_mass)
 
-    '''
-    f = ROOT.TFile("root_files/iso_workspace.root")
-    w = f.Get("w")
-    '''
+    w.writeToFile(f"root_files/ws/ws_{t}_{an}.root")
+

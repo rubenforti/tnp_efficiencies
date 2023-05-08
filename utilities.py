@@ -39,30 +39,39 @@ def pearson_chi2_eval(histo, pdf, nbins, res):
     return chi2_val, ndof
 
 
-def fit_quality(res):
+def check_chi2(histo, pdf, res):
     """
     """
-    check_migrad = (res.status() == 0)
+    chi2val, ndof = pearson_chi2_eval(histo, pdf, histo.numEntries(), res)
+
+    print(chi2val, ndof)
+
+    status_chi2 = bool(abs(chi2val - ndof) < 10*((2*ndof)**0.5))
+
+    return status_chi2
+
+
+def fit_quality(res, old_checks=False):
+    """
+    """
+
     check_covm = (res.covQual() == 3)
-    check_edm = (res.edm() < 1e-4)
+    if old_checks is True:
+        check_migrad = (res.status() == 0 or res.status() == 1)
+        check_chi2 = (res.GetTitle() != "Chi2_not_passed")
+        return bool(check_migrad*check_covm*check_chi2)
+    else:
+        check_migrad = (res.status()) == 0
+        check_edm = (res.edm() < 1e-4)
+        return bool(check_migrad*check_covm*check_edm)
 
-    return bool(check_migrad*check_covm*check_edm)
-
-def fit_quality_old(res, chi2stat):
-    """
-    """
-    check_migrad = (res.status() == 0 or res.status() == 1)
-    check_covm = (res.covQual() == 3)
-    check_chi2 = (chi2stat[0] - chi2stat[1] < 10*((2*chi2stat[1])**0.5))
-
-    return bool(check_migrad*check_covm*check_chi2)
 
 
 def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
     """
     """
     eff = npass/(npass+nfail)
-    var1 = ((1-npass)**2)*(sigma_npass**2)
+    var1 = (nfail**2)*(sigma_npass**2)
     var2 = (npass**2)*(sigma_nfail**2)
     sigma_eff = ROOT.TMath.Sqrt(var1+var2)/((npass+nfail)**2)
 
