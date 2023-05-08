@@ -140,4 +140,8 @@ libCpp/*.d
 
 
 # Datasets
-root_files/datasets/
+root_files/*.root
+root_files/
+
+# Temporary fig repository
+figs/
