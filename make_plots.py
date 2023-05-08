@@ -111,7 +111,7 @@ def plot_results(filename, results, binning_pt=(), binning_eta=()):
     """
     """
 
-    file = ROOT.TFile.Open("root_files/iso_indep_eff.root", "UPDATE")
+    file = ROOT.TFile.Open(filename, "UPDATE")
 
     if len(binning_pt) == 0:
         binning_pt = array('d', [24., 26., 28., 30., 32., 34.,
@@ -131,6 +131,11 @@ def plot_results(filename, results, binning_pt=(), binning_eta=()):
     h_deff = ROOT.TH2D(
         "eff_error_histo", "Relative error on efficiency (pt,eta)",
         len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
+    
+    '''
+    if results._analysis == 'indep':
+        corr_pass = ROOT.TH2
+    '''
 
     for key in res_dict.keys():
         idx_pt = int(key.split(",")[0])
@@ -144,18 +149,28 @@ def plot_results(filename, results, binning_pt=(), binning_eta=()):
     c1 = ROOT.TCanvas()
     c1.cd()
     h_eff.Draw("COLZ")
-    c1.SaveAs("differential_eff_indep.png")
+    c1.SaveAs("figs/efficiency_indep.png")
 
     c2 = ROOT.TCanvas()
     c2.cd()
     h_deff.Draw("COLZ")
-    c2.SaveAs("differential_eff_indep_errors.png")
+    c2.SaveAs("figs/efficiency_indep_relerrors.png")
 
-    file.Write("eff_histo")
+    file.Write("efficiency_histo")
     file.Write("eff_error_histo")
     file.Close()
 
 
 if __name__ == '__main__':
 
-    plot_differential_efficiency("results/indep_eff_results.pkl")
+    file = ROOT.TFile('root_files/ws/ws_iso_indep.root', "READ")
+
+    ws = file.Get("w")
+
+    res = results_manager("indep", ws)
+
+    for bin_pt in range(1,  16):
+        for bin_eta in range(1, 49):
+            res.add_result(bin_pt, bin_eta, check=False)
+
+    plot_results("root_files/ws/ws_iso_indep.root", res)

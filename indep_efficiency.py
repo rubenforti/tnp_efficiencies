@@ -35,7 +35,7 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
     # ----------------------------------
     #  Initial parameters - MODIFY HERE
     # ----------------------------------
-    NBINS = [2000, 2000]
+    NBINS = [2000, 10000]
     bufFractions = [0.5, 0.05]
 
     fit_strategy = [2, 2]
@@ -46,11 +46,11 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
     mean_p = ROOT.RooRealVar(
         f"mean_pass_({bin[0]}|{bin[1]})", "mean", 0, -5.0, 5.0)
     sigma_p = ROOT.RooRealVar(
-        f"sigma_pass_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.2, 5.0)
+        f"sigma_pass_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.1, 5.0)
     mean_f = ROOT.RooRealVar(
         f"mean_fail_({bin[0]}|{bin[1]})", "mean", 0, -5.0, 5.0)
     sigma_f = ROOT.RooRealVar(
-        f"sigma_fail_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.2, 5.0)
+        f"sigma_fail_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.1, 5.0)
 
     if bkg_pdf == "expo":
         tau_p = ROOT.RooRealVar(

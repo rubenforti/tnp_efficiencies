@@ -1,9 +1,8 @@
 """
 """
-
 import ROOT
 import pickle
-from utilities import fit_quality, eval_efficiency
+from utilities import fit_quality, eval_efficiency, pearson_chi2_eval
 
 
 class results_manager:
@@ -15,33 +14,41 @@ class results_manager:
         """
         self._dict_results = {}
         self._analysis = type_estimate
+        # self._ws = workspace
 
-    def op(self, filename):
+    def Open(self, filename):
         with open(filename, "rb") as file:
             self._dict_results = pickle.load(file)
 
-    def write(self, filename):
+    def Write(self, filename):
         with open(filename, "wb") as file:
             pickle.dump(self._dict_results, file)
-            file.close()
+            # file.close()
+    
 
     def dictionary(self):
         return self._dict_results
 
-    def add_result(self, bin_pt, bin_eta, *res, check=False):
+    def add_result(self, ws, bin_pt, bin_eta, check=False, old_checks=False):
         """
         """
+        Npass, sigma_Npass = 0, 0
+        Nfail, sigma_Nfail = 0, 0
+
         if check is True:
+            # SISTEMARE, COSÌ NON FUNZIONA !!!!!!!!
             quality = 1
             for result in res:
-                quality = quality*fit_quality(result)
+                quality = quality*fit_quality(result, old_checks=old_checks)
             goodfit = bool(quality)
-            print(goodfit)
         else:
             goodfit = True
+        
 
         if goodfit and (f"{bin_pt},{bin_eta}" not in self._dict_results) and self._analysis == 'indep':
-            res_pass, res_fail = res
+            res_pass = ws.obj(f"results_pass_({bin_pt}|{bin_eta})")
+            res_fail = ws.obj(f"results_fail_({bin_pt}|{bin_eta})")
+            print(res_pass.GetName(), res_fail.GetName())
             for par in res_pass.floatParsFinal():
                 if par.GetName() == f'nsig_pass_({bin_pt}|{bin_eta})':
                     Npass = par.getVal()
@@ -50,91 +57,66 @@ class results_manager:
                 if par.GetName() == f'nsig_fail_({bin_pt}|{bin_eta})':
                     Nfail = par.getVal()
                     sigma_Nfail = par.getError()
-            eff, d_eff = eval_efficiency(
-                Npass, Nfail, sigma_Npass, sigma_Nfail)
 
-            print(f'Measured efficiency is: {eff} +- {d_eff}')
+            # histo_pass = self._ws.data(f"Minv_data_pass_({bin_pt}|{bin_eta})")
+            # histo_fail = self._ws.data(f"Minv_data_fail_({bin_pt}|{bin_eta})")
 
             new_res = {
                 f"{bin_pt},{bin_eta}": {
-                    "efficiency": (eff, d_eff),
-                    "fit_stat_pass": {
-                        "parameters": res_pass.floatParsFinal(),
-                        "cov_matrix": res_pass.covarianceMatrix(),
-                        "global_correlation": res_pass.globalCorr(),
-                        "migrad_status": res_pass.status(),
-                        "cov_matrix_quality": res_pass.covQual(),
-                        "EDM": res_pass.edm()
-                        },
-                    "fit_stat_fail": {
-                        "parameters": res_fail.floatParsFinal(),
-                        "cov_matrix": res_fail.covarianceMatrix(),
-                        "global_correlation": res_fail.globalCorr(),
-                        "migrad_status": res_fail.status(),
-                        "cov_matrix_quality": res_fail.covQual(),
-                        "EDM": res_fail.edm()
-                        }
+                    "efficiency" : eval_efficiency(Npass, Nfail, sigma_Npass, sigma_Nfail),
+                    "pars_pass" : res_pass.floatParsFinal(),
+                    "corrmatrix_pass" : res_pass.correlationMatrix(),
+                    "status_pass" : (res_pass.status(), res_pass.covQual(), res_pass.edm()),
+                    "pars_fail": res_fail.floatParsFinal(),
+                    "corrmatrix_fail": res_fail.correlationMatrix(),
+                    "status_fail" : (res_fail.status(), res_fail.covQual(), res_fail.edm())
                     }
                 }
+
             self._dict_results.update(new_res)
 
         elif goodfit and (f"{bin_pt},{bin_eta}" not in self._dict_results) and self._analysis == 'sim':
+            res = ws.obj(f"results_({bin_pt}|{bin_eta})")
             new_res = {f"{bin_pt},{bin_eta}": {
                 "parameters": res.floatParsFinal(),
-                "cov_matrix": res.covarianceMatrix(),
-                "global_correlation": res.globalCorr(),
-                "migrad_status": res.status(),
-                "cov_matrix_quality": res.covQual(),
-                "EDM": res.edm()
+                "corrmatrix": res.covarianceMatrix(),
+                "status": (res.status(), res.covQual(), res.edm())
                 }
             }
             self._dict_results.update(new_res)
         else:
             pass
 
-    def view_efficiencies(self, bin_pt=0, bin_eta=0):
-        """
-        HAS TO BE EXTENDED FOR SIMULTANEOUS FITS
-        """
-        res = self._dict_results
+    def getEfficiency(self, bin_pt=0, bin_eta=0):
 
-        print(" Bins   Efficiency ")
-        print("-------------------")
         if bin_pt == 0 and bin_eta == 0:
-            for key in res.keys():
-                eff = res[key]["efficiency"][0]
-                d_eff = res[key]["efficiency"][1]
-                if eff <= 1 and eff >= 0:
-                    print(f'  {key} | {eff} +- {d_eff} ')
-                else:
-                    print(f'  {key} | {eff} +- {d_eff} !!!!!')
+            eff = [] 
+            [eff.append(self._dict_results[key]["efficiency"]) for key in self._dict_results.keys()]
+                # d_eff.append(self._dict_results[key]["efficiency"][1])
         else:
-            eff = res[f"{bin_pt},{bin_eta}"]["efficiency"][0]
-            d_eff = res[f"{bin_pt},{bin_eta}"]["efficiency"][1]
-            if eff <= 1 and eff >= 0:
-                print(f'  {key} | {eff} +- {d_eff} ')
-            else:
-                print(f'  {key} | {eff} +- {d_eff} !!!!!')
+            eff = self._dict_results[f"{bin_pt},{bin_eta}"]["efficiency"]
+            # d_eff = self._dict_results[f"{bin_pt},{bin_eta}"]["efficiency"][1]
+        return eff
 
-    def view_fits_statuses(self):
-        """
-        HAS TO BE EXTENDED FOR SIMULTANEOUS FITS
-        """
-        res = self._dict_results
-        print(" Bins | mig  covQual  EDM")
-        print("     ")
-        for key in res.keys():
-            migr_p = res[key]["fit_stat_pass"]["migrad_status"]
-            covq_p = res[key]["fit_stat_pass"]["cov_matrix_quality"]
-            edm = res[key]["fit_stat_pass"]["EDM"]
-            print(f"  {key} |  {migr_p}      {covq_p}      {edm}")
-            migr_p = res[key]["fit_stat_fail"]["migrad_status"]
-            covq_f = res[key]["fit_stat_fail"]["cov_matrix_quality"]
-            edm = res[key]["fit_stat_fail"]["EDM"]
-            print(f"  {key} |  {migr_p}      {covq_f}      {edm}")
-            print("    ")
+    def getCorr(self, bin_pt=0, bin_eta=0):
 
-    def check_fit_status(self, bin_pt, bin_eta, conditions='all'):
+        if bin_pt == 0 and bin_eta == 0:
+            corr = [] 
+            if self._analysis == 'indep':
+                [corr.append(self._dict_results[key]["corrmatrix_fail"], 
+                             self._dict_results[key]["corrmatrix_pass"]) for key in self._dict_results.keys()]
+            elif self._analysis == 'sim':
+                [corr.append(self._dict_results[key]["corrmatrix"]) for key in self._dict_results.keys()]
+        else:
+            if self._analysis == 'indep':
+                corr = (self._dict_results[f"{bin_pt},{bin_eta}"]["corrmatrix_fail"], 
+                        self._dict_results[f"{bin_pt},{bin_eta}"]["corrmatrix_pass"])
+            elif self._analysis == 'sim':
+                corr = self._dict_results[f"{bin_pt},{bin_eta}"]["corrmatix"]
+
+        return corr
+
+    def getStatus(self, bin_pt, bin_eta, conditions='all'):
         """
         HAS TO BE EXTENDED FOR SIMULTANEOUS FITS
         """
@@ -183,16 +165,78 @@ class results_manager:
                 print(f'Bin {key} has {status} problems')
                 bins.append(key)
         return bins
+    
+
+def compare_results(results, ref_txt):
+
+    with open(ref_txt, "r") as file:
+        row_list = file.readlines()
+    
+    h_delta_eff = ROOT.TH1D("delta_eff", "delta_eff", 50, 0, 5e-4)
+    h_delta_deff = ROOT.TH1D("delta_deff", "delta_deff", 50, 0, 5e-5)
+
+    idx_list = 3
+
+    for i in range(1, 16):
+        for j in range(1, 49):
+            eff, deff = results.getEfficiency(i,j)
+            elements = row_list[idx_list].split('\t')
+
+            h_delta_eff.Fill(abs(eff-float(elements[4])))
+            h_delta_deff.Fill(abs(deff-float(elements[5])))
+
+            idx_list += 1
+
+    c = ROOT.TCanvas()
+    c.Divide(2)
+
+    c.cd(1)
+    ROOT.gPad.SetLogy()
+    ROOT.gPad.SetLeftMargin(0.15)
+    h_delta_eff.Draw()
+
+    c.cd(2)
+    ROOT.gPad.SetLogy()
+    ROOT.gPad.SetLeftMargin(0.15)
+    h_delta_deff.Draw()
+
+    c.SaveAs("results/benchmark_iso/figs/delta_eff.png")
+    
+
+
+
+        
+    
+    
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
 
-    filename = 'indep_eff_results.pkl'
+    '''
 
-    res = results_manager()
+    file = ROOT.TFile('root_files/ws/ws_iso_indep.root', "READ")
 
-    res.open(filename)
+    ws = file.Get("w")
 
-    probs = res.problematic_bins('migrad')
+    res = results_manager("indep")
 
-    print(len(probs))
+    for bin_pt in range(1, 16):
+        for bin_eta in range(1, 49):
+            res.add_result(ws, bin_pt, bin_eta, check=False)
+    '''
+
+    res = results_manager('indep')
+    res.Open("results/benchmark_iso/new_results.pkl")
+
+
+    # res.write("results/benchmark_iso/new_results.pkl")
+
+    compare_results(res, 'results/benchmark_iso/old_results.txt')
+    

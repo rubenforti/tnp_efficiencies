@@ -111,16 +111,16 @@ if __name__ == '__main__':
 
     bkg_pdf = 'expo'
 
-    
+    '''
     bins_pt = [num for num in range(1, 16)]
     bins_eta = [num for num in range(1, 49)]
     bin_combinations = True
-    
+    '''
 
     # ------------------------------------------------------------------------
 
-    '''
-    bin_keys = ['15,29']
+    
+    bin_keys = ['14,46', '15,29']
 
     bin_combinations = False
 
@@ -132,7 +132,7 @@ if __name__ == '__main__':
 
     print(bins_pt)
     print(bins_eta)
-    '''
+    
 
 
     workspace_name = f"root_files/ws/ws_{type_eff}_{type_analysis}.root"
