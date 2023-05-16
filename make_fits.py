@@ -9,11 +9,12 @@ from results_utils import results_manager
 from indep_efficiency import indep_eff_fits
 from indep_efficiency import check_existing_fit as fit_exist_indep
 from sim_efficiency import simultaneous_efficiency
+from sim_efficiency import check_existing_fit as fit_exist_sim
 from utilities import import_pdf_library, fit_quality
 from workspace_config import ws_init
 
 
-def make_fits(ws_name, type_eff, type_estimate, bins, bin_combinations, bkg_pdf='expo', test_bkg=False,
+def make_fits(ws_name, res_name, type_eff, type_analysis, bins, bin_combinations, bkg_pdf='expo', test_bkg=False,
               fit_verbosity=-1, savefigs=False):
     """
     """
@@ -40,10 +41,14 @@ def make_fits(ws_name, type_eff, type_estimate, bins, bin_combinations, bkg_pdf=
     Nproblems = 0
     bins_with_problems = []
 
+    res_object = results_manager(type_analysis)
+    res_object.Open(res_name)
+
+
     for idx in range(len(bins_list[0])):
         bin_pt, bin_eta = bins_list[0][idx], bins_list[1][idx]
 
-        if type_estimate == 'indep':
+        if type_analysis == 'indep':
             
             isFitted = fit_exist_indep(ws, (bin_pt, bin_eta))
             print(type(isFitted[0]), type(isFitted[1]))
@@ -54,37 +59,61 @@ def make_fits(ws_name, type_eff, type_estimate, bins, bin_combinations, bkg_pdf=
                                                     verb=fit_verbosity, figs=savefigs)
             else:
                 res_pass, res_fail = isFitted
-            # results.add_result(res_pass, res_fail, bin_pt, bin_eta, check=True)
+            
             status = bool(
                 fit_quality(res_pass, old_checks=True)*fit_quality(res_fail, old_checks=True))
 
-        elif type_estimate == 'sim':
-            results = simultaneous_efficiency(type_eff, "indep", ws, (bin_pt, bin_eta), bkg_pdf, 
-                                              test_bkg=False, same_smearing=False, enable_mcfit=False, 
-                                              verb=fit_verbosity, figs=savefigs)
+            if status is False:
+                print(f"\nBin {bin_pt},{bin_eta} has problems!\n")
+                Nproblems += 1
+                bins_with_problems.append(f"{bin_pt},{bin_eta}")
+                res_pass.Print()
+                res_pass.correlationMatrix().Print()
+                print("****")
+                res_fail.Print()
+                res_fail.correlationMatrix().Print()
+                print("****")
+                print(res_pass.status(), res_fail.status())
+                print(res_pass.covQual(), res_fail.covQual())
+                print(res_pass.edm(), res_fail.edm())
+                print(' ')
+            else:
+                res_object.add_result(ws, bin_pt, bin_eta)
+            
+        elif type_analysis == 'sim':
+            isFitted = fit_exist_sim(ws, (bin_pt, bin_eta))
+            if isFitted == 0:
+                results = simultaneous_efficiency(type_eff, "indep", ws, (bin_pt, bin_eta), bkg_pdf, 
+                                                  refit_numbkg=True, test_bkg=False, same_smearing=False, 
+                                                  enable_mcfit=False, verb=fit_verbosity, figs=savefigs)
+            else: 
+                results = isFitted
+
             status = fit_quality(results, old_checks=True)
+
+            if status is False:
+                print(f"\nBin {bin_pt},{bin_eta} has problems!\n")
+                Nproblems += 1
+                bins_with_problems.append(f"{bin_pt},{bin_eta}")
+                results.Print()
+                #results.correlationMatrix().Print()
+                print("****")
+                print(results.status())
+                print(results.covQual())
+                print(results.edm())
+                print(' ')
+            else:
+                res_object.add_result(ws, bin_pt, bin_eta)
+                
         else:
             print("Wrong fit strategy! Closing the program")
             sys.exit()
-
-        if status is False:
-            print(f"\nBin {bin_pt},{bin_eta} has problems!\n")
-            Nproblems += 1
-            bins_with_problems.append(f"{bin_pt},{bin_eta}")
-            res_pass.Print()
-            res_pass.correlationMatrix().Print()
-            print("****")
-            res_fail.Print()
-            res_fail.correlationMatrix().Print()
-            print("****")
-            print(res_pass.status(), res_fail.status())
-            print(res_pass.covQual(), res_fail.covQual())
-            print(res_pass.edm(), res_fail.edm())
-            print(' ')
-
+    
+        
     print(f"NUM of problematic bins = {Nproblems}")
     print(bins_with_problems)
     ws.writeToFile(workspace_name)
+    res_object.Write(f"results/results_{type_eff}_{type_analysis}.pkl")
 
 
 if __name__ == '__main__':
@@ -107,19 +136,20 @@ if __name__ == '__main__':
     types_efficiencies = ("sa", "global", "ID", "iso", "trigger", "veto")
     type_eff = types_efficiencies[3]
 
-    type_analysis = 'indep'
+    type_analysis = 'sim'
 
     bkg_pdf = 'expo'
 
     '''
-    bins_pt = [num for num in range(1, 16)]
+    bins_pt = [num for num in range(1, 2)]
     bins_eta = [num for num in range(1, 49)]
     bin_combinations = True
     '''
+    
     # ------------------------------------------------------------------------
 
     
-    bin_keys = ['6,7']
+    bin_keys = ['1,1']
 
     bin_combinations = False
 
@@ -135,9 +165,10 @@ if __name__ == '__main__':
 
 
     workspace_name = f"root_files/ws/ws_{type_eff}_{type_analysis}.root"
+    results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
 
     bins = (bins_pt, bins_eta)
-    make_fits(workspace_name, type_eff, type_analysis, bins, bin_combinations, 
+    make_fits(workspace_name, results_name, type_eff, type_analysis, bins, bin_combinations, 
               bkg_pdf, fit_verbosity=-1, savefigs=True)
 
  

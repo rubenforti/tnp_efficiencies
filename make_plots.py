@@ -30,11 +30,10 @@ def plot_pass_and_fail(axis, data, function, bkg_pdf,
     for comp1 in function[1].getComponents():
         if comp1.GetName() == bkg_pdf[1]:
             bkg_set = ROOT.RooArgSet(comp1)
-            function[1].plotOn(frame1,
-                ROOT.RooFit.Components(bkg_set),
-                ROOT.RooFit.LineColor(2),
-                ROOT.RooFit.LineStyle(ROOT.kDashed))
-    
+            function[1].plotOn(frame1, 
+                               ROOT.RooFit.Components(bkg_set),
+                               ROOT.RooFit.LineColor(2),
+                               ROOT.RooFit.LineStyle(ROOT.kDashed))
     frame1.Draw()
 
     c.cd(2)
@@ -55,13 +54,6 @@ def plot_pass_and_fail(axis, data, function, bkg_pdf,
     frame0.Draw()
 
     c.SaveAs(name)
-
-
-
-
-
-
-
 
 
 
@@ -125,7 +117,6 @@ def plot_results(filename, results, binning_pt=(), binning_eta=()):
 
     idx_pt, idx_eta = 0, 0
 
-    
     h_eff = ROOT.TH2D("efficiency_th2", "Efficiency (pt,eta)", len(binning_pt)-1, binning_pt,
                       len(binning_eta)-1, binning_eta)
     h_deff = ROOT.TH2D(

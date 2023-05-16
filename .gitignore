@@ -144,6 +144,6 @@ root_files/*.root
 root_files/
 
 # Temporary fig repository
+figs
 figs/
-
 results/benchmark_iso/fit_plots/

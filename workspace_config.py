@@ -98,7 +98,7 @@ if __name__ == '__main__':
     t = type_eff[3]
 
     types_analysis = ["indep", "sim"]
-    an = types_analysis[0]
+    an = types_analysis[1]
 
     binning_pt = array('d', [24., 26., 28., 30., 32., 34., 36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
 
