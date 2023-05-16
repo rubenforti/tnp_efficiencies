@@ -126,10 +126,10 @@ def plot_results(filename, results, binning_pt=(), binning_eta=()):
     idx_pt, idx_eta = 0, 0
 
     
-    h_eff = ROOT.TH2D("efficiency_histo", "Efficiency (pt,eta)", len(binning_pt)-1, binning_pt,
+    h_eff = ROOT.TH2D("efficiency_th2", "Efficiency (pt,eta)", len(binning_pt)-1, binning_pt,
                       len(binning_eta)-1, binning_eta)
     h_deff = ROOT.TH2D(
-        "eff_error_histo", "Relative error on efficiency (pt,eta)",
+        "eff_rel_error_th2", "Relative error on efficiency (pt,eta)",
         len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
     
     '''
@@ -144,33 +144,36 @@ def plot_results(filename, results, binning_pt=(), binning_eta=()):
         # print(eff[0], eff[1])
         h_eff.SetBinContent(idx_pt, idx_eta, eff[0])
         h_eff.SetBinError(idx_pt, idx_eta, eff[1])
-        h_deff.SetBinContent(idx_pt, idx_eta, 100.0*eff[1]/eff[0])
+        h_deff.SetBinContent(idx_pt, idx_eta, eff[1]/eff[0])
 
-    c1 = ROOT.TCanvas()
+    c1 = ROOT.TCanvas("efficiency", "efficiency", 1600, 900)
     c1.cd()
+    ROOT.gPad.SetRightMargin(0.15)
     h_eff.Draw("COLZ")
-    c1.SaveAs("figs/efficiency_indep.png")
+    c1.SaveAs("figs/efficiency_indep.pdf")
 
-    c2 = ROOT.TCanvas()
+    c2 = ROOT.TCanvas("error efficiency", "error efficiency", 1600, 900)
     c2.cd()
+    ROOT.gPad.SetRightMargin(0.15)
     h_deff.Draw("COLZ")
-    c2.SaveAs("figs/efficiency_indep_relerrors.png")
+    c2.SaveAs("figs/efficiency_indep_rel_errors.pdf")
 
-    file.Write("efficiency_histo")
-    file.Write("eff_error_histo")
+    #file.Write("efficiency_th2")
+    # file.Write("eff_rel_error_th2")
     file.Close()
 
 
 if __name__ == '__main__':
 
-    file = ROOT.TFile('root_files/ws/ws_iso_indep.root', "READ")
+    file = ROOT.TFile('results/benchmark_iso/ws_iso_indep.root', "READ")
 
     ws = file.Get("w")
 
-    res = results_manager("indep", ws)
+    res = results_manager("indep")
 
-    for bin_pt in range(1,  16):
+    for bin_pt in range(1, 16):
         for bin_eta in range(1, 49):
-            res.add_result(bin_pt, bin_eta, check=False)
+            res.add_result(ws, bin_pt, bin_eta, check=False)
+    # res.Write('results/benchmark_iso/new_results_2.pkl')
 
     plot_results("root_files/ws/ws_iso_indep.root", res)

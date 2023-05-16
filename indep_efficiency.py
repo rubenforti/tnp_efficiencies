@@ -35,8 +35,8 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
     # ----------------------------------
     #  Initial parameters - MODIFY HERE
     # ----------------------------------
-    NBINS = [2000, 10000]
-    bufFractions = [0.5, 0.05]
+    NBINS = [2000, 2000]
+    bufFractions = [0.5, 0.5]
 
     fit_strategy = [2, 2]
 
@@ -57,6 +57,7 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
             f"tau_pass_({bin[0]}|{bin[1]})", "tau", 0.0, -5, 5)
         tau_f = ROOT.RooRealVar(
             f"tau_fail_({bin[0]}|{bin[1]})", "tau", 0.0, -5, 5)
+        tau = [tau_f, tau_p]
     elif bkg_pdf == "mixed":
         pass
     elif bkg_pdf == "cmsshape":
@@ -68,7 +69,7 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
     # ------------------------------
     #  Histograms and PDFs building
     # ------------------------------
-    mean, sigma, tau = [mean_f, mean_p], [sigma_f, sigma_p], [tau_f, tau_p]
+    mean, sigma = [mean_f, mean_p], [sigma_f, sigma_p]
     axis, histo_data, pdf_mc = [0, 0], [0, 0], [0, 0]
     smearing, conv_pdf, background = [0, 0], [0, 0], [0, 0]
 
@@ -98,7 +99,7 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
                                          "Gaussian smearing", axis[idx], mean[idx], sigma[idx])
 
         conv_pdf[idx] = ROOT.RooFFTConvPdf(f"conv_{cond}_({bin[0]}|{bin[1]})", f"Convolution pdf",
-                                           axis[idx], pdf_mc[idx], smearing[idx], 3)
+                                           axis[idx], pdf_mc[idx], smearing[idx])
         conv_pdf[idx].setBufferFraction(bufFractions[idx])
         # conv_pdf[idx].setBufferStrategy(0)
         # conv_pdf[idx].setOperMode(3)
@@ -165,6 +166,9 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
         status_chi2 = check_chi2(histo_data[idx], model[idx], results[idx])
         status = bool(status_chi2*fit_quality(results[idx], old_checks=True))
 
+        print(status_chi2)
+        print(status)
+
         low_nbkg = (Nbkg[idx].getVal() < 0.005*Nsig[idx].getVal())
         print(Nbkg[idx].getVal())
         print(Nsig[idx].getVal())
@@ -220,9 +224,9 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
 
     res_pass, res_fail = results
 
-    # ----------------------------
-    #  Quality checks (and plots)
-    # ----------------------------
+    # ----------------------------------
+    #  Quality checks (and plots) - NEW
+    # ----------------------------------
     '''
     if fit_quality(res_pass) and fit_quality(res_fail):
         # ws.Import(model[0]), ws.Import(model[1])

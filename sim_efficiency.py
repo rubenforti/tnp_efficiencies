@@ -10,7 +10,7 @@ from make_plots import plot_distr_with_fit
 from utilities import import_pdf_library, pearson_chi2_eval, llr_test_bkg
 
 
-def simultaneous_efficiency(type_eff, bin, bkg_pdf='expo',
+def simultaneous_efficiency(type_eff, type_analysis, ws, bin, bkg_pdf,
                             same_smearing=True,
                             test_bkg=False,
                             enable_mcfit=False,
@@ -21,152 +21,139 @@ def simultaneous_efficiency(type_eff, bin, bkg_pdf='expo',
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
 
-    file_ws = ROOT.TFile(f"root_files/ws/{type_eff}_workspace_sim.root")
-    workspace = file_ws.Get("w")
+    # ----------------------------------
+    #  Initial parameters - MODIFY HERE
+    # ----------------------------------
+    NBINS = [2000, 10000]
+    bufFractions = [0.5, 0.05]
 
-    '''
-    if type(workspace[f'PDF_pass_({bin[0]}|{bin[1]})']) is ROOT.RooAddPdf:
-        # DA IMPLEMENTARE CORRETTAMENTE
-        sys.exit()
+    fit_strategy = [2, 2]
 
-    elif type(workspace[f'PDF_pass_({bin[0]}|{bin[1]})']) is ROOT.TObject and type(workspace[f'PDF_fail_({bin[0]}|{bin[1]})']) is ROOT.TObject:
-    '''
+    # Lower limit for NSIG and upper limit for NBKG, in terms of total events in the histogram, for pass and fail respectively
+    lims_num = [[0.5, 0.2], [0.5, 0.2]]
 
-    # SI ASSUME CHE LE PDF NON SIANO GIÀ STATE DEFINITE !!!!!!!!!!!!
 
-    axis = ROOT.RooRealVar(workspace[f"x_sim_({bin[0]}|{bin[1]})"])
+    axis = ws.var(f"x_sim_({bin[0]}|{bin[1]})")
     axis.setRange("fitRange", 50, 130)
-
-    NBINS = 8000
-    binning = ROOT.RooUniformBinning(axis.getRange(
-        "fitRange")[0], axis.getRange("fitRange")[1], NBINS)
-    axis.setBinning(binning, "cache")
-
-    h_data, h_mc, pdf_mc = [0, 0], [0, 0], [0, 0]
-
-    smearing, conv_pdf = [0, 0], [0, 0]
+    
+    axis.setBinning(
+        ROOT.RooUniformBinning(axis[idx].getRange("fitRange")[0],
+                               axis[idx].getRange("fitRange")[1], NBINS[idx]), "cache")
 
     if same_smearing is True:
         mean = ROOT.RooRealVar(
-            f"mean_({bin[0]}|{bin[1]})", "MEAN", 0, -2, 2)
+            f"mean_({bin[0]}|{bin[1]})", "mean", 0, -2, 2)
         sigma = ROOT.RooRealVar(
-            f"sigma_({bin[0]}|{bin[1]})", "SIGMA", 0.5, 0.001, 2)
+            f"sigma_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.01, 2)
     else:
-        mean, sigma = [0, 0], [0, 0]
+        mean_p = ROOT.RooRealVar(
+            f"mean_pass_({bin[0]}|{bin[1]})", "mean", 0, -2, 2)
+        sigma_p = ROOT.RooRealVar(
+            f"sigma_pass_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.01, 2)
+        mean_f = ROOT.RooRealVar(
+            f"mean__fail_({bin[0]}|{bin[1]})", "mean", 0, -2, 2)
+        sigma_f = ROOT.RooRealVar(
+            f"sigma_fail_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.01, 2)
+        
+        mean, sigma = [mean_f, mean_p], [sigma_f, sigma_p]
 
-    for cond in ["pass", "fail"]:
+
+    tau_p = ROOT.RooRealVar(f"tau_pass_({bin[0]}|{bin[1]})", "tau", 0.0, -5, 5)
+    tau_f = ROOT.RooRealVar(f"tau_fail_({bin[0]}|{bin[1]})", "tau", 0.0, -5, 5)
+    tau = [tau_f, tau_p]
+    
+    alpha_p = ROOT.RooRealVar(f"alpha_pass_({bin[0]}|{bin[1]})", "alpha", 60.0, 40.0, 130.0)
+    beta_p  = ROOT.RooRealVar(f"beta_pass_({bin[0]}|{bin[1]})", "beta",   2.5,  0.1,  40.0)
+    gamma_p = ROOT.RooRealVar(f"gamma_pass_({bin[0]}|{bin[1]})", "gamma", 0.1,  0.0,  1.0)
+    peak_p  = ROOT.RooRealVar(f"peak_pass_({bin[0]}|{bin[1]})", "peak",   90.0)
+
+    alpha_f = ROOT.RooRealVar(f"alpha_fail_({bin[0]}|{bin[1]})", "alpha", 60.0, 40.0, 130.0)
+    beta_f  = ROOT.RooRealVar(f"beta_fail_({bin[0]}|{bin[1]})", "beta",   2.5,  0.1,  40.0)
+    gamma_f = ROOT.RooRealVar(f"gamma_fail_({bin[0]}|{bin[1]})", "gamma", 0.1,  0.0,  1.0)
+    peak_f  = ROOT.RooRealVar(f"peak_fail_({bin[0]}|{bin[1]})", "peak",   90.0)
+
+    alpha, beta, gamma, peak = [alpha_f, alpha_p], [beta_f, beta_p], [gamma_f, gamma_p], [peak_f, peak_p]
+
+
+    # ------------------------------
+    #  Histograms and PDFs building
+    # ------------------------------
+    mean, sigma = [mean_f, mean_p], [sigma_f, sigma_p]
+    h_data, h_mc, pdf_mc = [0, 0], [0, 0], [0, 0]
+    smearing, conv_pdf, background = [0, 0], [0, 0], [0, 0]
+
+    nexp, Nsig, Nbkg = [0, 0], [0, 0], [0, 0]
+    sum_func, model, results, fit_status = [0, 0], [0, 0], [0, 0], [0, 0]
+
+    for cond in ["pass", "fail"]:  # PASS has index 1, FAIL has index 0
 
         idx = 1 if cond == "pass" else 0
         print(f'idx = {idx}')
 
-        h_data[idx] = workspace[f"Minv_data_{cond}_({bin[0]}|{bin[1]})"]
+        h_data[idx] = ws.data(f"Minv_data_{cond}_({bin[0]}|{bin[1]})")
         print(type(h_data[idx]))
 
-        h_mc[idx] = workspace[f"Minv_data_{cond}_({bin[0]}|{bin[1]})"]
+        h_mc[idx] = ws.data(f"Minv_mc_{cond}_({bin[0]}|{bin[1]})")
 
         pdf_mc[idx] = ROOT.RooHistPdf(
             f"pdf_mc_{cond}_({bin[0]}|{bin[1]})", f"pdf_mc_{cond}",
-            axis, workspace[f"Minv_mc_{cond}_({bin[0]}|{bin[1]})"])
+            axis, h_mc[idx])
         print(type(pdf_mc[idx]))
 
-        if same_smearing is True:
-            smearing[idx] = ROOT.RooGaussian(
+        if same_smearing and idx == 1:  # idx==1 needed not to create two times the same pdfs
+            smearing = ROOT.RooGaussian(
                 f"smearing_({bin[0]}|{bin[1]})", "Gaussian smearing", axis, mean, sigma)
+            conv_pdf[0] = ROOT.RooFFTConvPdf(f"conv_fail_({bin[0]}|{bin[1]})", f"Convolution pdf",
+                                               axis, pdf_mc[0], smearing, 3)
+            conv_pdf[1] = ROOT.RooFFTConvPdf(f"conv_pass_({bin[0]}|{bin[1]})", f"Convolution pdf",
+                                               axis, pdf_mc[1], smearing, 3)
         else:
-            mean[idx] = ROOT.RooRealVar(f"mean_{cond}_({bin[0]}|{bin[1]})",
-                                        f"MEAN {cond}", 0, -2, 2)
-            sigma[idx] = ROOT.RooRealVar(f"sigma_{cond}_({bin[0]}|{bin[1]})",
-                                         f"SIGMA {cond}", 0.5, 0.001, 2)
             smearing[idx] = ROOT.RooGaussian(
                 f"smearing_{cond}_({bin[0]}|{bin[1]})", "Gaussian smearing",
                 axis, mean[idx], sigma[idx])
+            conv_pdf[idx] = ROOT.RooFFTConvPdf(f"conv_{cond}_({bin[0]}|{bin[1]})", f"Convolution pdf",
+                                               axis, pdf_mc[idx], smearing[idx], 3)
 
-    conv_pdf_pass = ROOT.RooFFTConvPdf(
-        f"conv_pass_({bin[0]}|{bin[1]})", f"Convolution pass",
-        axis, pdf_mc[1], smearing[1], 3)
-    conv_pdf_pass.setBufferFraction(0.1)
-    conv_pdf_pass.setBufferStrategy(2)
-    print(type(conv_pdf_pass))
+        conv_pdf[idx].setBufferFraction(bufFractions[idx])
+        # conv_pdf[idx].setBufferStrategy(2)
+        # print(type(conv_pdf_pass))
 
-    conv_pdf_fail = ROOT.RooFFTConvPdf(
-        f"conv_pass_({bin[0]}|{bin[1]})", "Convolution fail",
-        axis, pdf_mc[0], smearing[0], 3)
-    conv_pdf_fail.setBufferFraction(0.1)
-    conv_pdf_fail.setBufferStrategy(2)
-
-    # -----------------
-    #  Background pass
-    # -----------------
-    if (bkg_pdf == 'expo') or (bkg_pdf == 'mixed'):
-        tau_pass = ROOT.RooRealVar(f"tau_pass_({bin[0]}|{bin[1]})",
-                                   "TAU PASS", -0.5, -2.0, 0.001)
-        background_pass = ROOT.RooExponential(
-            f"expo_bkg_pass_({bin[0]}|{bin[1]})",
-            "Exponential bkg pass", axis, tau_pass)
-    elif bkg_pdf == 'cmsshape':
-        alpha = ROOT.RooRealVar(
-            f"alpha_pass_({bin[0]}|{bin[1]})", "ALPHA", 60.0, 40.0, 130.0)
-        beta = ROOT.RooRealVar(
-            f"beta_pass_({bin[0]}|{bin[1]})", "BETA", 2.5, 0.01, 15.0)
-        gamma = ROOT.RooRealVar(
-            f"gamma_pass_({bin[0]}|{bin[1]})", "GAMMA", 0.1, 0.0001, 0.2)
-        peak = ROOT.RooRealVar(
-            f"peak_pass_({bin[0]}|{bin[1]})", "PEAK", 90.0)
-        background_pass = ROOT.RooCMSShape(
-            f"cmsshape_bkg_pass_({bin[0]}|{bin[1]})", "CMSShape bkg", axis,
-            alpha, beta, gamma, peak)
-        print(type(background_pass))
-    else:
-        print(
-            "BKG shape given is not implemented! Retry with 'expo', 'cmsshape', or 'mixed'")
-        sys.exit()
-
-    # -----------------
-    #  Background fail
-    # -----------------
-    if bkg_pdf == 'expo':
-        background_fail = ROOT.RooExponential(
-            f"expo_bkg_fail_({bin[0]}|{bin[1]})", "Exponential bkg",
-            axis, ROOT.RooRealVar(f"tau_fail_({bin[0]}|{bin[1]})",
-                                  "TAU FAIL", -0.5, -2.0, 0.001))
-    elif (bkg_pdf == 'cmsshape') or (bkg_pdf == 'mixed'):
-        background_fail = ROOT.RooCMSShape(
-            f"cmsshape_bkg_fail_({bin[0]}|{bin[1]})", "CMSShape bkg", axis,
-            ROOT.RooRealVar(
-                f"alpha_fail_({bin[0]}|{bin[1]})", "ALPHA", 60.0, 40.0, 130.0),
-            ROOT.RooRealVar(
-                f"beta_fail_({bin[0]}|{bin[1]})", "BETA", 2.5, 0.01, 15.0),
-            ROOT.RooRealVar(
-                f"gamma_fail_({bin[0]}|{bin[1]})", "GAMMA", 0.1, 0.0001, 0.2),
-            ROOT.RooRealVar(
-                f"peak_fail_({bin[0]}|{bin[1]})", "PEAK", 90.0))
+        if bkg_pdf == 'expo':
+            background[idx] = ROOT.RooExponential(
+                f"expo_bkg_{cond}_({bin[0]}|{bin[1]})", "Exponential bkg", axis, tau[idx])
+        elif bkg_pdf == 'mixed' and idx == 1:
+            background[1] = ROOT.RooExponential(
+                f"expo_bkg_pass_({bin[0]}|{bin[1]})", "Exponential bkg", axis, tau[1])
+            background[0] = ROOT.RooCMSShape(f"cmsshape_bkg_pass_({bin[0]}|{bin[1]})", "CMSShape bkg", 
+                                             axis, alpha[0], beta[0], gamma[0], peak[0])
+        elif bkg_pdf == 'cmsshape':
+            background[idx] = ROOT.RooCMSShape(f"cmsshape_bkg_{cond}_({bin[0]}|{bin[1]})", "CMSShape bkg", 
+                                               axis, alpha[idx], beta[idx], gamma[idx], peak[idx])
+        else:
+            print("BKG shape given is not implemented! Retry with 'expo', 'cmsshape', or 'mixed'")
+            sys.exit()
 
     # ------------------------------
     #  Model for extended fit on MC
     # ------------------------------
     if enable_mcfit:
-        expected_ntot_mc = h_mc[1].sumEntries() + h_mc[0].sumEntries()
+        expected_ntot_mc = h_mc[1].sumEntries() + h_mc[0].sumEntries()  # CHECK !!!!!
         Nmc_tot = ROOT.RooRealVar(
             f"Nmc_tot_({bin[0]}|{bin[1]})", "N_mc Total",
-            expected_ntot_mc, 0, expected_ntot_mc+4*ROOT.TMath.Sqrt(expected_ntot_mc))
-        eff_mc = ROOT.RooRealVar(
-            f"efficiency_mc_({bin[0]}|{bin[1]})", "Efficiency MC", 0, 1)
+            expected_ntot_mc, 0, expected_ntot_mc+5*ROOT.TMath.Sqrt(expected_ntot_mc))
+        
+        eff_mc = ROOT.RooRealVar(f"efficiency_mc_({bin[0]}|{bin[1]})", "Efficiency MC", 0, 1)
+        Nmc_pass = ROOT.RooProduct(f"Nmc_pass_({bin[0]}|{bin[1]})", "Nmc pass", [eff_mc, Nmc_tot])
 
-        Nmc_pass = ROOT.RooProduct(
-                f"Nmc_pass_({bin[0]}|{bin[1]})", "Nmc pass", [eff_mc, Nmc_tot])
-
-        one_minus_eff_mc = ROOT.RooPolyVar(
-            f"one_minus_eff_mc_({bin[0]}|{bin[1]})", "1 - efficiency (mc)",
-            eff_mc, [1, -1.])
+        one_minus_eff_mc = ROOT.RooPolyVar("one_minus_eff_mc_({bin[0]}|{bin[1]})", 
+                                           "1 - efficiency (mc)", eff_mc, [1, -1.])
         Nmc_fail = ROOT.RooProduct(
-                f"Nmc_fail_({bin[0]}|{bin[1]})", "Nmc fail", [one_minus_eff_mc, Nmc_tot])
+            f"Nmc_fail_({bin[0]}|{bin[1]})", "Nmc fail", [one_minus_eff_mc, Nmc_tot])
 
-        model_mc_pass = ROOT.RooExtendPdf(
-            f"mc_pass_ext_({bin[0]}|{bin[1]})",
-            "MC extended pass", pdf_mc[1], Nmc_pass)
-        model_mc_fail = ROOT.RooExtendPdf(
-            f"mc_fail_ext_({bin[0]}|{bin[1]})",
-            "MC extended fail", pdf_mc[0], Nmc_fail)
+        model_mc_pass = ROOT.RooExtendPdf(f"mc_pass_ext_({bin[0]}|{bin[1]})",
+                                          "MC extended pass", pdf_mc[1], Nmc_pass)
+        model_mc_fail = ROOT.RooExtendPdf(f"mc_fail_ext_({bin[0]}|{bin[1]})",
+                                          "MC extended fail", pdf_mc[0], Nmc_fail)
 
     # -----------------------
     #  Model for PASS events
@@ -244,21 +231,12 @@ def simultaneous_efficiency(type_eff, bin, bkg_pdf='expo',
         simPdf.addPdf(model_mc_fail, "mc_fail")
 
     res = simPdf.fitTo(comb_dataset,
-                       Extended=True,
-                       # Range='fitRange',
-                       # ExternalConstraints=ROOT.RooArgSet("nexp"),
-                       # BatchMode=False,
-                       # Offset=True,
-                       # Minimizer=("Minuit2", "migrad"),
-                       Strategy=2,
-                       MaxCalls=100000,
-                       Save=True,
-                       PrintLevel=0)
-
-    res.Print()
-    print(res.status())
-    print(res.covQual())
-    res.floatParsFinal().Print()
+                       ROOT.RooFit.Range("fitRange"),
+                       ROOT.RooFit.Minimizer("Minuit2"),
+                       ROOT.RooFit.Strategy(fit_strategy[idx]),
+                       # ROOT.RooFit.MaxCalls(100000),
+                       ROOT.RooFit.Save(1),
+                       ROOT.RooFit.PrintLevel(verb))
 
     res.SetName(f"results_{cond}_({bin[0]}|{bin[1]})")
 
@@ -266,8 +244,8 @@ def simultaneous_efficiency(type_eff, bin, bkg_pdf='expo',
 
     '''
     if fit_quality(res) is True:
-        workspace.Import(model)
-        workspace.Import(res)
+        ws.Import(model)
+        ws.Import(res)
     '''
 
     '''

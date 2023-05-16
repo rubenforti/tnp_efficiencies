@@ -2,6 +2,7 @@
 """
 import ROOT
 import pickle
+from array import array
 from utilities import fit_quality, eval_efficiency, pearson_chi2_eval
 
 
@@ -172,35 +173,81 @@ def compare_results(results, ref_txt):
     with open(ref_txt, "r") as file:
         row_list = file.readlines()
     
-    h_delta_eff = ROOT.TH1D("delta_eff", "delta_eff", 50, 0, 5e-4)
-    h_delta_deff = ROOT.TH1D("delta_deff", "delta_deff", 50, 0, 5e-5)
+
+    file = ROOT.TFile("prova_histo2d.root", "RECREATE")
+
+    
+    binning_pt = array('d', [24., 26., 28., 30., 32., 34.,
+                       36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
+    binning_eta = array('d', [round(-2.4 + i*0.1, 2) for i in range(49)])
+    
+    h_delta_eff = ROOT.TH1D("delta_eff", "delta eff", 50, -1e-4, 1e-4)
+    h2d_delta_eff = ROOT.TH2D("delta_eff_2d", "delta eff", len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
+    h_delta_deff = ROOT.TH1D("delta_deff", "delta deff", 50, -1e-5, 1e-5)
+    h2d_error_delta_eff = ROOT.TH2D("error_delta_eff_2d", "error delta eff", len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
+    h2d_pull = ROOT.TH2D("pull_delta_eff_2d", "pull delta eff", len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
 
     idx_list = 3
+
+    print(row_list[0])
+    print(row_list[1])
+    print(row_list[2])
+    print(row_list[3])
 
     for i in range(1, 16):
         for j in range(1, 49):
             eff, deff = results.getEfficiency(i,j)
             elements = row_list[idx_list].split('\t')
 
-            h_delta_eff.Fill(abs(eff-float(elements[4])))
-            h_delta_deff.Fill(abs(deff-float(elements[5])))
+            h_delta_eff.Fill(eff-float(elements[4]))
+            h_delta_deff.Fill(deff-float(elements[5]))
+
+            h2d_delta_eff.SetBinContent(i, j, eff-float(elements[4]))
+            h2d_error_delta_eff.SetBinContent(i, j, float(elements[5]))
+
+            h2d_pull.SetBinContent(i, j, abs(eff-float(elements[4]))/float(elements[5]))
 
             idx_list += 1
 
-    c = ROOT.TCanvas()
-    c.Divide(2)
 
-    c.cd(1)
+
+    c0 = ROOT.TCanvas("", "", 1200, 900)
+    c0.Divide(2)
+    c0.cd(1)
+    ROOT.gStyle.SetOptStat("men")
     ROOT.gPad.SetLogy()
-    ROOT.gPad.SetLeftMargin(0.15)
     h_delta_eff.Draw()
-
-    c.cd(2)
+    c0.cd(2)
     ROOT.gPad.SetLogy()
-    ROOT.gPad.SetLeftMargin(0.15)
     h_delta_deff.Draw()
+    c0.SaveAs("figs/delta_eff.pdf")
 
-    c.SaveAs("results/benchmark_iso/figs/delta_eff.png")
+
+
+    c1 = ROOT.TCanvas("delta_eff", "delta_eff", 1600, 900)
+    c1.cd()
+    ROOT.gStyle.SetOptStat("en")
+    ROOT.gPad.SetRightMargin(0.15)
+    ROOT.gStyle.SetPalette(57)
+    h2d_delta_eff.Draw("COLZ")
+    h2d_delta_eff.SetContour(50)
+    c1.SaveAs("figs/delta_eff_2d.pdf")
+
+
+    c2 = ROOT.TCanvas("pull_delta_eff", "pull_delta_eff", 1600, 900)
+    c2.cd()
+    ROOT.gStyle.SetOptStat("en")
+    ROOT.gPad.SetRightMargin(0.15)
+    h2d_pull.Draw("COLZ")
+    h2d_delta_eff.SetContour(50)
+    c1.SaveAs("figs/pull_delta_eff_2d.pdf")
+
+
+    h2d_delta_eff.Write()
+    h2d_error_delta_eff.Write()
+    h2d_pull.Write()
+
+    file.Close()
     
 
 
@@ -232,9 +279,14 @@ if __name__ == '__main__':
             res.add_result(ws, bin_pt, bin_eta, check=False)
     '''
 
-    res = results_manager('indep')
-    res.Open("results/benchmark_iso/new_results.pkl")
+    res = results_manager("indep")
+    res.Open("results/benchmark_iso/new_results_2.pkl")
 
+    res.dictionary()["1,13"]["pars_pass"].Print("v")
+    res.dictionary()["1,13"]["pars_fail"].Print("v")
+    print("*********")
+    res.dictionary()["4,39"]["pars_pass"].Print("v")
+    res.dictionary()["4,39"]["pars_fail"].Print("v")
 
     # res.write("results/benchmark_iso/new_results.pkl")
 

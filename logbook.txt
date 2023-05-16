@@ -240,6 +240,15 @@ iniziale (es. beta: 5.0->5.5) l'edm non scende più sotto ~0.1 e anzi gran parte
 volte ha valori ordine 10/100
 
 
+26/04-05/05/2023
+----------------
+### UPDATE
+
+
+08-10/05/2023
+-------------
+
+
 
 
 
@@ -257,32 +266,24 @@ volte ha valori ordine 10/100
 
 TO-DO LIST
 ----------
+- Far girare fit simultanei su iso e confrontare coi risultati "indep"
 
-- Implementare la CMSSHAPE come background
+- BACKGROUND: prendere i vari root files contenenti i diversi bkg e cercare di spiegare 
+  un andamento esponenziale -> GOF test?
 
-- Costruire un modulo che permetta di gestire in modo efficiente i diversi cicli
-  di fit
+- Estendere l'analisi ad altri step -> se il lavoro sui bkg si dimostra promettente,
+  rivogere particolare attenzione agli step "standalone" e "tracking"
 
-- Aggiornare la classe results per i fit simultanei
-
-- Trovare il modo di salvarsi le pdf iniziali nel workspace. Vedere se a tale
-  scopo può essere utile il metodo "factory"
-
-- Fit simultaneo tra pass e fail ANCHE sui mc: come PDF dei mc si usa una
-  RooExtendPdf e si fa la trasformazione eff -> (sf)*(eff_mc)
-
-- Iso with same charge dataset:
-    - Studio generale: confrontare le distribuzioni dei dati rispetto al
-      montecarlo in macro-bin di (pt,eta)
-    - Studio particolare: per ogni bin valutare quanta parte del fondo visto
-      nei dati è attribuibile ai diversi tipi di fondi: QCD (rappresentati dai
-      DATI "samecharge"), drell-Yan non prompt ecc.
 
 
 IDEE PER MIGLIORAMENTI
 ----------------------
-  - LLR test sul parametro Nbkg (con H0: Nbkg=0): implementare una funzione opzionale
-    che, in caso il test sia passato (con alpha=0.05), effettua un nuovo fit senza
-    l'ipotesi di bkg
-  - Per i bin (pt,eta) difficoltosi: si può dividere il dataset in due, fare fit
-    separati e vedere se la distribuzione della DIFFERENZA dei PULL è centrata in zero
+- LLR test sul parametro Nbkg (con H0: Nbkg=0): implementare una funzione opzionale
+  che, in caso il test sia passato (con alpha=0.05), effettua un nuovo fit senza
+  l'ipotesi di bkg
+
+- Gestione degli istogrammi poco popolati: secondo un'idea di Marco si potrebbe utilizzare
+  la distribuzione dei MC pass al posto della MC fail (?)
+
+- Per i bin (pt,eta) difficoltosi: si può dividere il dataset in due, fare fit
+  separati e vedere se la distribuzione della DIFFERENZA dei PULL è centrata in zero

@@ -145,3 +145,5 @@ root_files/
 
 # Temporary fig repository
 figs/
+
+results/benchmark_iso/fit_plots/

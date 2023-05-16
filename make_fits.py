@@ -116,11 +116,10 @@ if __name__ == '__main__':
     bins_eta = [num for num in range(1, 49)]
     bin_combinations = True
     '''
-
     # ------------------------------------------------------------------------
 
     
-    bin_keys = ['14,46', '15,29']
+    bin_keys = ['6,7']
 
     bin_combinations = False
 
