@@ -184,11 +184,11 @@ precedente si verificava un problema che riguardava dei "bin in eccesso" che ven
 creati automaticamente. Probabilmente era una questione legata alla creazione del
 buffer per la FFT (vedi "prepareFFTBinning"), per la quale Minuit2 si lamentava,
 al contrario di Minuit. Il problema èstato risolto cambiando strategia al buffer,
-da "Extend" a "Mirror", che mi sembra la pi� corretta (in generale DA RIVEDERE
-COSA SIGNIFICANO, non mi è chiarissimo)
+da "Extend" a "Mirror", che mi sembra la più corretta --> in generale DA RIVEDERE
+COSA SIGNIFICANO, non mi è chiarissimo  [#!!!!!#]
 
 In questo modo il fit gira, ma si ottengono valori di EDM praticamente sempre
-maggiori di 1 (di sicuro mai ordine 10^-5). Lo status del minimizer èquindi
+maggiori di 1 (di sicuro mai ordine 10^-5). Lo status del minimizer è quindi
 sempre 3, mentre la covQual si riesce a far tornare =3.
 
 Le cose cambiano però se si fa un "pre-fit" con Minuit (con anche impostazioni
@@ -197,7 +197,8 @@ Potrebbe essere un procedimento corretto? Alla fine è un trucco per indirizzare
 convenientemente Minuit2 verso il minimo, che altrimenti sembra non si riesca
 a trovare.
 Da notare comunque che le NLL ottenute con il pre-fit e senza sono molto vicine...
-potrebbe quindi essere piùun "vizio di forma" di Minuit2 che altro... (???)
+potrebbe quindi essere più un "vizio di forma" di Minuit2 che altro...  -->  No, 
+peggio, vedi sotto
 
 
 26/04/2023
@@ -242,16 +243,77 @@ volte ha valori ordine 10/100
 
 26/04-05/05/2023
 ----------------
-### UPDATE
+Problemi con Minuit2 riassunti nel report da inviare a Josh. 
+Si decide quindi di lavorare con ROOT 6.24/08 sulla macchina cmsanalysis (che ha CentOs7). La versione
+scelta è l'ultima possibile per la quale Centos7 è un OS indicato. Purtroppo le varie "pythonizations"
+sono disponibili solo dalla versione 6.26, quindi la sintassi è stata adattata.
+
+Reso utilizzabile il modulo make_fits, che diventerà il "main" della repository.
+La funzione per i fit indipendenti è stata rimodulata in modo che i parametri e le impostazioni siano
+diversi per i due fit.
 
 
 08-10/05/2023
 -------------
+Effettuata routine di fit indipendenti tenendo come parametri iniziali quelli presenti sul 
+software esistente:
+  - NBINS = 2000
+  - buffer fractions = 0.5
+  - PDF SIGNAL: mc con interpolazione 3, convoluta con gaussiana di smearing
+  - SMEARING: gaussiana con mu(0, -5, 5), sigma(0.5, 0.1, 5)
+  - FFT: interpolazione di default, quindi ordine 2
+  - PDF BKG: exponential con tau(0, -5, 5)
+  - NORMALIZZAZIONI: Nsig(0.9*ev, 0.5, 1.5*ev), Nbkg(0.1*ev, 0.5, 1.5*ev)
+  - QUALITY CHECKS: status=(0,1), covQual=3, |chi2_meas-chi2_expected|<10*sigma_chi2
+  - REFIT: se i check falliscono e Nbkg/Nsig<0.005, si fissa tau=1, Nbkg=0 e si riesegue il fit
+
+Con queste impostazione tutti i fit riescono all'interno della routine. Fa eccezione in realtà il bin 
+6,7 che ha l'unico difetto di avere un chi2 nei pass oltre le 10 sigma: visto che gli altri parametri 
+di status sono sotto controllo e dato che IL CHECK SUL CHI2 NON VUOLE AVERE VALORE STATISTICO (come 
+raccontato da Marco, è semplicemente un modo di scartare i casi in cui il minimizzatore trova un minimo
+ad occhio di molto non aderente ai dati). Si procede quindi in questi casi ad aumentare "ad libitum" la 
+soglia, in questo caso 12 sigma bastano.
+
+NOTA: per errore inizialmente si era impostato sigma(0.5, **0.2**, 5). Questo aveva un effetto particolare 
+su un bin, nel quale la stima di NBKG_fail risultava ~40 invece che ~11 come atteso --> si otteneva che la 
+efficienza stimata distava 1.5 sigma da quella attesa. In nessuno dei due casi il parametro risultava al 
+limite dopo la minimizzazione. Di fatto quindi alcune di queste misure sono sensibili a cambi nel range e 
+nello step-size iniziale di (alcuni) parametri  [#!!!!!#]
+
+Nella cartella "results/benchmark_iso" è stato salvato:
+  - workspace con PDF e results objects
+  - i plots dei singoli fit (in apposita cartella)
+  - plot 2D di efficienza ed errore relativo
+  - plot di confronto con risultati esistenti 
 
 
+16-18/05/2023
+-------------
+Finito di sistemare il codice per i fit simultaneo; i parametri importati sono gli stessi di sopra, perché 
+come primo test vogliamo verificare che si ottengano gli stessi risultati di sopra (il dataset infatti è 
+lo stesso, non ha senso pensare che si riduca l'incertezza!).
+La routine è completata in 6 runs:
+  - Run 1: default settings  ->  11 problematic bins
+  - Run 2: NBINS->5000       ->  6 prob. bins
+  - Run 3: NBINS->10000      ->  4 prob. bins
+  - Run 4: sigma(*1*, *0.4*, 5)  ->  2 prob. bins 
+  - Run 5: check_chi2->15*sigma_chi2  ->  1 prob. bins (risolve sempre il bin 6,7)
+  - Run 6: buffer->0.1, sigma(1, *0.05*, 5), NBINS->1000  ->  OK 
 
+Il confronto coi risultati precedenti è buono e non si notano criticità. Tutto salvato analogamente a 
+sopra nella cartella "results/benchmark_iso_sim"
 
-
+Da queste analisi di confronto emergono delle possibilità di miglioramento della procedura di fit:
+  - Strategia iniziale per la definizione dei parametri 
+  - L'interpolazione va bene così?
+  - La condizione per il refit, invece di un arbitrario S/B<0.005 potrebbe essere basata su quante sigma
+    dista Nsig da Ntot. In un certo senso potrebbe essere simile a un LLR test? In ogni caso il LLR test
+    sarebbe già pronto
+  - Andrebbe posto un controllo sui parametri, per non salvare minimizzazioni che includono parametri al 
+    limite. In questo caso potrebbe anche valere la pena essere conservativi.
+  - Per quanto riguarda l'EDM invece non ha molto senso stare a richiedere un ordine 10^-5. ATTENZIONE 
+    comunque che il valore restituito da res.edm() è il valore calcolato da HESSE, non da MIGRAD. Quale
+    dei due conviene guardare, in ogni caso? 
 
 
 
@@ -273,6 +335,13 @@ TO-DO LIST
 
 - Estendere l'analisi ad altri step -> se il lavoro sui bkg si dimostra promettente,
   rivogere particolare attenzione agli step "standalone" e "tracking"
+
+
+
+DUBBI APERTI
+------------
+- Come si imposta la step-size in Minuit2? Non sembra esserci nessun metodo a tal fine né in RooMinimizer ne in ROOT.Fit.Fitter 
+
 
 
 
