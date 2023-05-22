@@ -7,7 +7,7 @@ import os
 import sys
 from results_utils import results_manager
 from make_plots import plot_pass_and_fail
-from utilities import import_pdf_library, fit_quality
+from utilities import import_pdf_library, fit_quality, check_chi2
 
 
 def check_existing_fit(ws, bin):
@@ -35,8 +35,8 @@ def simultaneous_efficiency(type_eff, type_analysis, ws, bin, bkg_pdf,
     # ----------------------------------
     #  Initial parameters - MODIFY HERE
     # ----------------------------------
-    NBINS = 5000
-    bufFractions = [0.2, 0.2]  # [Fail, Pass]
+    NBINS = 1000
+    bufFractions = [0.1, 0.1]  # [Fail, Pass]
 
     fit_strategy = 2
 
@@ -58,11 +58,11 @@ def simultaneous_efficiency(type_eff, type_analysis, ws, bin, bkg_pdf,
         mean_p = ROOT.RooRealVar(
             f"mean_pass_({bin[0]}|{bin[1]})", "mean", 0, -5.0, 5.0)
         sigma_p = ROOT.RooRealVar(
-            f"sigma_pass_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.1, 5.0)
+            f"sigma_pass_({bin[0]}|{bin[1]})", "sigma", 1, 0.05, 5.0)
         mean_f = ROOT.RooRealVar(
             f"mean_fail_({bin[0]}|{bin[1]})", "mean", 0, -5.0, 5.0)
         sigma_f = ROOT.RooRealVar(
-            f"sigma_fail_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.1, 5.0)
+            f"sigma_fail_({bin[0]}|{bin[1]})", "sigma", 1, 0.05, 5.0)
         
         mean, sigma = [mean_f, mean_p], [sigma_f, sigma_p]
         
@@ -188,11 +188,11 @@ def simultaneous_efficiency(type_eff, type_analysis, ws, bin, bkg_pdf,
             f"Nbkg_pass_({bin[0]}|{bin[1]})", "Nbkg pass",
             0.1*histo_data[1].sumEntries(), 0.5, 1.5*histo_data[1].sumEntries())
 
-    sum_pass = ROOT.RooAddPdf(
-            f"sum_pass_({bin[0]}|{bin[1]})", "Signal+Bkg pass",
-            ROOT.RooArgList(conv_pdf[1], background[1]), ROOT.RooArgList(Nsig_pass, Nbkg_pass))
+    sum_pass = ROOT.RooAddPdf(f"sum_pass_({bin[0]}|{bin[1]})", "Signal+Bkg pass",
+                              ROOT.RooArgList(conv_pdf[1], background[1]), 
+                              ROOT.RooArgList(Nsig_pass, Nbkg_pass))
     model_pass = ROOT.RooAddPdf(sum_pass)
-    print(type(model_pass))
+    model_pass.setNormRange("fitRange")
 
     # -----------------------
     #  Model for FAIL events
@@ -208,11 +208,11 @@ def simultaneous_efficiency(type_eff, type_analysis, ws, bin, bkg_pdf,
             f"Nbkg_fail_({bin[0]}|{bin[1]})", "Nbkg fail",
             0.1*histo_data[0].sumEntries(), 0.5, 1.5*histo_data[0].sumEntries())
 
-    sum_fail = ROOT.RooAddPdf(
-            f"sum_fail_({bin[0]}|{bin[1]})", "Signal+Bkg fail",
-            ROOT.RooArgList(conv_pdf[0], background[0]), ROOT.RooArgList(Nsig_fail, Nbkg_fail))
+    sum_fail = ROOT.RooAddPdf(f"sum_fail_({bin[0]}|{bin[1]})", "Signal+Bkg fail",
+                              ROOT.RooArgList(conv_pdf[0], background[0]), 
+                              ROOT.RooArgList(Nsig_fail, Nbkg_fail))
     model_fail = ROOT.RooAddPdf(sum_fail)
-    print(type(model_fail))
+    model_fail.setNormRange("fitRange")
 
     # --------------------
     #  Categories and fit
@@ -253,20 +253,59 @@ def simultaneous_efficiency(type_eff, type_analysis, ws, bin, bkg_pdf,
                        ROOT.RooFit.Save(1),
                        ROOT.RooFit.PrintLevel(verb))
 
-    res.SetName(f"results_({bin[0]}|{bin[1]})")
-
     # pearson_chi2_eval(histo_data, model, histo_data.numEntries(), res)
 
-    
+    if refit_numbkg and bkg_pdf=='expo':
+
+        status_chi2_pass = check_chi2(histo_data[1], model_pass, res)
+        status_pass = bool(status_chi2_pass*fit_quality(res, old_checks=True))
+        low_nbkg_pass = (Nbkg_pass.getVal() < 0.005*Nsig_pass.getVal())
+        refit_pass = (status_pass is False) and low_nbkg_pass
+
+        status_chi2_fail = check_chi2(histo_data[0], model_fail, res)
+        status_fail = bool(status_chi2_fail*fit_quality(res, old_checks=True))
+        low_nbkg_fail = (Nbkg_fail.getVal() < 0.005*Nsig_fail.getVal())
+        refit_fail = (status_fail is False) and low_nbkg_fail
+        
+        if refit_pass:
+            tau_p.setVal(1)
+            tau_p.setConstant()
+            Nbkg_pass.setVal(0)
+            Nbkg_pass.setConstant()
+
+        if refit_fail:
+            tau_f.setVal(1)
+            tau_f.setConstant()
+            Nbkg_fail.setVal(0)
+            Nbkg_fail.setConstant()
+        
+        if refit_pass or refit_fail:
+            print("REFITTING WITHOUT BACKGROUND")
+            print("\n\n\n\n")
+            res = simPdf.fitTo(comb_dataset,
+                               ROOT.RooFit.Range("fitRange"),
+                               ROOT.RooFit.Minimizer("Minuit2"),
+                               ROOT.RooFit.Strategy(fit_strategy),
+                               ROOT.RooFit.Save(1),
+                               ROOT.RooFit.PrintLevel(verb)
+                               )
+        
+    check_title = ''
+    if (check_chi2(histo_data[1], model_pass, res) is False) or \
+       (check_chi2(histo_data[0], model_fail, res) is False):
+        res.SetTitle("Chi2_not_passed")
+    res.SetName(f"results_({bin[0]}|{bin[1]})")
+
+            
     if fit_quality(res, old_checks=True) is True:
         ws.Import(simPdf)
         ws.Import(res)
         if figs:
-            bkg_names =[background[0].GetName(), background[1].GetName()]
+            bkg_names = [background[0].GetName(), background[1].GetName()]
             plot_pass_and_fail((axis, axis), histo_data, (model_fail, model_pass), bkg_names, 
                                name=f"figs/fit_iso/bin_{bin[0]},{bin[1]}.pdf")
     else:
-        bkg_names =[background[0].GetName(), background[1].GetName()]
+        bkg_names = [background[0].GetName(), background[1].GetName()]
         plot_pass_and_fail((axis, axis), histo_data, (model_fail, model_pass), bkg_names, 
                            name=f"figs/check_fits/bin_{bin[0]},{bin[1]}.pdf")
 

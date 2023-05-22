@@ -269,7 +269,7 @@ def compare_analysis(res_1, res_2):
     h_delta_deff = ROOT.TH1D("delta_deff", "delta deff", 50, -1e-5, 1e-5)
     h2d_pull = ROOT.TH2D("pull_delta_eff_2d", "pull delta eff", len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
 
-    for i in range(1, 2):
+    for i in range(1, 16):
         for j in range(1, 49):
             eff_1, deff_1 = res_1.getEfficiency(i,j)
             eff_2, deff_2 = res_2.getEfficiency(i,j)
@@ -332,8 +332,8 @@ if __name__ == '__main__':
 
     res_1 = results_manager("indep")
     res_2 = results_manager("sim")
-    res_1.Open("results/benchmark_iso/new_results.pkl")
-    res_2.Open("results/results_iso_sim.pkl")
+    res_1.Open("results/benchmark_iso/results_iso_indep_benchmark.pkl")
+    res_2.Open("results/benchmark_iso_sim/results_iso_sim.pkl")
 
 
 

@@ -141,13 +141,13 @@ def plot_results(filename, results, binning_pt=(), binning_eta=()):
     c1.cd()
     ROOT.gPad.SetRightMargin(0.15)
     h_eff.Draw("COLZ")
-    c1.SaveAs("figs/efficiency_indep.pdf")
+    c1.SaveAs("figs/efficiency_sim.pdf")
 
     c2 = ROOT.TCanvas("error efficiency", "error efficiency", 1600, 900)
     c2.cd()
     ROOT.gPad.SetRightMargin(0.15)
     h_deff.Draw("COLZ")
-    c2.SaveAs("figs/efficiency_indep_rel_errors.pdf")
+    c2.SaveAs("figs/efficiency_sim_rel_errors.pdf")
 
     #file.Write("efficiency_th2")
     # file.Write("eff_rel_error_th2")
@@ -156,15 +156,19 @@ def plot_results(filename, results, binning_pt=(), binning_eta=()):
 
 if __name__ == '__main__':
 
+    
+    '''
     file = ROOT.TFile('results/benchmark_iso/ws_iso_indep.root', "READ")
 
     ws = file.Get("w")
-
+    '''
     res = results_manager("indep")
-
+    res.Open("results/benchmark_iso_sim/results_iso_sim.pkl")
+    '''
     for bin_pt in range(1, 16):
         for bin_eta in range(1, 49):
             res.add_result(ws, bin_pt, bin_eta, check=False)
+    '''
     # res.Write('results/benchmark_iso/new_results_2.pkl')
 
     plot_results("root_files/ws/ws_iso_indep.root", res)

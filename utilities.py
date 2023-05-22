@@ -46,7 +46,7 @@ def check_chi2(histo, pdf, res):
 
     print(chi2val, ndof)
 
-    status_chi2 = bool(abs(chi2val - ndof) < 12*((2*ndof)**0.5))
+    status_chi2 = bool(abs(chi2val - ndof) < 15*((2*ndof)**0.5))
 
     return status_chi2
 

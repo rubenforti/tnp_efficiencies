@@ -14,8 +14,8 @@ from utilities import import_pdf_library, fit_quality
 from workspace_config import ws_init
 
 
-def make_fits(ws_name, res_name, type_eff, type_analysis, bins, bin_combinations, bkg_pdf='expo', test_bkg=False,
-              fit_verbosity=-1, savefigs=False):
+def make_fits(ws_name, res_name, type_eff, type_analysis, bins, bin_combinations, 
+              bkg_pdf='expo', test_bkg=False, fit_verbosity=-1, savefigs=False):
     """
     """
     path = os.path.dirname(__file__)
@@ -140,16 +140,16 @@ if __name__ == '__main__':
 
     bkg_pdf = 'expo'
 
-    '''
-    bins_pt = [num for num in range(1, 2)]
+    '''    
+    bins_pt = [num for num in range(1, 16)]
     bins_eta = [num for num in range(1, 49)]
     bin_combinations = True
+
     '''
-    
     # ------------------------------------------------------------------------
 
     
-    bin_keys = ['1,1']
+    bin_keys = ['13,2']
 
     bin_combinations = False
 
@@ -161,15 +161,13 @@ if __name__ == '__main__':
 
     print(bins_pt)
     print(bins_eta)
-    
-
 
     workspace_name = f"root_files/ws/ws_{type_eff}_{type_analysis}.root"
     results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
 
     bins = (bins_pt, bins_eta)
     make_fits(workspace_name, results_name, type_eff, type_analysis, bins, bin_combinations, 
-              bkg_pdf, fit_verbosity=-1, savefigs=True)
+              bkg_pdf, fit_verbosity=1, savefigs=True)
 
  
 
