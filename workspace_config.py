@@ -12,10 +12,11 @@ def get_roohist(file, type_set, flag, axis, bin_pt, bin_eta, global_scale=-1.):
     (pt, eta) bin, selected from the TH3 given as input.
     """
 
-    # Option "e" has to be activated? Not clear how "errors are computed"
-
-
-    print(type_set)
+    if len(bin_pt) == 1:
+        bin_pt.append(bin_pt[0])
+    
+    if len(bin_eta) == 1:
+        bin_eta.append(bin_eta[0])
 
     if type_set == "data":
         type_suffix = "RunGtoH"
@@ -30,7 +31,7 @@ def get_roohist(file, type_set, flag, axis, bin_pt, bin_eta, global_scale=-1.):
     
     histo3d = file.Get(f"{flag}_mu_{type_suffix}")
 
-    th1_histo = histo3d.ProjectionX(f"Histo_data_{flag}", bin_pt, bin_pt, bin_eta, bin_eta)
+    th1_histo = histo3d.ProjectionX(f"Histo_data_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")  # Option "e" is specified to calculate the bin errors in the new histogram for generic selection of bin_pt and bin_eta. Without it, it all works well ONLY IF the projection is done on one single bin of (pt, eta)
     
     if global_scale > 0:
         th1_histo.Scale(global_scale)
@@ -83,11 +84,11 @@ def ws_init(file_data, file_mc, type_eff, type_analysis, bins_pt, bins_eta, bins
                 print("INVALID ANALYSIS TYPE")
                 sys.exit()
 
-            histo_data_pass = get_roohist(file_data, "data", "pass", axis[1], i, j)
-            histo_mc_pass = get_roohist(file_mc, "mc", "pass", axis[1], i, j)
+            histo_data_pass = get_roohist(file_data, "data", "pass", axis[1], [i], [j])
+            histo_mc_pass = get_roohist(file_mc, "mc", "pass", axis[1], [i], [j])
 
-            histo_data_fail = get_roohist(file_data, "data", "fail", axis[0], i, j)
-            histo_mc_fail = get_roohist(file_mc, "mc", "fail", axis[0], i, j)
+            histo_data_fail = get_roohist(file_data, "data", "fail", axis[0], [i], [j])
+            histo_mc_fail = get_roohist(file_mc, "mc", "fail", axis[0], [i], [j])
 
             w.Import(histo_data_pass)
             w.Import(histo_mc_pass)

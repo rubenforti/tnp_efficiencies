@@ -317,6 +317,42 @@ Da queste analisi di confronto emergono delle possibilità di miglioramento dell
 
 
 
+24-26/05/2023
+-------------
+INIZIO DELL'ANALISI SUI BACKGROUNDS. Sempre considerando lo step "iso", si prendono gli istogrammi 3D di
+ogni processo di background desiderato e si fa la proiezione nei bin selezionati. Ogni istogramma (quando
+ancora è un TH1) viene moltiplicato per un fattore che è pari a Lumi_data/Lumi_bkg.
+
+Dettagli sullo scaling: quando si chiama il metodo scale() viene attivata in automatico l'opzione SumW2 per
+gli errori dell'istogramma. Ora, finché su quell'istogramma non ci si fa nulla va tutto bene, e infatti 
+viene successivamente trasformato in un RooDataHist (che resterà sempre tale e quale).
+VA VERIFICATO CHE GLI ERRORI DEL ROODATAHIST SIANO EFFETTIVAMENTE QUELLI CHE CI SI ASPETTA (ovvero 
+sqrt(n)*scale)
+
+Dettagli sui datasets a disposizione:
+  - "ZZ" si riferisce solamente a ZZ->2l+2nu, con xs=0.60 pb. Non abbiamo a disposizione il dataset
+    ZZ->2l+2q, che sarebbe più interessante perché ha un fattore 8.5 in sezione d'urto. La strategia attuale
+    è di assumere che siano processi simili e che quindi ogni valutazione sul primo set si possa estendere 
+    al secondo
+  - "Ztautau" contiene solo una decina di eventi IN TOTALE. C'è chiaramente un problema di fondo, che dovrà
+    risolvere qualcuno (sperem)
+
+
+29/05-01/06/2023
+----------------
+Eventi di bkg "ZZ": la loro distribuzione in massa (per macro bin di pt e eta) è piccata a 90 GeV, come in 
+parte atteso. La cosa da fare ora è confrontare la forma di questa distrib. con quella del MC di segnale
+(Z->mumu), e decidere se etichettare questo processo come segnale
+
+I passaggi successivi sono questi:
+  - stabilire in modo preciso quanto un processo di bkg è rilevante.
+  - fare un fit alle distribuzioni dei bkg sommati, in macro-bin di pt,eta se necessario
+  - effettuare una nuova routine di fit con questo modello
+  - confrontare i risultati con ipotesi esponenziale
+
+ATTENZIONE: la funzione "get_roohist" è stata modificata in modo tale da accettare più bin di pt e/o eta,
+al fine di fare un'analisi su macro-bin. I nomi dei dataset dipendono dalla forma con cui è passato l'indice
+del bin, quindi va fatta attenzione quando ad es. si vuole importare un dataset di bkg da un workspace
 
 
 
@@ -343,6 +379,11 @@ DUBBI APERTI
 - Come si imposta la step-size in Minuit2? Non sembra esserci nessun metodo a tal fine né in RooMinimizer ne in ROOT.Fit.Fitter 
 
 
+
+SYNTAX IMPROVEMENTS
+-------------------
+- Fare un main vero e proprio con rispettivo parser
+- Cambiare la segnatura di ogni bin: (idx_pt|idx_eta)->[pt_low,pt_high]_[eta_low_eta_high]
 
 
 IDEE PER MIGLIORAMENTI

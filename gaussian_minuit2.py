@@ -34,7 +34,7 @@ def prova_min2():
     model = ROOT.RooExtendPdf(
         "Extended", "extend", bkg_fit, expected_num)
 
-    res2 = model.fitTo(data, Extended=True, Minimizer=("Minuit2"), Save=True, PrintLevel=3)
+    res2 = model.fitTo(data, Extended=True, Minimizer=("Minuit2"), Save=True, PrintLevel=-1)
 
     print("***********************************")
     res2.Print()
