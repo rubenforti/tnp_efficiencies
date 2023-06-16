@@ -3,36 +3,15 @@
 
 import sys
 import os
-import pickle
 import ROOT
+from array import array
 
-
-def import_pdf_library(*functions):
-    """
-    """
-    current_path = os.path.dirname(__file__)
-
-    for function in functions:
-        header_incl = ' #include "libCpp/'+function+'.h"'
-        sourcefile = os.path.join(current_path, 'libCpp', f'{function}.cc')
-
-        print(sourcefile)
-        ctrl_head = ROOT.gInterpreter.Declare(header_incl)
-        ctrl_source = ROOT.gSystem.CompileMacro(sourcefile, opt="ks")
-
-        if ctrl_head is not True:
-            print("ERROR in header loading")
-            sys.exit()
-        if ctrl_source != 1:
-            print("ERROR in sourcefile compiling and loading")
-            sys.exit()
 
 def pearson_chi2_eval(histo, pdf, nbins, res):
     """
     """
     ndof = nbins - res.floatParsFinal().getSize()
-    print(ndof)
-
+    # print(ndof)
     chi2_obj = ROOT.RooChi2Var("chi2", "chi2", pdf, histo)
     chi2_val = chi2_obj.getVal() 
 
@@ -43,9 +22,7 @@ def check_chi2(histo, pdf, res):
     """
     """
     chi2val, ndof = pearson_chi2_eval(histo, pdf, histo.numEntries(), res)
-
-    print(chi2val, ndof)
-
+    # print(chi2val, ndof)
     status_chi2 = bool(abs(chi2val - ndof) < 15*((2*ndof)**0.5))
 
     return status_chi2
@@ -54,7 +31,6 @@ def check_chi2(histo, pdf, res):
 def fit_quality(res, old_checks=False):
     """
     """
-
     check_covm = (res.covQual() == 3)
     if old_checks is True:
         check_migrad = (res.status() == 0 or res.status() == 1)
@@ -66,22 +42,9 @@ def fit_quality(res, old_checks=False):
         return bool(check_migrad*check_covm*check_edm)
 
 
-
-def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
-    """
-    """
-    eff = npass/(npass+nfail)
-    var1 = (nfail**2)*(sigma_npass**2)
-    var2 = (npass**2)*(sigma_nfail**2)
-    sigma_eff = ROOT.TMath.Sqrt(var1+var2)/((npass+nfail)**2)
-
-    return eff, sigma_eff
-
-
 def llr_test_bkg(histo, pdf, alpha=0.05):
     """
     """
-
     pars_set = pdf.getParameters(histo)
 
     profiled_var = ROOT.RooRealVar()
@@ -105,7 +68,3 @@ def llr_test_bkg(histo, pdf, alpha=0.05):
     null = True if pval > 0.05 else False
 
     return null
-
-
-if __name__ == '__main__':
-    print("CIAO")

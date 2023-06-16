@@ -3,7 +3,8 @@
 
 import ROOT
 from workspace_config import get_roohist
-from results_utils import results_manager
+from utilities.results_utils import results_manager
+from utilities.general_utils import get_std_binnings
 from array import array
 import sys
 
@@ -66,47 +67,10 @@ def initialize_bkg_h2d(bkg_categories, binning_pt, binning_eta):
     return histos_pass, histos_fail
 
 
-BR_TAUToMU = 0.1739
-BR_TAUToE = 0.1782
-Z_TAU_TO_LEP_RATIO = (1.-(1. - BR_TAUToMU - BR_TAUToE)**2)
-xsec_ZmmPostVFP = 2001.9
-
-cross_sections_bkg = {
-    # Unit = pb
-    "WW" : 12.6,
-    "WZ" : 5.4341,
-    "ZZ" : 0.60,
-    "TTSemileptonic" : 366.34,
-    "Ztautau" : xsec_ZmmPostVFP*Z_TAU_TO_LEP_RATIO
-}
-
 
 def plot_bkg_mass():
 
     pass
-
-def get_bkg_lumi_scale(type_eff, bkg_categories):
-    """
-    "Lumi scale" defined as alpha that satisifies alpha*lumi_bkg = lumi_data
-    """
-
-    lumi_data = 16.8  # fb^-1
-
-    lumi_scale = {}
-
-    for cat in bkg_categories:
-        file = ROOT.TFile(f"/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root")
-        
-        wsum_histo = file.Get("weightSum")
-        num_init = wsum_histo.Integral()
-        xsection = cross_sections_bkg[cat]*1000
-        lumi_bkg = num_init/xsection
-
-        scale = lumi_data/lumi_bkg
-
-        lumi_scale.update({cat : scale})
-    
-    return lumi_scale
 
 
 
@@ -206,11 +170,14 @@ def draw_bkg_distrib_2d(workspace_bkg, bkg_categories, lumi_scales, binning_pt, 
             file_data = ROOT.TFile(file_ws_data)
             ws_data = file_data.Get("w")
 
+        print(len(binning_pt), len(binning_eta))
         for i in range(1, len(binning_pt)):
             for j in range(1, len(binning_eta)):
-                h_pass = workspace_bkg.data(f"Minv_bkg_pass_({i}|{j})_{cat}")
-                h_fail = workspace_bkg.data(f"Minv_bkg_fail_({i}|{j})_{cat}")
-                n_pass, n_fail = h_pass.sumEntries(), h_fail.sumEntries()
+                print(i, j)
+                h_pass = workspace_bkg.data(f"Minv_bkg_pass_([{i},{i}]|[{j},{j}])_{cat}")
+                h_fail = workspace_bkg.data(f"Minv_bkg_fail_([{i},{i}]|[{j},{j}])_{cat}")
+                n_pass = h_pass.sumEntries()
+                n_fail = h_fail.sumEntries()
                 
                 if divide_for_data:
                     h_data_pass = ws_data.data(f"Minv_data_pass_({i}|{j})")
@@ -253,30 +220,30 @@ def draw_bkg_distrib_2d(workspace_bkg, bkg_categories, lumi_scales, binning_pt, 
 
 if __name__ == "__main__":
 
-    # bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
-    bkg_categories = ["ZZ"]
-    binning_pt = array('d', [24., 26., 28., 30., 32., 34., 36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
-    binning_eta = array('d', [round(-2.4 + i*0.1, 2) for i in range(49)])
+    bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
+    # bkg_categories = ["ZZ"]
+    binning_pt, binning_eta = get_std_binnings()
 
     new_binning_pt = array('d', [24., 28., 32., 36., 40., 44., 47., 50., 55., 60., 65.])
     scale_bin_eta = 4
     new_binning_eta = array('d', [round(-2.4 + i*0.1*scale_bin_eta, 2) for i in range(int(48/scale_bin_eta)+1)])
     
 
-    lumi_scales = get_bkg_lumi_scale("iso", bkg_categories)  # To be multiplied w/ the number of events
-    
-    ws = generate_bkg_datasets("iso", bkg_categories, lumi_scales, binning_pt, binning_eta, 
-                               merge_bins=True, new_binning_pt=binning_pt, new_binning_eta=new_binning_eta)
-
-    
-    # file = ROOT.TFile("root_files/ws/ws_backgrounds_iso.root")
-    # ws = file.Get("w")
+    lumi_scales = {"WW":1, "WZ":1, "ZZ":1, "TTSemileptonic":1, "Ztautau":1}
+    # lumi_scales = get_bkg_lumi_scale("iso", bkg_categories)  # To be multiplied w/ the number of events
     
     '''
+    ws = generate_bkg_datasets("iso", bkg_categories, lumi_scales, binning_pt, binning_eta) #, 
+                               # merge_bins=True, new_binning_pt=binning_pt, new_binning_eta=new_binning_eta)
+    '''
+    
+    file = ROOT.TFile("root_files/ws/ws_backgrounds_iso.root")
+    ws = file.Get("w")
+    
+
     draw_bkg_distrib_2d(ws, bkg_categories, lumi_scales, binning_pt, binning_eta, divide_for_data=False,  
                         file_ws_data="results/benchmark_iso/ws_iso_indep_benchmark.root",
                         save_root_file=True)
-    '''
 
     '''
     h_pass_gen = ROOT.TH2D(h_pass[0])
@@ -302,6 +269,7 @@ if __name__ == "__main__":
     h_fail_gen.Draw("COLZ")
     '''
 
+    '''
     res = results_manager("indep")
     res.Open("results/benchmark_iso/results_iso_indep_benchmark.pkl")
     res_dict = res.dictionary()
@@ -310,8 +278,7 @@ if __name__ == "__main__":
     # print(h_pass_gen.GetBinContent(1,1), h_pass_gen.GetBinError(1,1))
     print(res_dict["1,1"]["pars_pass"].find("nbkg_pass_(1|1)"))
     print(res_dict["1,1"]["pars_fail"].find("nbkg_fail_(1|1)"))
-
-
+    '''
 
 
 

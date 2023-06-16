@@ -3,7 +3,7 @@
 import ROOT
 import os
 import sys
-from utilities import import_pdf_library
+from utilities.general_utils import import_pdf_library
 
 
 def prova_minuit2():

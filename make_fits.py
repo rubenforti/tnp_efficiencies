@@ -5,12 +5,12 @@ import ROOT
 import os
 import sys
 import time
-from results_utils import results_manager
+from utilities.results_utils import results_manager
 from indep_efficiency import indep_eff_fits
 from indep_efficiency import check_existing_fit as fit_exist_indep
 from sim_efficiency import simultaneous_efficiency
 from sim_efficiency import check_existing_fit as fit_exist_sim
-from utilities import import_pdf_library, fit_quality
+from utilities.general_utils import import_pdf_library, fit_quality
 from workspace_config import ws_init
 
 

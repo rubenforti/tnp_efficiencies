@@ -5,9 +5,9 @@ import ROOT
 import time
 import os
 import sys
-from results_utils import results_manager
-from make_plots import plot_distr_with_fit, plot_pass_and_fail
-from utilities import import_pdf_library, fit_quality, check_chi2
+from utilities.results_utils import results_manager
+from utilities.plot_utils import plot_distr_with_fit, plot_pass_and_fail
+from utilities.general_utils import import_pdf_library, fit_quality, check_chi2
 
 
 def check_existing_fit(ws, bin):
