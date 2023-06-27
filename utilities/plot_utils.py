@@ -8,16 +8,14 @@ from array import array
 from utilities.results_utils import results_manager
 
 
-
-def plot_pass_and_fail(axis, data, function, bkg_pdf,
-                       name='prova.png', pull=False):
+def plot_pass_and_fail(axis, data, function, bkg_pdf, name='prova.png', pull=False):
     """
     """
 
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
 
-    c = ROOT.TCanvas()
+    c = ROOT.TCanvas(1200, 900)
     c.Divide(2)
 
     c.cd(1)

@@ -4,7 +4,8 @@ import ROOT
 import os
 import pickle
 from array import array
-from utilities.general_utils import fit_quality, eval_efficiency, pearson_chi2_eval
+from utilities.fit_utils import fit_quality, pearson_chi2_eval
+from utilities.base_library import eval_efficiency
 
 
 class results_manager:

@@ -6,12 +6,12 @@ import os
 import sys
 import time
 from utilities.results_utils import results_manager
+# from utilities.dataset_utils import ws_init
 from indep_efficiency import indep_eff_fits
 from indep_efficiency import check_existing_fit as fit_exist_indep
 from sim_efficiency import simultaneous_efficiency
 from sim_efficiency import check_existing_fit as fit_exist_sim
-from utilities.general_utils import import_pdf_library, fit_quality
-from workspace_config import ws_init
+from utilities.fit_utils import fit_quality
 
 
 def make_fits(ws_name, res_name, type_eff, type_analysis, bins, bin_combinations, 
@@ -41,8 +41,8 @@ def make_fits(ws_name, res_name, type_eff, type_analysis, bins, bin_combinations
     Nproblems = 0
     bins_with_problems = []
 
-    res_object = results_manager(type_analysis)
-    res_object.Open(res_name)
+    # res_object = results_manager(type_analysis)
+    # res_object.Open(res_name)
 
 
     for idx in range(len(bins_list[0])):
@@ -78,7 +78,8 @@ def make_fits(ws_name, res_name, type_eff, type_analysis, bins, bin_combinations
                 print(res_pass.edm(), res_fail.edm())
                 print(' ')
             else:
-                res_object.add_result(ws, bin_pt, bin_eta)
+                pass
+                #res_object.add_result(ws, bin_pt, bin_eta)
             
         elif type_analysis == 'sim':
             isFitted = fit_exist_sim(ws, (bin_pt, bin_eta))
@@ -103,7 +104,8 @@ def make_fits(ws_name, res_name, type_eff, type_analysis, bins, bin_combinations
                 print(results.edm())
                 print(' ')
             else:
-                res_object.add_result(ws, bin_pt, bin_eta)
+                pass
+                #res_object.add_result(ws, bin_pt, bin_eta)
                 
         else:
             print("Wrong fit strategy! Closing the program")
@@ -113,7 +115,7 @@ def make_fits(ws_name, res_name, type_eff, type_analysis, bins, bin_combinations
     print(f"NUM of problematic bins = {Nproblems}")
     print(bins_with_problems)
     ws.writeToFile(workspace_name)
-    res_object.Write(f"results/results_{type_eff}_{type_analysis}.pkl")
+    # res_object.Write(f"results/results_{type_eff}_{type_analysis}.pkl")
 
 
 if __name__ == '__main__':
@@ -136,7 +138,7 @@ if __name__ == '__main__':
     types_efficiencies = ("sa", "global", "ID", "iso", "trigger", "veto")
     type_eff = types_efficiencies[3]
 
-    type_analysis = 'sim'
+    type_analysis = 'indep'
 
     bkg_pdf = 'expo'
 
@@ -149,7 +151,9 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------
 
     
-    bin_keys = ['13,2']
+
+
+    bin_keys = ['1,1']
 
     bin_combinations = False
 
@@ -162,12 +166,12 @@ if __name__ == '__main__':
     print(bins_pt)
     print(bins_eta)
 
-    workspace_name = f"root_files/ws/ws_{type_eff}_{type_analysis}.root"
+    workspace_name = f"root_files/ws/ws_{type_eff}_{type_analysis}_prova.root"
     results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
 
     bins = (bins_pt, bins_eta)
     make_fits(workspace_name, results_name, type_eff, type_analysis, bins, bin_combinations, 
-              bkg_pdf, fit_verbosity=1, savefigs=True)
+              bkg_pdf, fit_verbosity=1, savefigs=False)
 
  
 

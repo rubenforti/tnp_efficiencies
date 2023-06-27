@@ -2,7 +2,7 @@
 
 import ROOT
 import time
-from utilities.general_utils import import_pdf_library
+from utilities.dataset_utils import import_pdf_library
 
 
 def enableBinIntegrator(func, num_bins):

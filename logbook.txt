@@ -355,6 +355,23 @@ al fine di fare un'analisi su macro-bin. I nomi dei dataset dipendono dalla form
 del bin, quindi va fatta attenzione quando ad es. si vuole importare un dataset di bkg da un workspace
 
 
+14-19/06/2023
+-------------
+Migliorata l'organizzazione dei dati da dare in input alle varie funzioni:
+  - il modulo utilities/base_library.py contiene tutte le funzioni di base, comprese nuove funzioni che 
+    restituiscono oggetti base/comuni (come l'array di binning in pt, eta o massa).
+  - nella cartella utilities ci sono i vari moduli che contengono funzioni più specifiche
+  - tramite il dizionario restituito da bin_dict si può passare dai bounds fisici sui bin agli indici globali
+    e relativi agli assi pt/eta
+
+Ottenuto il dataset Z->tautau, che però presenta bin con integrale negativo. Rajarshi ha detto che guarda con
+Marco come sistemare questa cosa, che dipende sicuramente dal "genweight". Intanto comunque ho fatto la 
+distribuzione 2d di tutti i bkg, in numeri assoluti e relativi ai dati.
+
+Va fatta una funzione per plottare, bin per bin, le distribuzioni di bkg su quelle di segnale. Un problema
+incontrato sta nel fatto che l'asse deve essere uguale per tutti i roodatahists... nulla di che ma bisogna 
+mettercisi per bene.
+
 
 
 

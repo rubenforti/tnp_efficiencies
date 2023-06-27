@@ -7,7 +7,8 @@ import os
 import sys
 from utilities.results_utils import results_manager
 from utilities.plot_utils import plot_pass_and_fail
-from utilities.general_utils import import_pdf_library, fit_quality, check_chi2
+from utilities.dataset_utils import import_pdf_library
+from utilities.fit_utils import fit_quality, check_chi2
 
 
 def check_existing_fit(ws, bin):

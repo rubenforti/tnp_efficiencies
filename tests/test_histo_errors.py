@@ -89,9 +89,9 @@ class TestHistoErrors(unittest.TestCase):
         [self.assertAlmostEqual(histo_pois2.GetBinError(i), histo_pois2.GetBinContent(i)**0.5) 
          for i in range(1, NBINS+1)]
 
-        ## Check that with the "Scale" method, the errors returned are also scaled by the factor indicated 
-        ## (=2), so that the bin content are NOT the sqrt(bincontent), but are the same of the errors 
-        ## present in an histogram filled with weighted events
+        ## Check that with the "Scale" method, the errors returned are also scaled by the factor 
+        ## indicated (=2), so that the bin content are NOT the sqrt(bincontent), but are the same of 
+        ## the errors present in an histogram filled with weighted events
         histo_sumw2.Scale(2)
 
         for i in range(1, NBINS+1):
