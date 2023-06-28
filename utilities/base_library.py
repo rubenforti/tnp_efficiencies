@@ -119,7 +119,7 @@ def get_new_binning(new_binning_pt, new_binning_eta):
     bins = {}
     for idx_pt in range(1, len(new_binning_pt)):
         for idx_eta in range(1, len(new_binning_eta)):
-            bin_key = f"[{new_binning_pt[idx_pt-1]},{new_binning_pt[idx_pt]}][{new_binning_eta[idx_eta-1]}, {new_binning_eta[idx_eta]}]"
+            bin_key = f"[{new_binning_pt[idx_pt-1]},{new_binning_pt[idx_pt]}][{new_binning_eta[idx_eta-1]},{new_binning_eta[idx_eta]}]"
             global_idx, bound_idx_pt, bound_idx_eta = get_idx_from_bounds(
                 [new_binning_pt[idx_pt-1], new_binning_pt[idx_pt]],
                 [new_binning_eta[idx_eta-1], new_binning_eta[idx_eta]])
@@ -149,7 +149,7 @@ def bkg_lumi_scales(type_eff, bkg_categories):
         
         wsum_histo = file.Get("weightSum")
         num_init = wsum_histo.Integral()
-        xsection = cross_section_bkg(cat)*1000
+        xsection = cross_section_bkg(cat)*1000  # has to be put in fb
         lumi_bkg = num_init/xsection
 
         scale = lumi_data/lumi_bkg

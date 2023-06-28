@@ -135,8 +135,7 @@ def draw_bkg_distrib_2d(workspace, bkg_categories, lumi_scales, bin_dict, binnin
 
             _, bin_pt, bin_eta = bin_dict[bin_key]
 
-            print(bin_pt)
-            print(bin_eta)
+            print(bin_pt, bin_eta)
 
             h_pass = workspace.data(f"Minv_bkg_pass_{bin_key}_{cat}")
             h_fail = workspace.data(f"Minv_bkg_fail_{bin_key}_{cat}")
@@ -155,15 +154,19 @@ def draw_bkg_distrib_2d(workspace, bkg_categories, lumi_scales, bin_dict, binnin
             if type(bin_eta) is list:
                 bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
 
-            histos_pass[cat].SetBinContent(bin_pt, bin_eta, n_pass*1.0)
-            # The histograms are weighted with the lumi-scale, so the error on the 
-            # total number of events is the sqrt of the resulting number 
-            # (= sqrt(lumi_scale * num_init)) multiplied with sqrt(lumi_scale), to obtain the 
-            # correct value of lumi_scale*sqrt(num_init)
             if n_pass<0 or n_fail<0 or lumi_scales[cat]<0:
                 print(bin_pt, bin_eta, cat)
                 print("ERROR: negative number of events")
                 sys.exit()
+            
+            if n_pass==0 or n_fail==0:
+                print("WARNING: zero number of events\n******************************\n")
+
+            # The histograms are weighted with the lumi-scale, so the error on the 
+            # total number of events is the sqrt of the resulting number 
+            # (= sqrt(lumi_scale * num_init)) multiplied with sqrt(lumi_scale), to obtain the 
+            # correct value of lumi_scale*sqrt(num_init)
+            histos_pass[cat].SetBinContent(bin_pt, bin_eta, n_pass*1.0)
             histos_pass[cat].SetBinError(bin_pt, bin_eta, (n_pass*lumi_scales[cat])**0.5)  
             histos_fail[cat].SetBinContent(bin_pt, bin_eta, n_fail*1.0)
             histos_fail[cat].SetBinError(bin_pt, bin_eta, (n_fail*lumi_scales[cat])**0.5)
@@ -230,8 +233,9 @@ if __name__ == "__main__":
         }
     }
     
-    binning_eta_key = "eta_8bins"
     binning_pt_key = "pt"
+    binning_eta_key = "eta_8bins"
+
     binning_mass = binning("mass_60_120")
 
     new_binning_pt = binning(binning_pt_key)
@@ -242,9 +246,10 @@ if __name__ == "__main__":
 
     ws = ws_init(import_dictionary, an, bin_set, binning_mass)
 
-    draw_bkg_distrib_2d(ws, bkg_categories, lumi_scales, bin_set, binning(binning_pt_key), binning(binning_eta_key), 
-                        divide_for_data=False, save_root_file=True)
+    draw_bkg_distrib_2d(ws, bkg_categories, lumi_scales, bin_set, new_binning_pt, new_binning_eta,
+                        divide_for_data=True, save_root_file=True)
 
+    ws.writeToFile("root_files/ws/ws_data_bkg.root")
 
     '''
     h_pass_gen = ROOT.TH2D(h_pass[0])
