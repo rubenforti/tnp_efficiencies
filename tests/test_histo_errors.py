@@ -8,6 +8,7 @@ import unittest
 NDATA = 100000
 NBINS = 100
 
+
 def generate_th1_from_roodatahist(sumw2=False):
 
     axis = ROOT.RooRealVar("x", "x", 50, 130)
@@ -34,6 +35,7 @@ def generate_th1_from_roodatahist(sumw2=False):
 
     return histo
 
+###############################################################################
 
 def generate_th1_from_randgen(name, weight=1):
 
@@ -60,12 +62,14 @@ def generate_th1_from_randgen(name, weight=1):
 
     return histo
 
-
+###############################################################################
 
 class TestHistoErrors(unittest.TestCase):
 
     def test_poisson_roohisto(self):
-
+        """
+        Check that the errors in a RooDataHist are the sqrt(bincontent)
+        """
         histo = generate_th1_from_roodatahist()
 
         for i in range (1, NBINS+1):
@@ -75,6 +79,10 @@ class TestHistoErrors(unittest.TestCase):
 
 
     def test_errors_th1(self):
+        """
+        Checks on how the errors in a TH1 are treated when using some methods like "Add", "Scale",
+        "Sumw2" or the histogram is filled with weighted events.
+        """
 
         histo_pois = generate_th1_from_randgen("histo_pois")
         histo_weighted = generate_th1_from_randgen("histo_weighted", weight=2.0)
@@ -101,12 +109,21 @@ class TestHistoErrors(unittest.TestCase):
             self.assertAlmostEqual(histo_sumw2.GetBinContent(i), histo_weighted.GetBinContent(i))
             self.assertAlmostEqual(histo_sumw2.GetBinError(i), histo_weighted.GetBinError(i))
 
-
-
         print(histo_pois.GetBinError(43), histo_pois.GetBinContent(43)**0.5)
         print(histo_pois.GetBinContent(43), histo_sumw2.GetBinContent(43))
 
-        
+
+    def test_integral_scaled_th1(self):
+        """
+        Check that the integral of a TH1 is scaled by the factor indicated in the "Scale" method
+        """
+        histo_pois = generate_th1_from_randgen("histo_pois")
+        histo_pois.Scale(2.0)
+        self.assertAlmostEqual(histo_pois.Integral(), 2*NDATA)
+        self.assertAlmostEqual((2*histo_pois.Integral())**0.5, 2*(NDATA**0.5))  # dummy, just for clarity
+
+###############################################################################  
+###############################################################################
 
 
 if __name__ == '__main__':
