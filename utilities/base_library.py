@@ -43,30 +43,6 @@ xsec_bkg = {
 
 ###############################################################################
 
-def bin_dict():
-    """
-    Creates a dictionary that relates the bounds of every bin (keys) to the indexes useful for the bin 
-    selection. The indexes are returned in a 3-element list containing the global index, the pt index
-    and the eta index in this order.
-    """
-
-    index_dictionary = {}
-    global_idx = 1
-
-    binning_pt, binning_eta = binnings["pt"], binnings["eta"]
-
-    for idx_pt in range(1, len(binnings["pt"])):
-        for idx_eta in range(1, len(binnings["eta"])):
-
-            indexes = [global_idx, idx_pt, idx_eta]
-            bin_elem = {f"[{binning_pt[idx_pt-1]},{binning_pt[idx_pt]}][{binning_eta[idx_eta-1]},{binning_eta[idx_eta]}]" : indexes }
-            index_dictionary.update(bin_elem)
-            global_idx +=1
-    
-    return index_dictionary
-
-###############################################################################
-
 def binning(type):
     """
     Returns the binning array for the given type of variable. The type can be "pt", "eta", 
@@ -76,24 +52,50 @@ def binning(type):
 
 ###############################################################################
 
+def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
+    """
+    Creates a dictionary that relates the bounds of every bin (keys) to the indexes useful for the bin 
+    selection. The indexes are returned in a 3-element list containing the global index, the pt index
+    and the eta index in this order.
+    """
+    index_dictionary = {}
+    global_idx = 1
+
+    binning_pt, binning_eta = binnings[binning_pt_name], binnings[binning_eta_name]
+
+    for idx_pt in range(1, len(binning_pt)):
+        for idx_eta in range(1, len(binning_eta)):
+
+            bin_key = f"[{binning_pt[idx_pt-1]},{binning_pt[idx_pt]}][{binning_eta[idx_eta-1]},{binning_eta[idx_eta]}]"
+
+            if binning_pt_name == "pt" and binning_eta_name == "eta":
+                index_dictionary.update({bin_key : [global_idx, idx_pt, idx_eta]})
+                global_idx +=1
+            else:
+                global_idx, bounds_idx_pt, bounds_idx_eta = get_idx_from_bounds(
+                    [binning_pt[idx_pt-1], binning_pt[idx_pt]], [binning_eta[idx_eta-1], binning_eta[idx_eta]])
+                index_dictionary.update({bin_key : [global_idx, bounds_idx_pt, bounds_idx_eta]})
+
+    
+    return index_dictionary
+
+###############################################################################
+
 def get_idx_from_bounds(bounds_pt, bounds_eta):
     """
     Function that, given the bin bounds (that have to be present in the binning arrays!!!), returns the 
     coordinates of the selected region. The coordinates are given as list of global indexes and as bounds
     on pt/eta indexes (max and min, since the region is rectangular)
     """
-
-    dict_idx = bin_dict()
+    initial_dict = bin_dictionary("pt", "eta")
     global_bins = []
 
     bounds_pt_idx = []
     bounds_eta_idx = []
 
-    for el in dict_idx:
+    for el in initial_dict:
 
-        gl_idx, idx_pt, idx_eta = dict_idx[el]
-
-
+        gl_idx, idx_pt, idx_eta = initial_dict[el]
 
         string_pt, string_eta = el.split("][")
         pt_min, pt_max = string_pt[1:].split(",")
@@ -112,23 +114,6 @@ def get_idx_from_bounds(bounds_pt, bounds_eta):
 
 ###############################################################################
 
-def get_new_binning(new_binning_pt, new_binning_eta):
-    """
-    Returns a dictionary with new binning.
-    """
-    bins = {}
-    for idx_pt in range(1, len(new_binning_pt)):
-        for idx_eta in range(1, len(new_binning_eta)):
-            bin_key = f"[{new_binning_pt[idx_pt-1]},{new_binning_pt[idx_pt]}][{new_binning_eta[idx_eta-1]},{new_binning_eta[idx_eta]}]"
-            global_idx, bound_idx_pt, bound_idx_eta = get_idx_from_bounds(
-                [new_binning_pt[idx_pt-1], new_binning_pt[idx_pt]],
-                [new_binning_eta[idx_eta-1], new_binning_eta[idx_eta]])
-            bins.update({bin_key : [global_idx, bound_idx_pt, bound_idx_eta]})
-
-    return bins
-
-###############################################################################
-
 def cross_section_bkg(bkg_process):
     """
     Returns the cross section of the given background process in pb
@@ -141,7 +126,6 @@ def bkg_lumi_scales(type_eff, bkg_categories):
     """
     "Lumi scale" defined as alpha that satisifies lumi_data=alpha*lumi_bkg
     """
-
     lumi_scales = {}
 
     for cat in bkg_categories:

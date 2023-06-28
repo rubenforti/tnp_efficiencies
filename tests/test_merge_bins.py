@@ -3,10 +3,11 @@
 
 import ROOT
 import unittest
-from utilities.base_library import binning, get_new_binning
+from utilities.base_library import binning, bin_dictionary
 
 
 def create_flat_th3():
+    
     std_binning_pt = binning("pt")
     std_binning_eta = binning("eta")
     mass_binning = binning("mass_60_120")
@@ -29,10 +30,7 @@ class TestMergeBins(unittest.TestCase):
 
     def test_coverage_merge_pt(self):
 
-        newbins_pt = binning("pt_6bins")
-        newbins_eta = binning("eta")
-
-        new_bin_dictionary = get_new_binning(newbins_pt, newbins_eta)
+        new_bin_dictionary = bin_dictionary("pt_6bins", "eta")
 
         global_bins_check = []
 
@@ -50,10 +48,7 @@ class TestMergeBins(unittest.TestCase):
     
     def test_coverage_merge_eta(self):
 
-        newbins_pt = binning("pt")
-        newbins_eta = binning("eta_8bins")
-
-        new_bin_dictionary = get_new_binning(newbins_pt, newbins_eta)
+        new_bin_dictionary = bin_dictionary("pt", "eta_8bins")
 
         global_bins_check = []
 
@@ -71,10 +66,7 @@ class TestMergeBins(unittest.TestCase):
 
     def test_coverage_merge_both(self):
 
-        newbins_pt = binning("pt_9bins")
-        newbins_eta = binning("eta_16bins")
-
-        new_bin_dictionary = get_new_binning(newbins_pt, newbins_eta)
+        new_bin_dictionary = bin_dictionary("pt_9bins", "eta_16bins")
 
         global_bins_check = []
 
@@ -94,10 +86,7 @@ class TestMergeBins(unittest.TestCase):
 
         histo = create_flat_th3()
 
-        newbins_pt = binning("pt_6bins")
-        newbins_eta = binning("eta_16bins")
-
-        new_bin_dictionary = get_new_binning(newbins_pt, newbins_eta)
+        new_bin_dictionary = bin_dictionary("pt_6bins", "eta_16bins")
 
         axis = ROOT.RooRealVar("x", "x", 60, 120)
         axis.setRange("range", 60, 120)

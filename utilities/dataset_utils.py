@@ -4,7 +4,7 @@
 import sys
 import os
 import ROOT
-from utilities.base_library import binning, bin_dict, get_new_binning, bkg_lumi_scales
+from utilities.base_library import binning, bin_dictionary, get_new_binning, bkg_lumi_scales
 
 
 def import_pdf_library(*functions):
@@ -62,26 +62,9 @@ def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_sca
         print(f"{bin_pt}, {bin_eta}")
         #sys.exit()
 
-
     roohistogram = ROOT.RooDataHist(f"Minv_{type_set}_{flag}_{bin_key}", 
                                     f"Minv_{type_set}_{flag}_{bin_key}",
                                     ROOT.RooArgList(axis), th1_histo)
-    
-    '''
-    if th1_histo.Integral() < 0:
-
-        c = ROOT.TCanvas()
-        c.cd()
-        frame = axis.frame()
-        roohistogram.plotOn(frame)
-        frame.Draw()
-        c.SaveAs(f"../test_{bin_key}.png")
-
-        print("ERROR: negative entries in TH1")
-        print(f"{bin_pt}, {bin_eta}")
-        print(roohistogram.sumEntries())
-        sys.exit()
-    '''
     
     return roohistogram
 
@@ -236,7 +219,7 @@ if __name__ == '__main__':
     new_binning_eta = binning("eta_8bins")
 
     # bin_set = bin_dict()
-    bin_set = get_new_binning(new_binning_pt, new_binning_eta)
+    bin_set = bin(new_binning_pt, new_binning_eta)
 
     w = ws_init(import_dictionary, an, bin_set, binning_mass)
 
