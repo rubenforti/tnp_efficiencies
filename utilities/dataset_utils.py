@@ -4,7 +4,7 @@
 import sys
 import os
 import ROOT
-from utilities.base_library import binning, bin_dictionary, get_new_binning, bkg_lumi_scales
+from utilities.base_library import binning, bin_dictionary, bkg_lumi_scales
 
 
 def import_pdf_library(*functions):
@@ -91,9 +91,9 @@ def ws_init(import_datasets, type_analysis, bins, bins_mass):
         elif dataset_type == "bkg":
             file_set={}
             for cat in import_datasets[dataset_type]["filepaths"]:
-                file_set.update({cat : ROOT.TFile(import_datasets[dataset_type]["filepaths"][cat], "READ")})
+                file_set.update({cat : ROOT.TFile(import_datasets["bkg"]["filepaths"][cat], "READ")})
                 print(file_set[cat].GetName())
-            bkg_lumi_scales = import_datasets[dataset_type]["lumi_scales"]
+            bkg_lumi_scales = import_datasets["bkg"]["lumi_scales"]
         else:
             print("****\nINVALID DATASET TYPE\n****")
             sys.exit()
@@ -204,7 +204,7 @@ if __name__ == '__main__':
 
     import_dictionary = {
         "data" : filename_data,
-        # "mc" : filename_mc,
+        "mc" : filename_mc,
         "bkg" : {
             "filepaths" : bkg_filepaths,
             "lumi_scales" : lumi_scales
@@ -212,14 +212,9 @@ if __name__ == '__main__':
     }
 
 
-
     binning_mass = binning("mass_60_120")
 
-    new_binning_pt = binning("pt")
-    new_binning_eta = binning("eta_8bins")
-
-    # bin_set = bin_dict()
-    bin_set = bin(new_binning_pt, new_binning_eta)
+    bin_set = bin_dictionary("pt_6bins", "eta_4bins")
 
     w = ws_init(import_dictionary, an, bin_set, binning_mass)
 
@@ -231,4 +226,4 @@ if __name__ == '__main__':
 
 
 
-    w.writeToFile(f"../root_files/ws/ws_data_bkg.root")
+    w.writeToFile(f"root_files/ws/ws_data_mc_bkg.root")

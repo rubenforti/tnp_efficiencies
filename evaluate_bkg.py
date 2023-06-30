@@ -2,11 +2,22 @@
 """
 
 import ROOT
-from utilities.base_library import bkg_lumi_scales, binning, bin_dict, get_new_binning
-from utilities.dataset_utils import ws_init
-from array import array
 import sys
+from utilities.base_library import bkg_lumi_scales, binning, bin_dictionary
+from utilities.dataset_utils import ws_init
+from utilities.plot_utils import plot_bkg_on_data
 
+
+# bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
+
+bkg_colors = { 
+    "WW" : ROOT.kOrange+1,
+    "WZ" : ROOT.kYellow+3,
+    "ZZ" : ROOT.kGreen+1,
+    "TTSemileptonic" : ROOT.kCyan+1,
+    "Ztautau" : ROOT.kMagenta+1,
+    "total" : ROOT.kBlue
+}
 
 def initialize_h2d_bkg(bkg_categories, binning_pt, binning_eta):
 
@@ -65,51 +76,81 @@ def initialize_h2d_bkg(bkg_categories, binning_pt, binning_eta):
 
 ###############################################################################
 
-def plot_bkg_on_data(axis, histo_data, histos_bkg, bin_keys):
+def bkg_on_data(type_eff, ws, bin_keys, bkg_categories, bkg_shape="expo", figpath='figs/fit_iso_bkg'):
+    """
+    """
 
-    c = ROOT.TCanvas("c", "c", 1200, 900)
-    c.cd()
+    lumi_scales = bkg_lumi_scales(type_eff, bkg_categories)
 
-    frame = axis.frame(ROOT.RooFit.Title("Bkg on data"))
-    frame.GetXaxis().SetTitle("M_{TP} [GeV]")
+    for bin_key in bin_keys:
+        for flag in ["pass", "fail"]:
+            
+            histo_data = ws.data(f"Minv_data_{flag}_{bin_key}")
+            axis = ws.var(f"x_{flag}_{bin_key}")
+            axis.setBins(60, "plot_binning")
 
-    legend = ROOT.TLegend(0.7, 0.7, 0.9, 0.9)
+            datasets = {}
+            datasets.update({"axis" : axis})
+            datasets.update({"data" : histo_data})
 
-    legend.SetFillColor(ROOT.kWhite)
-    legend.SetLineColor(ROOT.kWhite)
+            for cat in bkg_categories:
 
-    histo_data = ROOT.RooDataHist("data", "data", axis, histo_data)
+                bkg_histo = ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")
+                datasets.update({f"{cat}_bkg" : {
+                    "roohisto" : bkg_histo,
+                    "histo_pdf" : ROOT.RooHistPdf(f"{cat}_bkg_pdf", f"{cat}_bkg_pdf", ROOT.RooArgSet(axis), bkg_histo),
+                    "lumi_scale" : lumi_scales[cat],
+                    "integral" : bkg_histo.sumEntries(),
+                    "color" : bkg_colors[cat]
+                    }
+                })
 
-    colors = [ROOT.kRed, ROOT.kBlue, ROOT.kGreen, ROOT.kOrange, ROOT.kMagenta, ROOT.kCyan, ROOT.kYellow]
-    col_idx = 0
-    histo_data.plotOn(frame, ROOT.RooFit.Name("data"))
+            bkg_total_histo = ROOT.RooDataHist("bkg_total_histo", "bkg_total_histo", axis)
 
-    histo_bkg = histos_bkg["WW"]
-    print(type(histo_bkg))
-    tot_bkg = ROOT.RooDataHist("tot_bkg", "tot_bkg", axis, histo_bkg)
+            total_bkg_variance = 0
+            for bkg_cat in bkg_categories:
+                bkg_total_histo.add(datasets[f"{bkg_cat}_bkg"]["roohisto"])
+                total_bkg_variance += datasets[f"{bkg_cat}_bkg"]["integral"]*datasets[f"{bkg_cat}_bkg"]["lumi_scale"]
 
-    '''
-    for bkg in histos_bkg:
 
-        histos_bkg[bkg] = ROOT.RooDataHist("bkg", "bkg", axis, histos_bkg[bkg])
-        histos_bkg[bkg].plotOn(frame,
-                               ROOT.RooFit.Name(bkg), 
-                               ROOT.RooFit.MarkerSize(0),
-                               ROOT.RooFit.LineColor(colors[col_idx]),
-                               ROOT.RooFit.DataError(3))
-        tot_bkg.add(histos_bkg[bkg])
-        col_idx += 1
-    '''
+            datasets.update({"total_bkg" : {
+                "roohisto": bkg_total_histo,
+                "lumi_scale" : 1,
+                "integral" : {
+                    "val" : bkg_total_histo.sumEntries(),
+                    "err" : total_bkg_variance**0.5
+                    },
+                "color" : bkg_colors["total"]
+                }
+            })
+            
+            pdf_bkg_fit = ws.pdf(f"{bkg_shape}_bkg_{flag}_{bin_key}")
+            if type(pdf_bkg_fit) is ROOT.TObject:
+                print(f"ERROR: bkg pdf not found at bin {bin_key}")
+                sys.exit()
+
+            res_obj = ws.obj(f"results_{flag}_{bin_key}")
+            pars = res_obj.floatParsFinal()
+            norm_bkg = pars.find(f"nbkg_{flag}_{bin_key}")
+
+            if type(norm_bkg) is not ROOT.RooRealVar:
+                norm_bkg = ROOT.RooRealVar(f"nbkg_{flag}_{bin_key}", f"nbkg_{flag}_{bin_key}", 0)
+
+            datasets.update({"pdf_bkg_fit" : {
+                "pdf" : pdf_bkg_fit,
+                "norm" : norm_bkg,
+                "color" : ROOT.kRed
+                }
+            })
+
+            plot_bkg_on_data(datasets, flag, bin_key, figpath=figpath)
+
+            
+
+
 
     
-    tot_bkg.plotOn(frame, 
-                   ROOT.RooFit.Name("tot_bkg"),
-                   # ROOT.RooFit.MarkerSize(0), 
-                   ROOT.RooFit.LineColor(ROOT.kBlack),
-                   ROOT.RooFit.DataError(3))
-    
-    frame.Draw()
-    c.SaveAs("plots/bkg_on_data.pdf")
+
 
 ###############################################################################
 
@@ -202,6 +243,8 @@ def draw_bkg_distrib_2d(workspace, bkg_categories, lumi_scales, bin_dict, binnin
 
 if __name__ == "__main__":
 
+    ROOT.gROOT.SetBatch(True)
+    ROOT.PyConfig.IgnoreCommandLineOptions = True
 
     bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
     # bkg_categories = ["Ztautau"]
@@ -241,15 +284,23 @@ if __name__ == "__main__":
     new_binning_pt = binning(binning_pt_key)
     new_binning_eta = binning(binning_eta_key)
 
+
     # bin_set = bin_dict()
-    bin_set = get_new_binning(new_binning_pt, new_binning_eta)
+    bin_set = bin_dictionary(binning_pt_key, binning_eta_key)
 
-    ws = ws_init(import_dictionary, an, bin_set, binning_mass)
+    # ws = ws_init(import_dictionary, an, bin_set, binning_mass)
 
+    file = ROOT.TFile("root_files/ws/ws_data_mc_bkg.root", "READ")
+    ws = file.Get("w")
+
+    '''
     draw_bkg_distrib_2d(ws, bkg_categories, lumi_scales, bin_set, new_binning_pt, new_binning_eta,
-                        divide_for_data=True, save_root_file=True)
+                        divide_for_data=False, save_root_file=True)
+    '''
 
-    ws.writeToFile("root_files/ws/ws_data_bkg.root")
+    bkg_on_data("iso", ws, bin_set, bkg_categories)
+    file.Close()
+    #ws.writeToFile("root_files/ws/ws_data_bkg.root")
 
     '''
     h_pass_gen = ROOT.TH2D(h_pass[0])

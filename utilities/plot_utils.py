@@ -6,16 +6,34 @@ import os
 import pickle
 from array import array
 from utilities.results_utils import results_manager
+from utilities.base_library import bkg_lumi_scales
+from utilities.CMS_lumi import CMS_lumi
+
+bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
 
 
-def plot_pass_and_fail(axis, data, function, bkg_pdf, name='prova.png', pull=False):
+
+
+def style_settings():
+    """
+    General style settings for plots
+    """
+    ROOT.gStyle.SetOptStat(0)
+    ROOT.gStyle.SetStatBorderSize(0)
+    ROOT.gStyle.SetStatX(1.)
+    ROOT.gStyle.SetStatY(1.)
+
+
+
+
+def plot_pass_and_fail(axis, data, function, pdf_bkg, name='prova.png', pull=False):
     """
     """
 
-    path = os.path.dirname(__file__)
-    ROOT.gSystem.cd(path)
+    # path = os.path.dirname(__file__)
+    # ROOT.gSystem.cd(path)
 
-    c = ROOT.TCanvas(1200, 900)
+    c = ROOT.TCanvas()
     c.Divide(2)
 
     c.cd(1)
@@ -26,7 +44,7 @@ def plot_pass_and_fail(axis, data, function, bkg_pdf, name='prova.png', pull=Fal
     function[1].plotOn(frame1, ROOT.RooFit.LineColor(4)) 
     
     for comp1 in function[1].getComponents():
-        if comp1.GetName() == bkg_pdf[1]:
+        if comp1.GetName() == pdf_bkg[1]:
             bkg_set = ROOT.RooArgSet(comp1)
             function[1].plotOn(frame1, 
                                ROOT.RooFit.Components(bkg_set),
@@ -39,10 +57,10 @@ def plot_pass_and_fail(axis, data, function, bkg_pdf, name='prova.png', pull=Fal
     frame0 = axis[0].frame(ROOT.RooFit.Title("FAIL"))
     data[0].plotOn(frame0)
     
-    function[0].plotOn(frame0, ROOT.RooFit.LineColor(4)) 
+    function[0].plotOn(frame0, ROOT.RooFit.LineColor(4))
     
     for comp0 in function[0].getComponents():
-        if comp0.GetName() == bkg_pdf[0]:
+        if comp0.GetName() == pdf_bkg[0]:
             bkg_set = ROOT.RooArgSet(comp0)
             function[0].plotOn(frame0,
                 ROOT.RooFit.Components(bkg_set),
@@ -55,7 +73,7 @@ def plot_pass_and_fail(axis, data, function, bkg_pdf, name='prova.png', pull=Fal
 
 
 
-def plot_distr_with_fit(axis, data, function, bkg_pdf,
+def plot_distr_with_fit(axis, data, function, pdf_bkg,
                         name='prova.png', pull=False):
     """
     """
@@ -76,7 +94,7 @@ def plot_distr_with_fit(axis, data, function, bkg_pdf,
         
     
     for comp in function.getComponents():
-        if comp.GetName() == bkg_pdf:
+        if comp.GetName() == pdf_bkg:
             bkg_set = ROOT.RooArgSet(comp)
             function.plotOn(frame,
                 ROOT.RooFit.Components(bkg_set),
@@ -84,7 +102,7 @@ def plot_distr_with_fit(axis, data, function, bkg_pdf,
                 ROOT.RooFit.LineStyle(ROOT.kDashed))
     
     #function.plotOn(frame, ROOT.RooCmdArg("LineColor", 4))
-    # bkg_pdf.plotOn(frame, ROOT.RooCmdArg("LineColor", 2))
+    # pdf_bkg.plotOn(frame, ROOT.RooCmdArg("LineColor", 2))
     frame.Draw()
 
     if pull:
@@ -150,6 +168,141 @@ def plot_results(filename, results, binning_pt=(), binning_eta=()):
     #file.Write("efficiency_th2")
     # file.Write("eff_rel_error_th2")
     file.Close()
+
+
+def plot_bkg_on_data(plot_objects, flag, bin_key, figpath=''):
+    """
+    """
+
+    c = ROOT.TCanvas("c", "c", 900, 900)
+    c.cd()
+
+    style_settings()
+
+    pad_title = ROOT.TPad("pad_title", "pad_title", 0, 0.95, 1, 1)
+    pad_plot = ROOT.TPad("pad_plot", "pad_plot", 0, 0.25, 0.7, 0.95)
+    pad_pull = ROOT.TPad("pad_pull", "pad_pull", 0, 0, 0.7, 0.25)
+    pad_info = ROOT.TPad("pad_info", "pad_info", 0.7, 0, 1, 0.9)
+
+    pad_title.SetLeftMargin(0.1)
+    pad_title.SetRightMargin(0.1)
+    pad_title.SetTopMargin(0.1)
+    pad_title.SetBottomMargin(0.1)
+    pad_title.Draw()
+
+    pad_plot.SetBottomMargin(0)
+    pad_plot.SetLeftMargin(0.15)
+    pad_plot.SetRightMargin(0.05)
+    pad_plot.SetTopMargin(0.05)
+    pad_plot.Draw()
+
+    pad_pull.SetTopMargin(0)
+    pad_pull.SetBottomMargin(0.2)
+    pad_pull.SetLeftMargin(0.15)
+    pad_pull.SetRightMargin(0.05)
+    pad_pull.Draw()
+
+    pad_info.SetLeftMargin(0)
+    pad_info.SetRightMargin(0)
+    pad_info.SetTopMargin(0.05)
+    pad_info.SetBottomMargin(0)
+    pad_info.Draw()
+
+
+    pad_title.cd()
+    titlebox = ROOT.TPaveText(0, 0, 1, 1, "NDC NB")
+    titlebox.SetFillColor(0)
+    # titlebox.SetTextFont(42)
+    titlebox.SetTextSize(0.35)
+    titlebox.AddText(f"Bin {bin_key} - {flag}ing probes")
+    titlebox.Draw()
+    c.Update()
+
+    axis = plot_objects.pop("axis")
+
+
+    pad_plot.cd()
+    frame = axis.frame(ROOT.RooFit.Bins(60))
+    frame.SetTitle("")
+    frame.SetTitleSize(0)
+    frame_axis = frame.GetXaxis()
+    frame_axis.SetLabelSize(0)
+    xtitle = frame_axis.GetTitle()
+    frame_axis.SetTitleSize(0)
+
+    datahist = plot_objects.pop("data")
+    datahist.plotOn(frame, ROOT.RooFit.Name("Data"))
+
+    pdf_bkg_obj = plot_objects.pop("pdf_bkg_fit")
+    pdf_bkg_obj["pdf"].plotOn(frame, 
+                              ROOT.RooFit.Name("Fitted bkg"),
+                              ROOT.RooFit.LineColor(pdf_bkg_obj["color"]),
+                              ROOT.RooFit.Normalization(pdf_bkg_obj["norm"].getVal(), ROOT.RooAbsReal.NumEvent))
+
+    total_bkg = plot_objects.pop("total_bkg")
+    total_bkg["roohisto"].plotOn(frame,
+                                 ROOT.RooFit.Name("Total bkg"),
+                                 # ROOT.RooFit.Invisible(),
+                                 ROOT.RooFit.LineColor(total_bkg["color"]),
+                                 ROOT.RooFit.MarkerColor(total_bkg["color"]),
+                                 ROOT.RooFit.Normalization(total_bkg["integral"]["val"], ROOT.RooAbsReal.NumEvent))
+    
+    pad_info.cd()
+    textbox = ROOT.TPaveText(0, 0.4, 1, 0.8, "NDC NB")
+    textbox.SetFillColor(0)
+    textbox.SetTextSize(0.05)
+    textbox.SetTextAlign(12)
+    c.Update()
+    textbox.AddText(f"Data entries: {datahist.sumEntries()}")
+    textbox.AddText(f"Nbkg from fit: {round(pdf_bkg_obj['norm'].getVal(),2)} #pm {round(pdf_bkg_obj['norm'].getError(),2)}")
+    textbox.AddText(f"Nbkg from MC: {round(total_bkg['integral']['val'],2)} #pm {round(total_bkg['integral']['err'],2)}")
+    difference = total_bkg['integral']['val'] - pdf_bkg_obj['norm'].getVal()
+    sigma_difference = ((total_bkg['integral']['err']**2)+(pdf_bkg_obj['norm'].getError()**2))**0.5
+    nsigma = difference/sigma_difference
+    textbox.AddText(f"Distance in #sigma = {round(nsigma, 2)}")
+    textbox.AddText("--------------------")
+
+   
+    for bkg_key in plot_objects:
+        pad_plot.cd()
+        bkg_obj = plot_objects[bkg_key]
+        bkg_obj["histo_pdf"].plotOn(frame, 
+                         ROOT.RooFit.Name(bkg_key),
+                         ROOT.RooFit.LineColor(bkg_obj["color"]),
+                         ROOT.RooFit.LineStyle(1),
+                         ROOT.RooFit.Normalization(bkg_obj["integral"], ROOT.RooAbsReal.NumEvent))
+        pad_info.cd()
+        bkg_error = (bkg_obj["lumi_scale"]*bkg_obj["integral"])**0.5
+        textbox.AddText(f"Num {bkg_key} = {round(bkg_obj['integral'],2)} #pm {round(bkg_error, 2)}")
+
+
+    pad_plot.cd()
+    frame.Draw()
+    CMS_lumi(pad_plot, 5, 0, simulation=True)
+
+    pad_pull.cd()
+    pull = frame.pullHist("Total bkg", "Fitted bkg", True)
+    pull.SetTitle("")
+    pull_axis = pull.GetXaxis()
+    pull_axis.SetTitle(xtitle)
+    pull_axis.SetTitleSize(0.07)
+    pull_axis.SetLabelSize(0.07)
+    pull_axis.SetTitleOffset(1)
+    pull.Draw()
+
+    pad_info.cd()
+    textbox.Draw()  
+    c.Update()
+
+    print(total_bkg["integral"]["val"], pdf_bkg_obj["norm"].getVal())
+
+    c.SaveAs(f"{figpath}/bkg_{bin_key}_{flag}.pdf")
+
+    #c.Destructor()
+        
+
+
+
 
 
 if __name__ == '__main__':

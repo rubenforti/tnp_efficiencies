@@ -66,7 +66,7 @@ def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
     for idx_pt in range(1, len(binning_pt)):
         for idx_eta in range(1, len(binning_eta)):
 
-            bin_key = f"[{binning_pt[idx_pt-1]},{binning_pt[idx_pt]}][{binning_eta[idx_eta-1]},{binning_eta[idx_eta]}]"
+            bin_key = f"[{binning_pt[idx_pt-1]}to{binning_pt[idx_pt]}][{binning_eta[idx_eta-1]}to{binning_eta[idx_eta]}]"
 
             if binning_pt_name == "pt" and binning_eta_name == "eta":
                 index_dictionary.update({bin_key : [global_idx, idx_pt, idx_eta]})
@@ -98,8 +98,8 @@ def get_idx_from_bounds(bounds_pt, bounds_eta):
         gl_idx, idx_pt, idx_eta = initial_dict[el]
 
         string_pt, string_eta = el.split("][")
-        pt_min, pt_max = string_pt[1:].split(",")
-        eta_min, eta_max = string_eta[:-1].split(",")
+        pt_min, pt_max = string_pt[1:].split("to")
+        eta_min, eta_max = string_eta[:-1].split("to")
 
         pt_min, pt_max = float(pt_min), float(pt_max)
         eta_min, eta_max = float(eta_min), float(eta_max)

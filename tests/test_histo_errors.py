@@ -113,6 +113,10 @@ class TestHistoErrors(unittest.TestCase):
         print(histo_pois.GetBinContent(43), histo_sumw2.GetBinContent(43))
 
 
+###############################################################################
+
+class TestHistoIntegral(unittest.TestCase):
+
     def test_integral_scaled_th1(self):
         """
         Check that the integral of a TH1 is scaled by the factor indicated in the "Scale" method
@@ -121,6 +125,40 @@ class TestHistoErrors(unittest.TestCase):
         histo_pois.Scale(2.0)
         self.assertAlmostEqual(histo_pois.Integral(), 2*NDATA)
         self.assertAlmostEqual((2*histo_pois.Integral())**0.5, 2*(NDATA**0.5))  # dummy, just for clarity
+
+
+    def test_sumEntries_scaled(self):
+        """
+        Check that the sumEntries() method of a RooDataHist returns the same value as the integral of the
+        corresponding TH1, in the case the TH1 is scaled        """
+        h_th1 = generate_th1_from_randgen("h_th1", weight=1.5)
+        axis = ROOT.RooRealVar("x", "x", 50, 130)
+        h_roohist = ROOT.RooDataHist("h_roohist", "h_roohist", ROOT.RooArgList(axis), h_th1)
+        self.assertAlmostEqual(h_roohist.sumEntries(), h_th1.Integral())
+    
+    
+    def test_roohisto_add(self):
+        """
+        Check that the add() method for a RooDataHist works as expected
+        """
+        h_th1_1 = generate_th1_from_randgen("h_th1_1", weight=1.5)
+        h_th1_2 = generate_th1_from_randgen("h_th1_2", weight=2.7)
+        axis = ROOT.RooRealVar("x", "x", 50, 130)
+        h_roohist_1 = ROOT.RooDataHist("h_roohist_1", "h_roohist", ROOT.RooArgList(axis), h_th1_1)
+        h_roohist_2 = ROOT.RooDataHist("h_roohist_22", "h_roohist", ROOT.RooArgList(axis), h_th1_2)
+
+        h_roohist = ROOT.RooDataHist("h_roohist", "h_roohist", ROOT.RooArgList(axis))
+        h_roohist.add(h_roohist_1)
+        h_roohist.add(h_roohist_2)
+
+        self.assertAlmostEqual(h_roohist.sumEntries(), h_th1_1.Integral()+h_th1_2.Integral())
+
+        for i in range(0, h_roohist.numEntries()):
+            h_roohist.get(i)
+            self.assertAlmostEqual(h_roohist.weight(i), h_th1_1.GetBinContent(i+1)+h_th1_2.GetBinContent(i+1))
+
+
+
 
 ###############################################################################  
 ###############################################################################

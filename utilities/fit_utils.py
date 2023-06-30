@@ -7,6 +7,30 @@ import ROOT
 from array import array
 
 
+def check_existing_fit(type_analysis, ws, bin_key):
+
+    if type_analysis == 'indep':
+
+        isFittedPass = type(ws.obj(f'PDF_pass_{bin_key}')) is ROOT.RooAddPdf
+        isFittedFail = type(ws.obj(f'PDF_fail_{bin_key}')) is ROOT.RooAddPdf
+        if isFittedPass and isFittedFail:
+            print("Not possible to refit an existing PDF! \nReturning the results obtained previously")
+            res_pass = ROOT.RooFitResult(ws.obj(f'results_pass_{bin_key}'))
+            res_fail = ROOT.RooFitResult(ws.obj(f'results_fail_{bin_key}'))
+            return (res_pass, res_fail)
+        else:
+            return (0, 0)
+    
+    if type_analysis == 'sim':
+        if type(ws.obj(f'simPDF_({bin[0]}|{bin[1]})')) is ROOT.RooSimultaneous:
+            print("Not possible to refit an existing PDF! \nReturning the results obtained previously")
+            res = ROOT.RooFitResult(ws.obj(f'results_({bin[0]}|{bin[1]})'))
+            return res
+        else:
+            return 0
+
+###############################################################################
+
 def pearson_chi2_eval(histo, pdf, nbins, res):
     """
     """
@@ -17,6 +41,7 @@ def pearson_chi2_eval(histo, pdf, nbins, res):
 
     return chi2_val, ndof
 
+###############################################################################
 
 def check_chi2(histo, pdf, res):
     """
@@ -27,6 +52,7 @@ def check_chi2(histo, pdf, res):
 
     return status_chi2
 
+###############################################################################
 
 def fit_quality(res, old_checks=False):
     """
@@ -41,6 +67,7 @@ def fit_quality(res, old_checks=False):
         check_edm = (res.edm() < 1e-4)
         return bool(check_migrad*check_covm*check_edm)
 
+###############################################################################
 
 def llr_test_bkg(histo, pdf, alpha=0.05):
     """

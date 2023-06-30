@@ -6,29 +6,12 @@ import time
 import os
 import sys
 from utilities.results_utils import results_manager
-from utilities.plot_utils import plot_distr_with_fit, plot_pass_and_fail
+from utilities.plot_utils import plot_bkg_on_data, plot_pass_and_fail
 from utilities.dataset_utils import import_pdf_library
 from utilities.fit_utils import fit_quality, check_chi2
 
 
-def check_existing_fit(ws, bin):
-    isFittedPass = type(
-        ws.obj(f'PDF_pass_({bin[0]}|{bin[1]})')) is ROOT.RooAddPdf
-    isFittedFail = type(
-        ws.obj(f'PDF_fail_({bin[0]}|{bin[1]})')) is ROOT.RooAddPdf
-    if isFittedPass and isFittedFail:
-        print("Not possible to refit an existing PDF! \nReturning the results obtained previously")
-        res_pass = ROOT.RooFitResult(
-            ws.obj(f'results_pass_({bin[0]}|{bin[1]})'))
-        res_fail = ROOT.RooFitResult(
-            ws.obj(f'results_fail_({bin[0]}|{bin[1]})'))
-        return (res_pass, res_fail)
-    else:
-        return (0, 0)
-
-
-def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False, test_bkg=False,
-                   verb=-1, figs=False):
+def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=False, verb=-1, figs=False):
   
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
@@ -45,23 +28,23 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
     lims_num = [[0.5, 0.2], [0.5, 0.2]]
 
     mean_p = ROOT.RooRealVar(
-        f"mean_pass_({bin[0]}|{bin[1]})", "mean", 0, -5.0, 5.0)
+        f"mean_pass_{bin_key}", "mean", 0, -5.0, 5.0)
     sigma_p = ROOT.RooRealVar(
-        f"sigma_pass_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.1, 5.0)
+        f"sigma_pass_{bin_key}", "sigma", 0.5, 0.1, 5.0)
     mean_f = ROOT.RooRealVar(
-        f"mean_fail_({bin[0]}|{bin[1]})", "mean", 0, -5.0, 5.0)
+        f"mean_fail_{bin_key}", "mean", 0, -5.0, 5.0)
     sigma_f = ROOT.RooRealVar(
-        f"sigma_fail_({bin[0]}|{bin[1]})", "sigma", 0.5, 0.1, 5.0)
+        f"sigma_fail_{bin_key}", "sigma", 0.5, 0.1, 5.0)
 
-    if bkg_pdf == "expo":
+    if bkg_shape == "expo":
         tau_p = ROOT.RooRealVar(
-            f"tau_pass_({bin[0]}|{bin[1]})", "tau", 0.0, -5, 5)
+            f"tau_pass_{bin_key}", "tau", 0.0, -5, 5)
         tau_f = ROOT.RooRealVar(
-            f"tau_fail_({bin[0]}|{bin[1]})", "tau", 0.0, -5, 5)
+            f"tau_fail_{bin_key}", "tau", 0.0, -5, 5)
         tau = [tau_f, tau_p]
-    elif bkg_pdf == "mixed":
+    elif bkg_shape == "mixed":
         pass
-    elif bkg_pdf == "cmsshape":
+    elif bkg_shape == "cmsshape":
         pass
     else:
         print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
@@ -81,8 +64,8 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
 
         idx = 1 if cond == "pass" else 0
 
-        axis[idx] = ws.var(f"x_{cond}_({bin[0]}|{bin[1]})")
-        axis[idx].setRange("fitRange", 60, 120)
+        axis[idx] = ws.var(f"x_{cond}_{bin_key}")
+        axis[idx].setRange("fitRange", 60.0, 120.0)
 
         # binning = ROOT.RooUniformBinning(
         #     axis.getRange("fitRange")[0], axis.getRange("fitRange")[1], NBINS[idx])
@@ -90,27 +73,27 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
             ROOT.RooUniformBinning(axis[idx].getRange("fitRange")[0],
                                    axis[idx].getRange("fitRange")[1], NBINS[idx]), "cache")
 
-        histo_data[idx] = ws.data(f"Minv_data_{cond}_({bin[0]}|{bin[1]})")
+        histo_data[idx] = ws.data(f"Minv_data_{cond}_{bin_key}")
 
         pdf_mc[idx] = ROOT.RooHistPdf(
-            f"pdf_mc_{cond}_({bin[0]}|{bin[1]})", "pdf MC", axis[idx],
-            ws.data(f"Minv_mc_{cond}_({bin[0]}|{bin[1]})"), 3)
+            f"pdf_mc_{cond}_{bin_key}", "pdf MC", axis[idx],
+            ws.data(f"Minv_mc_{cond}_{bin_key}"), 3)
 
-        smearing[idx] = ROOT.RooGaussian(f"smearing_{cond}_({bin[0]}|{bin[1]})",
+        smearing[idx] = ROOT.RooGaussian(f"smearing_{cond}_{bin_key}",
                                          "Gaussian smearing", axis[idx], mean[idx], sigma[idx])
 
-        conv_pdf[idx] = ROOT.RooFFTConvPdf(f"conv_{cond}_({bin[0]}|{bin[1]})", f"Convolution pdf",
+        conv_pdf[idx] = ROOT.RooFFTConvPdf(f"conv_{cond}_{bin_key}", f"Convolution pdf",
                                            axis[idx], pdf_mc[idx], smearing[idx])
         conv_pdf[idx].setBufferFraction(bufFractions[idx])
         # conv_pdf[idx].setBufferStrategy(0)
         # conv_pdf[idx].setOperMode(3)
 
-        if bkg_pdf == "expo":
-            background[idx] = ROOT.RooExponential(f"expo_bkg_{cond}_({bin[0]},{bin[1]})",
+        if bkg_shape == "expo":
+            background[idx] = ROOT.RooExponential(f"expo_bkg_{cond}_{bin_key}",
                                                   "Exponential background", axis[idx], tau[idx])
-        elif bkg_pdf == "mixed":
+        elif bkg_shape == "mixed":
             pass
-        elif bkg_pdf == "cmsshape":
+        elif bkg_shape == "cmsshape":
             pass
         else:
             print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
@@ -123,32 +106,32 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
         n_events = histo_data[idx].sumEntries()
 
         nexp[idx] = ROOT.RooRealVar(
-            f"nexp_{cond}_({bin[0]}|{bin[1]})", f"nexp {cond}",
+            f"nexp_{cond}_{bin_key}", f"nexp {cond}",
             n_events, n_events-5*(n_events**0.5), n_events+5*(n_events**0.5))
 
         '''
         Nsig[idx] = ROOT.RooRealVar(
-            f"nsig_{cond}_({bin[0]}|{bin[1]})", "#signal events",
+            f"nsig_{cond}_{bin_key}", "#signal events",
             nexp[idx].getVal(), lims_num[idx][0]*nexp[idx].getVal(), nexp[idx].getMax())
         Nbkg[idx] = ROOT.RooRealVar(
-            f"nbkg_{cond}_({bin[0]}|{bin[1]})", "#background events",
+            f"nbkg_{cond}_{bin_key}", "#background events",
             lims_num[idx][1]*nexp[idx].getVal()/2., 0.0, lims_num[idx][1]*nexp[idx].getVal())
         '''
  
-        Nsig[idx] = ROOT.RooRealVar(f"nsig_{cond}_({bin[0]}|{bin[1]})", "#signal events",
+        Nsig[idx] = ROOT.RooRealVar(f"nsig_{cond}_{bin_key}", "#signal events",
                                     0.9*nexp[idx].getVal(), 0.5, 1.5*nexp[idx].getVal())
-        Nbkg[idx] = ROOT.RooRealVar(f"nbkg_{cond}_({bin[0]}|{bin[1]})", "#background events",
+        Nbkg[idx] = ROOT.RooRealVar(f"nbkg_{cond}_{bin_key}", "#background events",
                                     0.1*nexp[idx].getVal(), 0.5, 1.5*nexp[idx].getVal())           
 
         sum_func[idx] = ROOT.RooAddPdf(
-                            f"sum_{cond}_({bin[0]}|{bin[1]})", "Signal+Bkg",
+                            f"sum_{cond}_{bin_key}", "Signal+Bkg",
                             ROOT.RooArgList(conv_pdf[idx], background[idx]),
                             ROOT.RooArgList(Nsig[idx], Nbkg[idx]))
 
         # sum_func[idx].setNormRange("fitRange")
 
         model[idx] = ROOT.RooAddPdf(
-            sum_func[idx], f'PDF_{cond}_({bin[0]}|{bin[1]})')
+            sum_func[idx], f'PDF_{cond}_{bin_key}')
 
         model[idx].setNormRange("fitRange")
 
@@ -173,7 +156,7 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
         print(Nsig[idx].getVal())
         print(low_nbkg)
 
-        if (status is False) and refit_numbkg and low_nbkg and bkg_pdf=='expo':
+        if (status is False) and refit_numbkg and low_nbkg and bkg_shape=='expo':
             results[idx].Print()
             tau[idx].setVal(1)
             tau[idx].setConstant()
@@ -196,7 +179,7 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
 
         fit_status[idx] = fit_quality(results[idx], old_checks=True)
 
-        results[idx].SetName(f"results_{cond}_({bin[0]}|{bin[1]})")
+        results[idx].SetName(f"results_{cond}_{bin_key}")
 
     # ----------------------------------
     #  Quality checks (and plots) - NEW
@@ -205,14 +188,24 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
         ws.Import(model[0]), ws.Import(model[1])
         ws.Import(results[0]), ws.Import(results[1])
         if figs:
+            '''
+            plot_bkg_on_data(ws, "pass", bin_key, bkg_shape="expo", figname=f"figs/fit_iso_bkg/pass_{bin_key}_w_bkg.pdf")
+            plot_bkg_on_data(ws, "fail", bin_key, bkg_shape="expo", figname=f"figs/fit_iso_bkg/fail_{bin_key}_w_bkg.pdf")
+            '''
             bkg_names =[background[0].GetName(), background[1].GetName()]
             plot_pass_and_fail(axis, histo_data, model, bkg_names, 
-                               name=f"figs/fit_iso/bin_{bin[0]},{bin[1]}.pdf")
+                               name=f"figs/fit_iso_new/bin_{bin_key}.pdf")
+            
+            
     else:
-        bkg_names =[background[0].GetName(), background[1].GetName()]
-        plot_pass_and_fail(axis, histo_data, model, bkg_names, 
-                            name=f"figs/check_fits/bin_{bin[0]},{bin[1]}.pdf")
-    
+        if figs:
+            pass
+            '''
+            bkg_names =[background[0].GetName(), background[1].GetName()]
+            plot_pass_and_fail(axis, histo_data, model, bkg_names, 
+                                name=f"figs/check_fits/bin_{bin_key}.pdf")
+            '''
+        
     res_pass, res_fail = results
 
     '''
@@ -223,6 +216,8 @@ def indep_eff_fits(type_eff, type_analysis, ws, bin, bkg_pdf, refit_numbkg=False
     '''
 
     return res_pass, res_fail
+
+
 
 if __name__ == '__main__':
 

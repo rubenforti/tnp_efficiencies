@@ -5,97 +5,93 @@ import ROOT
 import os
 import sys
 import time
-from utilities.results_utils import results_manager
-# from utilities.dataset_utils import ws_init
-from indep_efficiency import indep_eff_fits
-from indep_efficiency import check_existing_fit as fit_exist_indep
+import argparse
+from utilities.base_library import bin_dictionary, binning, bkg_lumi_scales
+from indep_efficiency import independent_efficiency
 from sim_efficiency import simultaneous_efficiency
-from sim_efficiency import check_existing_fit as fit_exist_sim
-from utilities.fit_utils import fit_quality
+from utilities.fit_utils import check_existing_fit, fit_quality
+from utilities.dataset_utils import ws_init
 
 
-def make_fits(ws_name, res_name, type_eff, type_analysis, bins, bin_combinations, 
-              bkg_pdf='expo', test_bkg=False, fit_verbosity=-1, savefigs=False):
+
+def make_fits(ws_name, type_eff, type_analysis, bins_dictionary,
+              bkg_pdf='expo', fit_verbosity=-1, savefigs=False):
     """
     """
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
 
-    if bin_combinations is True:
-        bins_pt = []
-        bins_eta = []
-        for i in range(len(bins[0])):
-            for j in range(len(bins[1])):
-                bins_pt.append(bins[0][i])
-                bins_eta.append(bins[1][j])
-        bins_list = [bins_pt, bins_eta]
-    else:
-        bins_list = bins
-    
-    print(bins_list)
 
     file_ws = ROOT.TFile(ws_name)
     ws = file_ws.Get("w")
 
-
     Nproblems = 0
-    bins_with_problems = []
+    problematic_bins = {}
 
-    # res_object = results_manager(type_analysis)
-    # res_object.Open(res_name)
+    for bin_key in bins_dictionary:
 
+        global_idx, bin_pt, bin_eta = bins_dictionary[bin_key]
 
-    for idx in range(len(bins_list[0])):
-        bin_pt, bin_eta = bins_list[0][idx], bins_list[1][idx]
+        existingRes = check_existing_fit(type_analysis, ws, bin_key)
 
         if type_analysis == 'indep':
-            
-            isFitted = fit_exist_indep(ws, (bin_pt, bin_eta))
-            print(type(isFitted[0]), type(isFitted[1]))
 
-            if (isFitted[0] == 0 and isFitted[1] == 0):
-                res_pass, res_fail = indep_eff_fits(type_eff, "indep", ws, (bin_pt, bin_eta), 
-                                                    bkg_pdf, test_bkg=False, refit_numbkg=True, 
-                                                    verb=fit_verbosity, figs=savefigs)
+            print(type(existingRes[0]), type(existingRes[1]))
+
+            if (existingRes[0] == 0 and existingRes[1] == 0):
+                res_pass, res_fail = independent_efficiency(ws, bin_key, bkg_pdf, 
+                                                            test_bkg=False, refit_numbkg=True, 
+                                                            verb=fit_verbosity, figs=savefigs)
             else:
-                res_pass, res_fail = isFitted
+                res_pass, res_fail = existingRes
             
             status = bool(
                 fit_quality(res_pass, old_checks=True)*fit_quality(res_fail, old_checks=True))
 
-            if status is False:
-                print(f"\nBin {bin_pt},{bin_eta} has problems!\n")
+            if status is False or 1!=0:
+                print(f"\nBin {bin_key} ({bin_pt}|{bin_eta}) has problems!\n")
                 Nproblems += 1
-                bins_with_problems.append(f"{bin_pt},{bin_eta}")
+                print("****")
                 res_pass.Print()
                 res_pass.correlationMatrix().Print()
+                '''
+                pars_pass = res_pass.floatParsFinal()
+                nsig_pass = pars_pass.find(f"nsig_pass_{bin_key}")
+                print((nsig_pass.getVal()**0.5, nsig_pass.getError()))
+                '''
                 print("****")
                 res_fail.Print()
                 res_fail.correlationMatrix().Print()
+                '''
+
+                pars_fail = res_fail.floatParsFinal()
+                nsig_fail = pars_fail.find(f"nsig_fail_{bin_key}")
+                print((nsig_fail.getVal()**0.5, nsig_fail.getError()))
+                '''
                 print("****")
                 print(res_pass.status(), res_fail.status())
                 print(res_pass.covQual(), res_fail.covQual())
                 print(res_pass.edm(), res_fail.edm())
-                print(' ')
+                print('\n')
             else:
                 pass
                 #res_object.add_result(ws, bin_pt, bin_eta)
             
         elif type_analysis == 'sim':
-            isFitted = fit_exist_sim(ws, (bin_pt, bin_eta))
-            if isFitted == 0:
-                results = simultaneous_efficiency(type_eff, "indep", ws, (bin_pt, bin_eta), bkg_pdf, 
+
+            if existingRes == 0:
+                results = simultaneous_efficiency(ws, bin_key, bkg_pdf, 
                                                   refit_numbkg=True, test_bkg=False, same_smearing=False, 
                                                   enable_mcfit=False, verb=fit_verbosity, figs=savefigs)
             else: 
-                results = isFitted
+                results = existingRes
 
             status = fit_quality(results, old_checks=True)
 
-            if status is False:
+            if status is False or 1!=0:
                 print(f"\nBin {bin_pt},{bin_eta} has problems!\n")
                 Nproblems += 1
-                bins_with_problems.append(f"{bin_pt},{bin_eta}")
+                problematic_bins.update({bin_key: bin_dictionary[bin_key]})
                 results.Print()
                 #results.correlationMatrix().Print()
                 print("****")
@@ -112,10 +108,13 @@ def make_fits(ws_name, res_name, type_eff, type_analysis, bins, bin_combinations
             sys.exit()
     
         
-    print(f"NUM of problematic bins = {Nproblems}")
-    print(bins_with_problems)
-    ws.writeToFile(workspace_name)
-    # res_object.Write(f"results/results_{type_eff}_{type_analysis}.pkl")
+    print(f"NUM of problematic bins = {Nproblems}\n")
+
+    print("List of non fitted bins:")
+    for probl_bin_key in problematic_bins:
+        print(problematic_bins[probl_bin_key][1], problematic_bins[probl_bin_key][2])
+
+    return ws
 
 
 if __name__ == '__main__':
@@ -142,37 +141,58 @@ if __name__ == '__main__':
 
     bkg_pdf = 'expo'
 
-    '''    
-    bins_pt = [num for num in range(1, 16)]
-    bins_eta = [num for num in range(1, 49)]
-    bin_combinations = True
+        
+    bins = bin_dictionary("pt", "eta_8bins")
 
-    '''
-    # ------------------------------------------------------------------------
+
+    # -------------------------------------------------------------------------
+    # Dataset generation
+    # ------------------
+
+
+
+    filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
+    filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
+    dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
+    bkg_filepaths = {}
+
+    bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
+    
+    [bkg_filepaths.update({cat : 
+        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_categories]
+    
+    print(bkg_filepaths)
+    
+
+    lumi_scales = bkg_lumi_scales(type_eff, bkg_categories)
+
+    print(lumi_scales)
 
     
 
+    import_dictionary = {
+        "data" : filename_data,
+        "mc" : filename_mc,
+        "bkg" : {
+            "filepaths" : bkg_filepaths,
+            "lumi_scales" : lumi_scales
+        }
+    }
 
-    bin_keys = ['1,1']
+    workspace_name = f"root_files/ws/ws_data_mc_bkg.root"
+    ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
+    ws.writeToFile(workspace_name)
 
-    bin_combinations = False
+    
+    # ------------------------------------------------------------------------
 
-    bins_pt, bins_eta = [], []
 
-    for key in bin_keys:
-        bins_pt.append(key.split(',')[0])
-        bins_eta.append(key.split(',')[1])
-
-    print(bins_pt)
-    print(bins_eta)
-
-    workspace_name = f"root_files/ws/ws_{type_eff}_{type_analysis}_prova.root"
+   
     results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
 
-    bins = (bins_pt, bins_eta)
-    make_fits(workspace_name, results_name, type_eff, type_analysis, bins, bin_combinations, 
-              bkg_pdf, fit_verbosity=1, savefigs=False)
+    ws = make_fits(workspace_name, type_eff, type_analysis, bins, savefigs=True)
 
+    ws.writeToFile(workspace_name)
  
 
     #print("RISULTATI SCRITTI SU PICKLE FILE")

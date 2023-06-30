@@ -6,7 +6,7 @@ import ROOT as rt
 #   Updated by:   Dinko Ferencek (Rutgers)
 #
 
-cmsText     = "CMS";
+cmsText     = "CMS"
 cmsTextFont   = 61  
 
 writeExtraText = True
@@ -21,20 +21,24 @@ cmsTextOffset    = 0.1
 
 relPosX    = 0.080
 relPosY    = 0.035
-irelExtraDY = 1.2
+relExtraDY = 1.2
 
 extraOverCmsTextSize  = 0.76
 
 lumi_13TeV = "20.1 fb^{-1}"
+lumi_13TeV_16GtoH = "16.8 fb^{-1}"
 lumi_8TeV  = "19.7 fb^{-1}" 
 lumi_7TeV  = "5.1 fb^{-1}"
 lumi_sqrtS = ""
 
 drawLogo      = False
 
-def CMS_lumi(pad,  iPeriod,  iPosX ):
+def CMS_lumi(pad,  iPeriod,  iPosX, simulation = False):
     outOfFrame    = False
     if(iPosX/10==0 ): outOfFrame = True
+
+    if simulation:
+        extraText = "  Simulation Preliminary"
 
     alignY_=3
     alignX_=2
@@ -72,6 +76,10 @@ def CMS_lumi(pad,  iPeriod,  iPosX ):
     elif ( iPeriod==4 ):
         lumiText += lumi_13TeV
         lumiText += " (13 TeV)"
+    elif ( iPeriod==5 ):
+        lumiText += lumi_13TeV_16GtoH
+        lumiText += " (13 TeV)"
+
     elif ( iPeriod==7 ):
         if( outOfFrame ):lumiText += "#scale[0.85]{"
         lumiText += lumi_13TeV 
@@ -107,7 +115,7 @@ def CMS_lumi(pad,  iPeriod,  iPosX ):
         latex.SetTextFont(cmsTextFont)
         latex.SetTextAlign(11) 
         latex.SetTextSize(cmsTextSize*t)    
-        latex.DrawLatex(l,1-t+lumiTextOffset*t,cmsText)
+        latex.DrawLatex(l, 1-t+lumiTextOffset*t, cmsText)
   
     pad.cd()
 
@@ -129,12 +137,13 @@ def CMS_lumi(pad,  iPeriod,  iPosX ):
             yl_0 = posY_ - 0.15
             xl_1 = posX_ + 0.15*H/W
             yl_1 = posY_
-            CMS_logo = rt.TASImage("CMS-BW-label.png")
+            CMS_logo = rt.TASImage("utilities/cms-logo.png")
             pad_logo =  rt.TPad("logo","logo", xl_0, yl_0, xl_1, yl_1 )
             pad_logo.Draw()
             pad_logo.cd()
             CMS_logo.Draw("X")
             pad_logo.Modified()
+            pad_logo.Update()
             pad.cd()          
         else:
             latex.SetTextFont(cmsTextFont)
