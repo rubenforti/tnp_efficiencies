@@ -28,7 +28,6 @@ class results_manager:
             pickle.dump(self._dict_results, file)
             # file.close()
     
-
     def dictionary(self):
         return self._dict_results
 

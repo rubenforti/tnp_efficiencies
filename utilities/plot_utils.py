@@ -6,12 +6,10 @@ import os
 import pickle
 from array import array
 from utilities.results_utils import results_manager
-from utilities.base_library import bkg_lumi_scales
+from utilities.base_library import bkg_lumi_scales, binning, sumw2_error
 from utilities.CMS_lumi import CMS_lumi
 
 bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
-
-
 
 
 def style_settings():
@@ -22,8 +20,6 @@ def style_settings():
     ROOT.gStyle.SetStatBorderSize(0)
     ROOT.gStyle.SetStatX(1.)
     ROOT.gStyle.SetStatY(1.)
-
-
 
 
 def plot_pass_and_fail(axis, data, function, pdf_bkg, name='prova.png', pull=False):
@@ -115,17 +111,16 @@ def plot_distr_with_fit(axis, data, function, pdf_bkg,
     c.SaveAs(name)
 
 
-def plot_results(filename, results, binning_pt=(), binning_eta=()):
+def plot_eff_results(filename, results, binning_pt=(), binning_eta=()):
     """
     """
 
     file = ROOT.TFile.Open(filename, "UPDATE")
 
     if len(binning_pt) == 0:
-        binning_pt = array('d', [24., 26., 28., 30., 32., 34.,
-                           36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
+        binning_pt = binning("pt")
     if len(binning_eta) == 0:
-        binning_eta = array('d', [round(-2.4 + i*0.1, 2) for i in range(49)])
+        binning_eta = binning("eta")
 
     ROOT.gStyle.SetOptStat("n")
 
@@ -231,7 +226,10 @@ def plot_bkg_on_data(plot_objects, flag, bin_key, figpath=''):
     frame_axis.SetTitleSize(0)
 
     datahist = plot_objects.pop("data")
-    datahist.plotOn(frame, ROOT.RooFit.Name("Data"))
+    datahist.plotOn(frame, 
+                    ROOT.RooFit.Binning("plot_binning"),
+                    ROOT.RooFit.Name("Data"))
+    
 
     pdf_bkg_obj = plot_objects.pop("pdf_bkg_fit")
     pdf_bkg_obj["pdf"].plotOn(frame, 
@@ -242,10 +240,11 @@ def plot_bkg_on_data(plot_objects, flag, bin_key, figpath=''):
     total_bkg = plot_objects.pop("total_bkg")
     total_bkg["roohisto"].plotOn(frame,
                                  ROOT.RooFit.Name("Total bkg"),
+                                 ROOT.RooFit.Binning("plot_binning"),
                                  # ROOT.RooFit.Invisible(),
                                  ROOT.RooFit.LineColor(total_bkg["color"]),
                                  ROOT.RooFit.MarkerColor(total_bkg["color"]),
-                                 ROOT.RooFit.Normalization(total_bkg["integral"]["val"], ROOT.RooAbsReal.NumEvent))
+                                 ROOT.RooFit.Normalization(total_bkg["integral"], ROOT.RooAbsReal.NumEvent))
     
     pad_info.cd()
     textbox = ROOT.TPaveText(0, 0.4, 1, 0.8, "NDC NB")
@@ -253,12 +252,16 @@ def plot_bkg_on_data(plot_objects, flag, bin_key, figpath=''):
     textbox.SetTextSize(0.05)
     textbox.SetTextAlign(12)
     c.Update()
+    sigma_histo = sumw2_error(total_bkg['roohisto'])
     textbox.AddText(f"Data entries: {datahist.sumEntries()}")
     textbox.AddText(f"Nbkg from fit: {round(pdf_bkg_obj['norm'].getVal(),2)} #pm {round(pdf_bkg_obj['norm'].getError(),2)}")
-    textbox.AddText(f"Nbkg from MC: {round(total_bkg['integral']['val'],2)} #pm {round(total_bkg['integral']['err'],2)}")
-    difference = total_bkg['integral']['val'] - pdf_bkg_obj['norm'].getVal()
-    sigma_difference = ((total_bkg['integral']['err']**2)+(pdf_bkg_obj['norm'].getError()**2))**0.5
-    nsigma = difference/sigma_difference
+    textbox.AddText(f"Nbkg from MC: {round(total_bkg['integral'],2)} #pm {round(sigma_histo,2)}")
+    
+    delta = total_bkg['integral'] - pdf_bkg_obj['norm'].getVal()
+    
+    
+    sigma_on_delta = (sigma_histo**2 + pdf_bkg_obj['norm'].getError()**2)**0.5
+    nsigma = delta/sigma_on_delta
     textbox.AddText(f"Distance in #sigma = {round(nsigma, 2)}")
     textbox.AddText("--------------------")
 
@@ -272,7 +275,7 @@ def plot_bkg_on_data(plot_objects, flag, bin_key, figpath=''):
                          ROOT.RooFit.LineStyle(1),
                          ROOT.RooFit.Normalization(bkg_obj["integral"], ROOT.RooAbsReal.NumEvent))
         pad_info.cd()
-        bkg_error = (bkg_obj["lumi_scale"]*bkg_obj["integral"])**0.5
+        bkg_error = sumw2_error(bkg_obj["roohisto"])
         textbox.AddText(f"Num {bkg_key} = {round(bkg_obj['integral'],2)} #pm {round(bkg_error, 2)}")
 
 
@@ -294,7 +297,7 @@ def plot_bkg_on_data(plot_objects, flag, bin_key, figpath=''):
     textbox.Draw()  
     c.Update()
 
-    print(total_bkg["integral"]["val"], pdf_bkg_obj["norm"].getVal())
+    print(total_bkg["integral"], pdf_bkg_obj["norm"].getVal())
 
     c.SaveAs(f"{figpath}/bkg_{bin_key}_{flag}.pdf")
 

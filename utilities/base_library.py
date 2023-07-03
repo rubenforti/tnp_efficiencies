@@ -54,9 +54,10 @@ def binning(type):
 
 def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
     """
-    Creates a dictionary that relates the bounds of every bin (keys) to the indexes useful for the bin 
-    selection. The indexes are returned in a 3-element list containing the global index, the pt index
-    and the eta index in this order.
+    Creates a dictionary that relates the bounds of every bin (keys) to the 
+    indexes useful for the bin selection. The indexes are returned in a 
+    3-element list containing the global index, the pt index and the eta index
+    in this order.
     """
     index_dictionary = {}
     global_idx = 1
@@ -83,9 +84,10 @@ def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
 
 def get_idx_from_bounds(bounds_pt, bounds_eta):
     """
-    Function that, given the bin bounds (that have to be present in the binning arrays!!!), returns the 
-    coordinates of the selected region. The coordinates are given as list of global indexes and as bounds
-    on pt/eta indexes (max and min, since the region is rectangular)
+    Function that, given the bin bounds (that have to be present in the binning
+    arrays!!!), returns the coordinates of the selected region. The coordinates 
+    are given as list of global indexes and as bounds on pt/eta indexes (max 
+    and min, since the region is rectangular)
     """
     initial_dict = bin_dictionary("pt", "eta")
     global_bins = []
@@ -153,6 +155,38 @@ def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
     sigma_eff = ROOT.TMath.Sqrt(var1+var2)/((npass+nfail)**2)
 
     return eff, sigma_eff
+
+###############################################################################
+
+def sumw2_error(histo):
+    """
+    Calculates the error on the integral of a RooDataHist as the (square root 
+    of the) sum of the errors associated to each bin. The errors considered are
+    the "SumW2", already stored in the RooDataHist.
+    """
+
+    variance = 0
+    for i in range(0, histo.numEntries()):
+        histo.get(i)
+        variance += histo.weightError(ROOT.RooAbsData.SumW2)**2
+    sum_error = variance**0.5
+
+    return sum_error
+
+###############################################################################
+
+def init_pt_eta_h2d(histo_name, histo_title, binning_pt, binning_eta):
+
+    histos = {}
+
+    for flag in ["pass", "fail"]:
+
+        h2d = ROOT.TH2D(f"{histo_name}_{flag}", f"{histo_title} - {flag}ing probes", 
+                        len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
+        histos.update({f"{histo_name}_{flag}" : h2d})
+
+    return histos
+
 
 ###############################################################################
 ###############################################################################

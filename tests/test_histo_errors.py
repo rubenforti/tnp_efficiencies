@@ -153,9 +153,20 @@ class TestHistoIntegral(unittest.TestCase):
 
         self.assertAlmostEqual(h_roohist.sumEntries(), h_th1_1.Integral()+h_th1_2.Integral())
 
+        errors_etype0 = 0
+        errors_etype1 = 0
         for i in range(0, h_roohist.numEntries()):
             h_roohist.get(i)
             self.assertAlmostEqual(h_roohist.weight(i), h_th1_1.GetBinContent(i+1)+h_th1_2.GetBinContent(i+1))
+            errors_etype0 += h_roohist.weightError(0)**2
+            errors_etype1 += h_roohist.weightError(1)**2
+        
+        errors_etype0 = errors_etype0**0.5
+        errors_etype1 = errors_etype1**0.5
+
+        print(h_roohist.sumEntries()**0.5, errors_etype0, h_roohist.get_sumw2()**0.5, errors_etype1)
+        print(h_roohist.sumEntries(), h_roohist.get_sumw2())
+            
 
 
 
