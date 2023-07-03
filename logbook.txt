@@ -373,34 +373,53 @@ incontrato sta nel fatto che l'asse deve essere uguale per tutti i roodatahists.
 mettercisi per bene.
 
 
+26/06-03/07/2023
+----------------
+Sistemato il problema della costruzione dei dataset: la funzione ws_init adesso accetta come primo argomento 
+un dizionario contenete le informazioni necessarie a caricare diversi tipi di dataset (dati, mc, bkg) 
+simultaneamente.
+
+Analisi sui bkg:
+  - sommati gli istogrammi dei vari processi di bkg; 
+  - confrontato il numero di eventi (=pesi) nell'istogramma totale con il numero di eventi di bkg che si è 
+    ottenuto dal fit -> c'è una grande discrepanza ma potrebbero esserci fattori di cui non si è tenuto conto 
+    che sporcano il risultato
+  - la shape della distribuzione dello Ztautau sembra discostarsi dall'esponenziale; DA TENERE D'OCCHIO
+
+NOTA SULLE INCERTEZZE: quando un istogramma è riempito con pesi, automaticamente viene chiamata l'opzione
+SumW2, che abilita il calcolo dell'errore come somma dei pesi al quadrato. Dopo aver fatto la trasformazione
+TH1->RooDataHist, per avere il valore corretto dell'errore su un bin va chiamato il metodo
+"RooDataHist.getWeightError(ROOT.RooAbsData.Sumw2)": nel caso dell'istogramma contenente tutti gli eventi di 
+background, per ogni bin l'errore è definito quindi come sqrt( sum(n_i*(w_i^2)) )
+
+
+
 
 
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-TO-DO LIST
-----------
-- Far girare fit simultanei su iso e confrontare coi risultati "indep"
-
-- BACKGROUND: prendere i vari root files contenenti i diversi bkg e cercare di spiegare 
-  un andamento esponenziale -> GOF test?
-
-- Estendere l'analisi ad altri step -> se il lavoro sui bkg si dimostra promettente,
-  rivogere particolare attenzione agli step "standalone" e "tracking"
-
+TO-DO LIST BACKGROUNDS
+----------------------
+- Ottenere da Rajarshi il weightsum del sample di segnale Z->mumu e normalizzare talew dataset a lumi_data
+- Fare un plot dei bkg confrontati con il dataset di segnale, per vedere che la normalizzazione abbia senso
+- Confrontare il rapporto B/(S+B) che si ottiene con i MC con quello ottenuto col fit sui dati
+- Valutare l'impatto delle differenze del punto prima sulle efficienze: 
+    1) costruire pseudodata composto da segnale e bkg conf frazione nota;
+    2) far girare l'algoritmo di fit su questo dataset
+    3) confrontare le efficienze ottenute un questo modo con quelle vere (note dai MC) -> eventuali bias
 
 
 DUBBI APERTI
 ------------
-- Come si imposta la step-size in Minuit2? Non sembra esserci nessun metodo a tal fine né in RooMinimizer ne in ROOT.Fit.Fitter 
-
+- Come si imposta la step-size in Minuit2? Non sembra esserci nessun metodo a tal fine né in RooMinimizer
+  né in ROOT.Fit.Fitter 
 
 
 SYNTAX IMPROVEMENTS
 -------------------
 - Fare un main vero e proprio con rispettivo parser
-- Cambiare la segnatura di ogni bin: (idx_pt|idx_eta)->[pt_low,pt_high]_[eta_low_eta_high]
 
 
 IDEE PER MIGLIORAMENTI
