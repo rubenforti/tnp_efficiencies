@@ -5,8 +5,8 @@ import ROOT
 import time
 import os
 import sys
-from utilities.results_utils import results_manager
-from utilities.plot_utils import plot_bkg_on_data, plot_pass_and_fail
+from utilities.results_utils import results_manager, efficiency_from_res
+from utilities.plot_utils import plot_bkg_on_histo, plot_pass_fail
 from utilities.dataset_utils import import_pdf_library
 from utilities.fit_utils import fit_quality, check_chi2
 
@@ -181,6 +181,9 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
 
         results[idx].SetName(f"results_{cond}_{bin_key}")
 
+
+    eff, d_eff = efficiency_from_res(results[1], results[0])
+
     # ----------------------------------
     #  Quality checks (and plots) - NEW
     # ----------------------------------
@@ -192,9 +195,23 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
             plot_bkg_on_data(ws, "pass", bin_key, bkg_shape="expo", figname=f"figs/fit_iso_bkg/pass_{bin_key}_w_bkg.pdf")
             plot_bkg_on_data(ws, "fail", bin_key, bkg_shape="expo", figname=f"figs/fit_iso_bkg/fail_{bin_key}_w_bkg.pdf")
             '''
-            bkg_names =[background[0].GetName(), background[1].GetName()]
-            plot_pass_and_fail(axis, histo_data, model, bkg_names, 
-                               name=f"figs/fit_iso_new/bin_{bin_key}.pdf")
+            plot_objects = {
+                "pass" : {
+                    "axis" : axis[1],
+                    "data" : histo_data[1],
+                    "model" : model[1],
+                    "res" : results[1],
+                },
+                "fail" : {
+                    "axis": axis[0],
+                    "data": histo_data[0],
+                    "model": model[0],
+                    "res": results[0],
+                },
+                "efficiency" : [eff, d_eff]
+            }
+            plot_pass_fail("indep", plot_objects, bin_key, pull=False,
+                           figpath=f"figs/fit_iso_indep_mergedbins")
             
             
     else:

@@ -367,6 +367,8 @@ Migliorata l'organizzazione dei dati da dare in input alle varie funzioni:
 Ottenuto il dataset Z->tautau, che però presenta bin con integrale negativo. Rajarshi ha detto che guarda con
 Marco come sistemare questa cosa, che dipende sicuramente dal "genweight". Intanto comunque ho fatto la 
 distribuzione 2d di tutti i bkg, in numeri assoluti e relativi ai dati.
+NOTA INFORMATIVA: il genweight da modificare, in questo caso, è quello relativo ai muoni prompt a livello 
+gen. Chiaramente in Z->tautau questo controllo va disattivato.
 
 Va fatta una funzione per plottare, bin per bin, le distribuzioni di bkg su quelle di segnale. Un problema
 incontrato sta nel fatto che l'asse deve essere uguale per tutti i roodatahists... nulla di che ma bisogna 
@@ -391,6 +393,29 @@ SumW2, che abilita il calcolo dell'errore come somma dei pesi al quadrato. Dopo 
 TH1->RooDataHist, per avere il valore corretto dell'errore su un bin va chiamato il metodo
 "RooDataHist.getWeightError(ROOT.RooAbsData.Sumw2)": nel caso dell'istogramma contenente tutti gli eventi di 
 background, per ogni bin l'errore è definito quindi come sqrt( sum(n_i*(w_i^2)) )
+
+
+04-07/07/2023
+-------------
+Trovati problemi di memoria nella gestione dei subplot pass/fail -> per il momento i plot sono disattivati,
+ma quesa cosa andrà sistemata.
+
+Ottenuto il weightsum del dataset Z->mumu, che è 50602137.0, valore salvato nella base_library. L'istogramma
+"nuovo" fornito da Rajarshi ha i bin contents che differiscono, in media 1e-12 da quelli dell'istogramma 
+originario -> applichiamo i weightsum tranquillamente su quell'istogramma.
+
+Scalato il sample mc di segnale, plottata la sua distribuzione insieme a quella dei bkg: risultati
+ragionevoli; da una valutazione "ad occhio" su qualche bin sparso, sembra che  la normalizzazione del bkg
+sia sempre circa 1.8 volte il numero di eventi TOTALI di segnale: non credo sia un problema, visto che
+possono emergere facilmente fattori di scala nel MC, ma è bene tenerlo a mente.
+
+Rifatti fit indipendenti sui bin allargati in eta (binning pt = standard, binning eta = eta_8bins): si è
+scelto di allargare in questo modo per non avere nessun dataset di bkg con integrale totale negativo.
+Ottenuta la frazione bkgfrac = nbkg/(nsig+nbkg) sia dai MC così normalizzati sia dai risultati del fit
+sui dati. Distribuzione del rapporto tra le due frazioni correttamente plottata -> va fatto un root file
+contenete anche i pull.
+
+
 
 
 

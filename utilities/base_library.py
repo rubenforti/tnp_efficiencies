@@ -23,7 +23,7 @@ binnings = {
 
 lumi_data = 16.8  # fb^-1
 
-
+sig_mc_repo = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS"
 bkg_repo = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
 
 
@@ -37,9 +37,12 @@ xsec_bkg = {
     "WW" : 12.6,
     "WZ" : 5.4341,
     "ZZ" : 0.60,
-    "TTSemileptonic" : 366.34,
+    "TTSemileptonic" : 366.34, 
     "Ztautau" : xsec_ZmmPostVFP*Z_TAU_TO_LEP_RATIO
 }
+
+weightSum_signal = 50602137.0
+
 
 ###############################################################################
 
@@ -124,11 +127,19 @@ def cross_section_bkg(bkg_process):
 
 ###############################################################################
 
-def bkg_lumi_scales(type_eff, bkg_categories):
+def lumi_factors(type_eff, bkg_categories):
     """
     "Lumi scale" defined as alpha that satisifies lumi_data=alpha*lumi_bkg
     """
     lumi_scales = {}
+
+    # file_sig = ROOT.TFile(f"{sig_mc_repo}/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root")
+    # wsum_histo_sig = file_sig.Get("weightSum")
+    # num_init_sig = wsum_histo_sig.Integral()
+    num_init_sig = weightSum_signal
+    xsection_sig = xsec_ZmmPostVFP*1000  # has to be put in fb
+    lumi_sig = num_init_sig/xsection_sig
+    lumi_scales.update({"Zmumu" : lumi_data/lumi_sig})
 
     for cat in bkg_categories:
         file = ROOT.TFile(f"{bkg_repo}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root")
@@ -172,20 +183,6 @@ def sumw2_error(histo):
     sum_error = variance**0.5
 
     return sum_error
-
-###############################################################################
-
-def init_pt_eta_h2d(histo_name, histo_title, binning_pt, binning_eta):
-
-    histos = {}
-
-    for flag in ["pass", "fail"]:
-
-        h2d = ROOT.TH2D(f"{histo_name}_{flag}", f"{histo_title} - {flag}ing probes", 
-                        len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
-        histos.update({f"{histo_name}_{flag}" : h2d})
-
-    return histos
 
 
 ###############################################################################

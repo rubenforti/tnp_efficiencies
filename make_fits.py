@@ -6,9 +6,9 @@ import os
 import sys
 import time
 import argparse
-from utilities.base_library import bin_dictionary, binning, bkg_lumi_scales
+from utilities.base_library import bin_dictionary, binning, lumi_factors
 from indep_efficiency import independent_efficiency
-from sim_efficiency import simultaneous_efficiency
+# from sim_efficiency import simultaneous_efficiency
 from utilities.fit_utils import check_existing_fit, fit_quality
 from utilities.dataset_utils import ws_init
 
@@ -144,6 +144,12 @@ if __name__ == '__main__':
         
     bins = bin_dictionary("pt", "eta_8bins")
 
+    '''
+    bin_prova = {
+        "[24.0to26.0][-2.4to-2.3]" : bins["[24.0to26.0][-2.4to-2.3]"]
+    }
+    '''
+
 
     # -------------------------------------------------------------------------
     # Dataset generation
@@ -154,43 +160,47 @@ if __name__ == '__main__':
     filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
     filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
     dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
-    bkg_filepaths = {}
-
+    
     bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
     
-    [bkg_filepaths.update({cat : 
+    bkg_filenames = {}
+    [bkg_filenames.update({cat : 
         f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_categories]
     
-    print(bkg_filepaths)
+    print(bkg_filenames)
     
 
-    lumi_scales = bkg_lumi_scales(type_eff, bkg_categories)
+    lumi_scales = lumi_factors(type_eff, bkg_categories)
 
     print(lumi_scales)
 
+
+    lumi_scale_signal = lumi_scales.pop("Zmumu")
     
 
     import_dictionary = {
         "data" : filename_data,
-        "mc" : filename_mc,
+        "mc" : {
+            "filename": filename_mc,
+            "lumi_scale" : lumi_scale_signal
+        },
         "bkg" : {
-            "filepaths" : bkg_filepaths,
+            "filenames" : bkg_filenames,
             "lumi_scales" : lumi_scales
         }
     }
 
-    workspace_name = f"root_files/ws/ws_data_mc_bkg.root"
+    # workspace_name = f"root_files/ws/ws_bkg_studies.root"
+    workspace_name = "root_files/ws/ws_bkg_prova.root"
+    
     ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
     ws.writeToFile(workspace_name)
 
-    
     # ------------------------------------------------------------------------
-
-
    
     results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
 
-    ws = make_fits(workspace_name, type_eff, type_analysis, bins, savefigs=True)
+    ws = make_fits(workspace_name, type_eff, type_analysis, bins, savefigs=False)
 
     ws.writeToFile(workspace_name)
  

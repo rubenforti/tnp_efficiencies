@@ -3,22 +3,27 @@
 
 import ROOT
 import sys
-from utilities.base_library import bkg_lumi_scales, binning, bin_dictionary, sumw2_error, eval_efficiency, init_pt_eta_h2d
+from utilities.base_library import lumi_factors, binning, bin_dictionary, sumw2_error, eval_efficiency
+from utilities.results_utils import init_pass_fail_histos, init_pass_fail_h2d
 from utilities.dataset_utils import ws_init
-from utilities.plot_utils import plot_bkg_on_data
+from utilities.plot_utils import plot_bkg_on_histo
+from array import array
 
 
 # bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
 
-bkg_colors = { 
+colors = { 
     "WW" : ROOT.kOrange+1,
     "WZ" : ROOT.kYellow+3,
     "ZZ" : ROOT.kGreen+1,
     "TTSemileptonic" : ROOT.kCyan+1,
     "Ztautau" : ROOT.kMagenta+1,
     "SameCharge" : ROOT.kOrange+10,
-    "total" : ROOT.kBlue
+    "total_bkg" : ROOT.kRed,
+    "pdf_bkg_fit" : ROOT.kRed,
+    "signal" : ROOT.kBlue
 }
+
 
 ###############################################################################
 
@@ -27,22 +32,23 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, import_data
     """
     Creates a dictionary containing the bkg MC datasets and the useful information related to them.
     """
-    lumi_scales = bkg_lumi_scales(type_eff, bkg_categories)
+    lumi_scales = lumi_factors(type_eff, bkg_categories)
 
     axis = ws.var(f"x_{flag}_{bin_key}")
-    axis.setBins(60, "plot_binning")
+    axis.setBins(20, "plot_binning")
 
     datasets = {}
     datasets.update({"axis" : axis})
 
     for cat in bkg_categories:
+        
         bkg_histo = ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")
         datasets.update({f"{cat}_bkg" : {
             "roohisto" : bkg_histo,
             "histo_pdf" : ROOT.RooHistPdf(f"{cat}_bkg_pdf", f"{cat}_bkg_pdf", ROOT.RooArgSet(axis), bkg_histo),
             "lumi_scale" : lumi_scales[cat],
             "integral" : bkg_histo.sumEntries(),
-            "color" : bkg_colors[cat]
+            "color" : colors[cat]
             }
         })
 
@@ -56,7 +62,7 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, import_data
         "roohisto": bkg_total_histo,
         "lumi_scale" : 1,
         "integral" : bkg_total_histo.sumEntries(),
-        "color" : bkg_colors["total"]
+        "color" : colors["total_bkg"]
         }
     })
 
@@ -66,7 +72,14 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, import_data
     
     if import_mc_signal:
         histo_mc = ws.data(f"Minv_mc_{flag}_{bin_key}")
-        datasets.update({"MC_signal" : histo_mc})
+        datasets.update({"MC_signal" : {
+            "roohisto" : histo_mc,
+            "histo_pdf" : ROOT.RooHistPdf(f"MC_signal_pdf", f"MC_signal_pdf", ROOT.RooArgSet(axis), histo_mc),
+            "lumi_scale" : lumi_scales["Zmumu"],
+            "integral" : histo_mc.sumEntries(),
+            "color" : colors["signal"]
+            }
+        })
     
     if import_fit_pars:
         res_obj = ws.obj(f"results_{flag}_{bin_key}")
@@ -93,20 +106,11 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, import_data
         datasets.update({"pdf_bkg_fit" : {
             "pdf" : pdf_bkg_fit,
             "norm" : norm_bkg,
-            "color" : ROOT.kRed
+            "color" : colors["pdf_bkg_fit"]
             }
         })
 
     return datasets
-
-###############################################################################
-
-
-
-
-
-
-
 
 ###############################################################################
 
@@ -151,20 +155,43 @@ def fit_bkg(type_eff, type_analysis, ws, flag, bin_key, fit_shape="expo"):
 ###############################################################################
 
 def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta, 
-                plot_on_data=False, plot_on_signal=False, figpath='figs/fit_iso_bkg'):
+                plot_on_data=False, plot_on_signal=False, figpath='figs/bkg_and_sig_mc'):
     """
     """
 
+    if plot_on_data and plot_on_signal:
+        print("ERROR: plotting on data AND signal is not available now")
+        sys.exit()
+
     nbins_pt, nbins_eta = len(binning_pt)-1, len(binning_eta)-1
+
+    '''
+    binning_ratio_1 = [round(0.0 + 0.2*i, 2) for i in range(6)]
+    binning_ratio_2 = [round(1 + i, 2) for i in range(1, 10)]
+    binning_ratio_3 = [round(10 + 20*i, 2) for i in range(1, 10)]
+    binning_ratio = binning_ratio_1 + binning_ratio_2 + binning_ratio_3 + [200]
+    '''
+    binning_ratio = [round(0.0 + 0.2*i, 2) for i in range(6)] + \
+                    [round(1.0 + i, 2) for i in range(1, 10)] + \
+                    [round(10.0 + 20*i, 2) for i in range(1, 10)] + [200.0]
+
+    binning_sigma = [round(-10.0 + i, 2) for i in range(91)]
+
 
     histos = {}
 
     if plot_on_data:
-        histos.update(init_pt_eta_h2d("h2d_nsigma", "Nbkg fit vs MC [sigma]", binning_pt, binning_eta))
         
-
+        histos.update(init_pass_fail_h2d("h2d_nsigma", "Nbkg fit vs MC [sigma]", binning_pt, binning_eta))
+        histos.update(init_pass_fail_histos("h_nsigma", "Nbkg fit vs MC [sigma]", array('d',binning_sigma)))
+        
     if plot_on_signal:
-        histos.update(init_pt_eta_h2d("h2d_bkg_fraction", "Bkg fraction mc/fit ratio", binning_pt, binning_eta))
+        histos.update(init_pass_fail_h2d("h2d_bkgfrac_ratio",  "Bkg fraction mc/fit ratio", binning_pt, binning_eta))
+        histos.update(init_pass_fail_histos("h_bkgfrac_ratio", "Bkg fraction mc/fit ratio", array('d',binning_ratio)))
+        histos.update(init_pass_fail_h2d("h2d_bkgfrac_pull",  "Bkg fraction mc vs fit pull", binning_pt, binning_eta))
+        histos.update(init_pass_fail_histos("h_bkgfrac_pull", "Bkg fraction mc vs fit pull", array('d',binning_sigma)))
+    
+        ratios = []
 
 
     for bin_key in bin_dict:
@@ -184,15 +211,16 @@ def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta,
 
                 datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
                                                import_data=True, import_fit_pdf_bkg=True)
-
-                integral_histo_bkg = datasets["total_bkg"]["roohisto"].sumEntries()
+                
+                integral_histo_bkg = datasets["total_bkg"]["integral"]
+                
                 norm_bkg = datasets["pdf_bkg_fit"]["norm"]
                 err_integral_histo_bkg = sumw2_error(datasets["total_bkg"]["roohisto"])
 
                 nsigma = (integral_histo_bkg - norm_bkg.getVal())/((err_integral_histo_bkg**2 + (norm_bkg.getError()**2))**0.5)
                 histos[f"h2d_nsigma_{flag}"].SetBinContent(bin_pt, bin_eta, nsigma)
-
-                plot_bkg_on_data(datasets, flag, bin_key, figpath=figpath) 
+                
+                plot_bkg_on_histo(datasets, flag, bin_key, figpath='figs/bkg_mc_on_data') 
 
 
             if plot_on_signal:
@@ -200,17 +228,18 @@ def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta,
                 datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
                                                import_mc_signal=True, import_fit_pars=True)
 
-                nbkg = datasets["total_bkg"]["roohisto"].sumEntries()
+                nbkg = datasets["total_bkg"]["integral"]
                 err_nbkg = sumw2_error(datasets["total_bkg"]["roohisto"])
 
-                nsignal = datasets["MC_signal"].sumEntries()
-                err_nsignal = sumw2_error(datasets["MC_signal"])
+                nsignal = datasets["MC_signal"]["integral"]
+                err_nsignal = sumw2_error(datasets["MC_signal"]["roohisto"])
 
-
+                print(nsignal, err_nsignal)
+                
                 if type(datasets["fit_pars"]["nsig"]) is ROOT.RooRealVar:
                     fit_par_nsig = datasets["fit_pars"]["nsig"]
                 else:
-                    fit_par_nsig = ROOT.RooRealVar(fit_par_nsig.GetName(), fit_par_nsig.GetTitle(), 0)
+                    fit_par_nsig = ROOT.RooRealVar(fit_par_nsig.GetName(), fit_par_nsig.GetTitle(), 1)
                 
                 if type(datasets["fit_pars"]["nbkg"]) is ROOT.RooRealVar:
                     fit_par_nbkg = datasets["fit_pars"]["nbkg"]
@@ -219,19 +248,40 @@ def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta,
 
                 bkgfrac_mc, err_bkgfrac_mc = eval_efficiency(nbkg, nsignal, err_nbkg, err_nsignal)
                 
-                bkgfrac_fit, err_bkgfrac_fit = eval_efficiency(fit_par_nbkg.getVal(), fit_par_nsig.getVal(), 
-                                                         fit_par_nbkg.getError(), fit_par_nsig.getError())
-
+                bkgfrac_fit, err_bkgfrac_fit = eval_efficiency(fit_par_nbkg.getVal(), fit_par_nsig.getVal(),
+                                                                fit_par_nbkg.getError(), fit_par_nsig.getError())
                 
-                bkgfrac_fit= 999999 if bkgfrac_fit==0 else bkgfrac_fit
-                bkgfrac_ratio = bkgfrac_mc/bkgfrac_fit
-                err_bkgfrac_ratio = bkgfrac_ratio*((err_bkgfrac_mc/bkgfrac_mc)**2 + (err_bkgfrac_fit/bkgfrac_fit)**2)**0.5
+                bkg_frac_pull = (bkgfrac_mc - bkgfrac_fit)/((err_bkgfrac_mc**2 + (err_bkgfrac_fit**2))**0.5)
 
-                histos[f"h2d_bkg_fraction_{flag}"].SetBinContent(bin_pt, bin_eta, bkgfrac_ratio)
-                histos[f"h2d_bkg_fraction_{flag}"].SetBinError(bin_pt, bin_eta, err_bkgfrac_ratio)
+                if bkgfrac_fit == 0:
+                    bkgfrac_ratio = 199.9
+                    err_bkgfrac_ratio = bkgfrac_mc
+                else:
+                    bkgfrac_ratio = bkgfrac_mc/bkgfrac_fit
+                    err_bkgfrac_ratio = bkgfrac_ratio*((err_bkgfrac_mc/bkgfrac_mc)**2 + (err_bkgfrac_fit/bkgfrac_fit)**2)**0.5
 
+                histos[f"h2d_bkgfrac_ratio_{flag}"].SetBinContent(bin_pt, bin_eta, bkgfrac_ratio)
+                histos[f"h2d_bkgfrac_ratio_{flag}"].SetBinError(bin_pt, bin_eta, err_bkgfrac_ratio)
+                histos[f"h_bkgfrac_ratio_{flag}"].Fill(bkgfrac_ratio)
+                histos[f"h2d_bkgfrac_pull_{flag}"].SetBinContent(bin_pt, bin_eta, bkg_frac_pull)
+                histos[f"h_bkgfrac_pull_{flag}"].Fill(bkg_frac_pull)
 
-                
+                plot_bkg_on_histo(datasets, flag, bin_key, figpath=figpath) 
+
+    
+    if plot_on_data:
+        filename = f"bkg_results/nsigma_bkg_vs_datafit.root"
+    elif plot_on_signal:
+        # filename = f"bkg_results/bkgfrac_mc_vs_datafit.root"
+        filename = "prova.root"
+
+    file = ROOT.TFile(filename, "RECREATE")
+    file.cd()
+    for histo in histos.values():
+        histo.Write()
+    file.Close()
+
+    '''    
     if plot_on_data:
         c1 = ROOT.TCanvas()
         c1.Divide(1,2)
@@ -239,7 +289,7 @@ def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta,
         histos["h2d_nsigma_pass"].Draw("COLZ")
         c1.cd(2)
         histos["h2d_nsigma_fail"].Draw("COLZ")
-        c1.SaveAs("figs/backgrounds/nsigma_bkg_mc_vs_datafit.pdf")
+        c1.SaveAs("bkg_results/nsigma_bkg_mc_vs_datafit.pdf")
     
     if plot_on_signal:
         c2 = ROOT.TCanvas()
@@ -248,7 +298,27 @@ def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta,
         histos["h2d_bkg_fraction_pass"].Draw("COLZ")
         c2.cd(2)
         histos["h2d_bkg_fraction_fail"].Draw("COLZ")
-        c2.SaveAs("figs/backgrounds/bkg_fraction_ratio_mc_datafit.pdf")
+        c2.SaveAs("bkg_results/bkgfrac_ratio_mc_datafit_2d.pdf")
+
+        c3 = ROOT.TCanvas()
+        c3.Divide(2,1)
+        c3_1 = c3.GetPad(1)
+        c3_1.cd()
+        c3_1.SetLogx()
+        c3_1.SetLogy()
+        histos["h_bkgfrac_pass"].SetNormFactor(1)
+        histos["h_bkgfrac_pass"].Draw()
+        c3_2 = c3.GetPad(2)
+        c3_2.cd()
+        c3_2.SetLogx()
+        c3_2.SetLogy()
+        histos["h_bkgfrac_fail"].SetNormFactor(1)
+        histos["h_bkgfrac_fail"].Draw()
+        c3.SaveAs("figs/backgrounds/bkg_fraction_ratio_mc_datafit.pdf")
+
+    print(ratios)
+    '''
+
 
 
 
@@ -284,7 +354,7 @@ def plot_backgrounds_2d(ws, bkg_categories, lumi_scales, bin_dict, binning_pt, b
 
     for cat in bkg_categories:
 
-        histos.update(init_pt_eta_h2d(cat, cat, binning_pt, binning_eta))
+        histos.update(init_pass_fail_h2d(cat, cat, binning_pt, binning_eta))
 
 
         if add_title != "":
@@ -384,23 +454,30 @@ if __name__ == "__main__":
     types_analysis = ["indep", "sim"]
     an = types_analysis[0]
 
-    lumi_scales = bkg_lumi_scales(t, bkg_categories)
+    lumi_scales = lumi_factors(t, bkg_categories)
+
+    sig_lumi_scale = lumi_scales.pop("Zmumu")
     # lumi_scales = {"WW":1, "WZ":1, "ZZ":1, "TTSemileptonic":1, "Ztautau":1}
 
     filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
     filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
+    filename_mc_weightsum = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS/tnp_iso_mc_vertexWeights1_oscharge1.root"
+
     dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
 
-    bkg_filepaths = {}
-    [bkg_filepaths.update({cat : 
+    bkg_filenames = {}
+    [bkg_filenames.update({cat : 
         f"{dirname_bkg}/tnp_{t}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_categories]
 
 
     import_dictionary = {
-        # "data" : filename_data,
-        # "mc" : filename_mc,
+        "data" : filename_data,
+        "mc" : {
+            "filename" : filename_mc_weightsum,
+            "lumi_scale" : sig_lumi_scale
+        },
         "bkg" : {
-            "filepaths" : bkg_filepaths,
+            "filenames" : bkg_filenames,
             "lumi_scales" : lumi_scales
         }
     }
@@ -418,17 +495,22 @@ if __name__ == "__main__":
     bin_set = bin_dictionary(binning_pt_key, binning_eta_key)
 
     # ws = ws_init(import_dictionary, an, bin_set, binning_mass)
+    # ws.writeToFile("root_files/ws/ws_bkg_studies.root")
 
-    file = ROOT.TFile("root_files/ws/ws_data_mc_bkg.root", "READ")
+    # file = ROOT.TFile("root_files/ws/ws_bkg_studies.root", "READ")
+    file = ROOT.TFile("root_files/ws/ws_bkg_prova.root", "READ")
+
     ws = file.Get("w")
 
 
-    plot_backgrounds_2d(ws, bkg_categories, lumi_scales, bin_set, new_binning_pt, new_binning_eta,
-                        norm_data=True, norm_tot_bkg=False, filename="root_files/backgrounds/bkg_2d_distr_norm_mc_signal.root")
+    #plot_backgrounds_2d(ws, bkg_categories, lumi_scales, bin_set, new_binning_pt, new_binning_eta,
+    #                    norm_data=True, norm_tot_bkg=False, filename="root_files/backgrounds/bkg_2d_distr_norm_mc_signal.root")
     
 
-    # bkg_distrib("iso", bkg_categories, ws, bin_set, new_binning_pt, new_binning_eta, plot_on_signal=True)
-    # file.Close()
+    bkg_distrib("iso", bkg_categories, ws, bin_set, new_binning_pt, new_binning_eta, 
+                plot_on_data=False, plot_on_signal=True)
+    
+    file.Close()
     #ws.writeToFile("root_files/ws/ws_data_bkg.root")
 
     '''

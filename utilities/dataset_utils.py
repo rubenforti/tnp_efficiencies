@@ -4,7 +4,7 @@
 import sys
 import os
 import ROOT
-from utilities.base_library import binning, bin_dictionary, bkg_lumi_scales
+from utilities.base_library import binning, bin_dictionary, lumi_factors
 
 
 def import_pdf_library(*functions):
@@ -33,9 +33,9 @@ def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_sca
     Returns a RooDataHists of the variable TP_invmass, in a single (pt, eta) bin
     """
 
-    if type_set == "data":
+    if type_set=="data":
         type_suffix = "RunGtoH"
-    elif type_set == "mc" or type_set == "bkg":
+    elif type_set=="mc" or type_set=="mc_w" or type_set=="bkg":
         type_suffix = "DY_postVFP"
     else:
         print("ERROR: invalid category type given!")
@@ -82,16 +82,21 @@ def ws_init(import_datasets, type_analysis, bins, bins_mass):
     x = ROOT.RooRealVar("x", "TP M_inv", bins_mass[0], bins_mass[-1], unit="GeV/c^2")
     w.Import(x)
 
+    x_binning = ROOT.RooUniformBinning(bins_mass[0], bins_mass[-1], len(bins_mass)-1, "x_binning")
+
     global_counter = 0
     
     for dataset_type in import_datasets:
 
-        if dataset_type == "data" or dataset_type == "mc":
+        if dataset_type=="data":
             file = ROOT.TFile(import_datasets[dataset_type], "READ")
-        elif dataset_type == "bkg":
+        elif dataset_type=="mc":
+            file = ROOT.TFile(import_datasets["mc"]["filename"], "READ")
+            sig_lumi_scale = import_datasets["mc"]["lumi_scale"]
+        elif dataset_type=="bkg":
             file_set={}
-            for cat in import_datasets[dataset_type]["filepaths"]:
-                file_set.update({cat : ROOT.TFile(import_datasets["bkg"]["filepaths"][cat], "READ")})
+            for cat in import_datasets[dataset_type]["filenames"]:
+                file_set.update({cat : ROOT.TFile(import_datasets["bkg"]["filenames"][cat], "READ")})
                 print(file_set[cat].GetName())
             bkg_lumi_scales = import_datasets["bkg"]["lumi_scales"]
         else:
@@ -105,33 +110,43 @@ def ws_init(import_datasets, type_analysis, bins, bins_mass):
             if type_analysis == 'indep':
                 x_pass = ROOT.RooRealVar(f"x_pass_{bin_key}", "TP M_inv", 
                                         bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-
+                x_pass.setBinning(x_binning)
                 x_fail = ROOT.RooRealVar(f"x_fail_{bin_key}", "TP M_inv",
                                         bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+                x_fail.setBinning(x_binning)
                 axis = (x_fail, x_pass)
                 w.Import(x_pass)
                 w.Import(x_fail)
             elif type_analysis == 'sim':
                 x_sim = ROOT.RooRealVar(f"x_sim_{bin_key}", "TP M_inv",
                                         bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+                x_sim.setBinning(x_binning)
                 axis = (x_sim, x_sim)
             else:
                 print("****\nINVALID ANALYSIS TYPE\n****")
                 sys.exit()
             
-            if dataset_type == "data" or dataset_type == "mc":
+            if dataset_type == "data":
                 histo_pass = get_roohist(file, dataset_type, "pass", axis[1], bin_key, bin_pt, bin_eta)
                 histo_fail = get_roohist(file, dataset_type, "fail", axis[0], bin_key, bin_pt, bin_eta)
+                w.Import(histo_pass)
+                w.Import(histo_fail)
+                global_counter += 2
+            if dataset_type == "mc":
+                histo_pass = get_roohist(file, dataset_type, "pass", axis[1], 
+                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
+                histo_fail = get_roohist(file, dataset_type, "fail", axis[0], 
+                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
                 w.Import(histo_pass)
                 w.Import(histo_fail)
                 global_counter += 2
             elif dataset_type == "bkg":
                 for cat in bkg_lumi_scales:
                     histo_pass = get_roohist(file_set[cat], dataset_type, "pass", axis[1], 
-                                             bin_key, bin_pt, bin_eta, bkg_lumi_scales[cat])
+                                             bin_key, bin_pt, bin_eta, global_scale=bkg_lumi_scales[cat])
                     histo_pass.SetName(f"{histo_pass.GetName()}_{cat}")
                     histo_fail = get_roohist(file_set[cat], dataset_type, "fail", axis[0], 
-                                             bin_key, bin_pt, bin_eta, bkg_lumi_scales[cat])
+                                             bin_key, bin_pt, bin_eta, global_scale=bkg_lumi_scales[cat])
                     histo_fail.SetName(f"{histo_fail.GetName()}_{cat}")
                     w.Import(histo_pass)
                     w.Import(histo_fail)
@@ -187,7 +202,7 @@ if __name__ == '__main__':
     an = types_analysis[0]
 
 
-    lumi_scales = bkg_lumi_scales(t, bkg_categories)
+    lumi_scales = lumi_factors(t, bkg_categories)
     # lumi_scales = {"WW":1, "WZ":1, "ZZ":1, "TTSemileptonic":1, "Ztautau":1}
 
 

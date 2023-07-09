@@ -8,6 +8,24 @@ from utilities.fit_utils import fit_quality, pearson_chi2_eval
 from utilities.base_library import eval_efficiency
 
 
+def efficiency_from_res(res_pass, res_fail):
+    """
+    """
+    pars_pass, pars_fail = res_pass.floatParsFinal(), res_fail.floatParsFinal()
+
+    for par in pars_pass:
+        if "nsig" in par.GetName():
+            npass = par
+    for par in pars_fail:
+        if "nsig" in par.GetName():
+            nfail = par
+
+    eff, d_eff = eval_efficiency(npass.getVal(), nfail.getVal(), npass.getError(), nfail.getError())
+
+    return eff, d_eff
+
+###############################################################################
+
 class results_manager:
     """
     """
@@ -50,22 +68,13 @@ class results_manager:
         if goodfit and (f"{bin_pt},{bin_eta}" not in self._dict_results) and self._analysis == 'indep':
             res_pass = ws.obj(f"results_pass_({bin_pt}|{bin_eta})")
             res_fail = ws.obj(f"results_fail_({bin_pt}|{bin_eta})")
-            print(res_pass.GetName(), res_fail.GetName())
-            for par in res_pass.floatParsFinal():
-                if par.GetName() == f'nsig_pass_({bin_pt}|{bin_eta})':
-                    Npass = par.getVal()
-                    sigma_Npass = par.getError()
-            for par in res_fail.floatParsFinal():
-                if par.GetName() == f'nsig_fail_({bin_pt}|{bin_eta})':
-                    Nfail = par.getVal()
-                    sigma_Nfail = par.getError()
-
+            
             # histo_pass = self._ws.data(f"Minv_data_pass_({bin_pt}|{bin_eta})")
             # histo_fail = self._ws.data(f"Minv_data_fail_({bin_pt}|{bin_eta})")
 
             new_res = {
                 f"{bin_pt},{bin_eta}": {
-                    "efficiency" : eval_efficiency(Npass, Nfail, sigma_Npass, sigma_Nfail),
+                    "efficiency" : efficiency_from_res(res_pass, res_fail),
                     "pars_pass" : res_pass.floatParsFinal(),
                     "corrmatrix_pass" : res_pass.correlationMatrix(),
                     "status_pass" : (res_pass.status(), res_pass.covQual(), res_pass.edm()),
@@ -170,6 +179,34 @@ class results_manager:
                 bins.append(key)
         return bins
     
+###############################################################################
+
+def init_pass_fail_histos(histo_name, histo_title, binning):
+
+    histos = {}
+
+    for flag in ["pass", "fail"]:
+
+        h1d = ROOT.TH1D(f"{histo_name}_{flag}", f"{histo_title} - {flag}ing probes", len(binning)-1, binning)
+        histos.update({f"{histo_name}_{flag}" : h1d})
+
+    return histos
+
+###############################################################################
+
+def init_pass_fail_h2d(histo_name, histo_title, binning_pt, binning_eta):
+
+    histos = {}
+
+    for flag in ["pass", "fail"]:
+
+        h2d = ROOT.TH2D(f"{histo_name}_{flag}", f"{histo_title} - {flag}ing probes", 
+                        len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
+        histos.update({f"{histo_name}_{flag}" : h2d})
+
+    return histos
+    
+###############################################################################
 
 def compare_with_benchmark(results, ref_txt):
 
@@ -247,8 +284,8 @@ def compare_with_benchmark(results, ref_txt):
     h2d_pull.Write()
 
     file.Close()
-    
 
+###############################################################################
 
 def compare_analysis(res_1, res_2):
     """
@@ -316,16 +353,8 @@ def compare_analysis(res_1, res_2):
     file.Close()
     
         
-    
-    
-
-
-
-
-
-
-
-
+###############################################################################
+###############################################################################
 
 if __name__ == '__main__':
 
