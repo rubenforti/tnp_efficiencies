@@ -306,7 +306,7 @@ sopra nella cartella "results/benchmark_iso_sim"
 Da queste analisi di confronto emergono delle possibilità di miglioramento della procedura di fit:
   - Strategia iniziale per la definizione dei parametri 
   - L'interpolazione va bene così?
-  - La condizione per il refit, invece di un arbitrario S/B<0.005 potrebbe essere basata su quante sigma
+  - La condizione per il refit, invece di un arbitrario B/S<0.005 potrebbe essere basata su quante sigma
     dista Nsig da Ntot. In un certo senso potrebbe essere simile a un LLR test? In ogni caso il LLR test
     sarebbe già pronto
   - Andrebbe posto un controllo sui parametri, per non salvare minimizzazioni che includono parametri al 
@@ -409,11 +409,57 @@ ragionevoli; da una valutazione "ad occhio" su qualche bin sparso, sembra che  l
 sia sempre circa 1.8 volte il numero di eventi TOTALI di segnale: non credo sia un problema, visto che
 possono emergere facilmente fattori di scala nel MC, ma è bene tenerlo a mente.
 
+Sistemate le funzioni per il plotting di pass e fail. Vanno un po' sistemate le funzioni per il plot dei bkg,
+nello specifico servirà:
+  - magari mettere nella stessa canva pass e fail, ma non è necessario (si perde in chiarezza)
+  - sistemare come i bkg vengono plottati: per chiarezza al momento sono messi come RooHistPdf, ma questo 
+    fa sì che gli errori non siano visualizzati (e questo può essere misleading). Si potrebbe plottare
+    sempre una RooHistPdf,  ma con delle box colorate che rappresentano l'errore
+  - aggiustare il binning in MASSA, per far sì che gli eventi siano sempre positivi, e mettere l'asse y in 
+    scala logaritmica
+
 Rifatti fit indipendenti sui bin allargati in eta (binning pt = standard, binning eta = eta_8bins): si è
 scelto di allargare in questo modo per non avere nessun dataset di bkg con integrale totale negativo.
 Ottenuta la frazione bkgfrac = nbkg/(nsig+nbkg) sia dai MC così normalizzati sia dai risultati del fit
 sui dati. Distribuzione del rapporto tra le due frazioni correttamente plottata -> va fatto un root file
 contenete anche i pull.
+
+
+10/07/2023
+----------
+Effettuato il fit (indep) sugli pseudodati e confrontate le efficienze che se ne estraggono con quelle
+vere (dalla MC truth): in generale, dove il fit passa i check di qualità, la differenza tra i risultati 
+resta dentro una sigma e il rapporto tra i due è minore di 10^-3. 
+Ci sono però dei bin che NON passano i check perché l'EDM stimato da HESSE è troppo alto (anche se quello
+di MIGRAD è accettabile): che si fa?
+
+Altra cosa (IMPORTANTE): il fit sugli pseudodati è fatto con l'opzione SumW2Error=True, che fa sì che "The 
+errors reflect the uncertainty of the Monte Carlo simulation. Use this if you want to know how much accuracy
+you can get from the available Monte Carlo statistics"; ora, questo è giusto? Le alternative sono l'opzione
+"SumW2Error=False" oppure l'"AsymptoticError", che "Uses the asymptotically correct approach to estimate
+errors in the presence of weights. This is slower but more accurate than SumW2Error" -> quale va usata?
+
+
+14-15/07/2023
+-------------
+Indicazioni da Bianchini:
+  - SumW2 è giusto per il fit sugli pseudodati
+  - "AsymptoticError" non si sa esattamente cosa faccia... ma nulla di particolarmente promettente
+  - Vanno bene come controllo i parametri "status" e "edm" di HESSE
+
+Fit su pseudodata (workspace "ws_bkg_pseudodata"), su merged bins pt-eta_8bins:
+  - Run 1: default settings   ->  26 problematic bins 
+  - Run 2: sigma(0.5, *0.05*, 5)  ->  11 prob. bins
+  - Run 3: bufFractions->0.1, Nbins->10000  ->  5 prob. bins (problemi di EDM solo nei pass)
+  - Run 4: Nbins_pass->5000, bufFrac_pass->0.25, nsig(*nexp*, 0.5, *5nexp*) ->  3 prob. bins
+  - Run 5: Nbins_pass->1000   ->  2 prob. bins
+  - Run 6: bufFrac_pass->0.4, nbkg(*0.01nexp*, 0.5, 1.5nexp)  ->  OK
+
+Adesso va costruita la funzione che plotta i risultati ma dovrebbe essere abbastanza straightforward.
+Cosa utile magari sarebbe rifare i fit cambiando i parametri con un certo ordine, andando magari subito
+a cambiare i valori iniziali di nsig e nbkg: mi sembra che infatti alcuni problemi risiedano lì; i problemi
+sulla sigma sono stati risolti abbatanza direttamente.
+
 
 
 
@@ -434,6 +480,7 @@ TO-DO LIST BACKGROUNDS
     1) costruire pseudodata composto da segnale e bkg conf frazione nota;
     2) far girare l'algoritmo di fit su questo dataset
     3) confrontare le efficienze ottenute un questo modo con quelle vere (note dai MC) -> eventuali bias
+
 
 
 DUBBI APERTI
