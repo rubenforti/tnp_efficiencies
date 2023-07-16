@@ -33,12 +33,15 @@ lumi_sqrtS = ""
 
 drawLogo      = False
 
+
 def CMS_lumi(pad,  iPeriod,  iPosX, simulation = False):
     outOfFrame    = False
     if(iPosX/10==0 ): outOfFrame = True
 
     if simulation:
-        extraText = "  Simulation Preliminary"
+        extraText = "   Simulation Preliminary"
+    else:
+        extraText = "   Preliminary"
 
     alignY_=3
     alignX_=2

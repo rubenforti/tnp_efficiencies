@@ -5,7 +5,6 @@ import sys
 import os
 import pickle
 from array import array
-from utilities.results_utils import results_manager
 from utilities.base_library import lumi_factors, binning, sumw2_error
 from utilities.CMS_lumi import CMS_lumi
 
@@ -23,137 +22,158 @@ def style_settings():
 
 ###############################################################################
 
-def plot_minv_distrib_with_fit(pad, flag, axis, data, pdf_fit, pull=False):
+def plot_minv_distrib_with_fit(pad, axis, data, pdf_fit):
     """
+    Function that creates and saves the plot containing the invariant mass 
+    distribution, together with the post-fit pdf. The pull is not implemented
+    yet, since there has been some memory problems with the pads.
     """
 
     pad.cd()
 
-    if not pull: 
-        pad.Divide(1, 2, 0, 0)
-        subpad_title = pad.GetPad(1)
-        subpad_title.SetPad("subpad_title", "subpad_title", 0, 0.9, 1, 1, 0, 0, 0)
-        subpad_title.SetMargin(0.15, 0.05, 0.05, 0), subpad_title.Draw()
-        subpad_plot = pad.GetPad(2)
-        subpad_plot.SetPad("subpad_plot", "subpad_plot", 0, 0, 1, 0.9, 0, 0, 0)
-        subpad_plot.SetMargin(0.15, 0.05, 0.15, 0.05), subpad_plot.Draw()
-    else:
-        pad.Divide(1, 3, 0, 0)
-        subpad_title = pad.GetPad(1)
-        subpad_title.SetPad("subpad_title", "subpad_title", 0, 0.9, 1, 1, 0, 0, 0)
-        subpad_title.SetMargin(0.15, 0.05, 0.05, 0), subpad_title.Draw()
-        subpad_plot = pad.GetPad(2)
-        subpad_plot.SetPad("subpad_plot", "subpad_plot", 0, 0.3, 1, 0.9, 0, 0, 0)
-        subpad_plot.SetMargin(0.15, 0.05, 0, 0.05), subpad_plot.Draw()
-        subpad_pull = pad.GetPad(3)
-        subpad_pull.SetPad("subpad_pull", "subpad_pull", 0, 0, 1, 0.3, 0, 0, 0)
-        subpad_pull.SetMargin(0.15, 0.05, 0.15, 0), subpad_pull.Draw()
-
-    
-    # In questa maniera il titolo non viene disegnatom in realtà manca proprio la box che dovrebbe contenere
-    # il testo. Forse si può bypassare il problema con la legenda
-    subpad_title.cd()
-    titlebox = ROOT.TPaveText(0, 0, 1, 1, "NDC NB")
-    titlebox.SetFillColor(5)
-    titlebox.SetTextSize(0.5)
-    titlebox.SetTextAlign(12)
-    titlebox.AddText(pad.GetTitle())
-    titlebox.Draw()
-    subpad_title.Update()
-    subpad_title.Draw()
-    pad.Update()
-
-
-    subpad_plot.cd()
     plot_frame = axis.frame(ROOT.RooFit.Bins(axis.getBins("plot_binning")))
     
-    # COSÌ COMPARE ALL'INTERNO DEL PLOT, CHE PALLE
-    # BISOGNERÀ CREARE UN TPAVETEXT DA PIAZZARE BENE NEL PAD COME TITOLO
     plot_frame.SetTitle("")
     plot_frame.SetTitleSize(0)
     frame_yaxis = plot_frame.GetYaxis()
-    frame_yaxis.SetTitleOffset(1.2)
-
-    if pull:
-        frame_axis = plot_frame.GetXaxis()
-        frame_axis.SetLabelSize(0)
-        frame_axis.SetTitleSize(0)
+    frame_yaxis.SetTitleOffset(1.75)
 
     data.plotOn(plot_frame,
                 ROOT.RooFit.Binning("plot_binning"),
                 ROOT.RooFit.Name("Data"))
+    data.statOn(plot_frame,
+                ROOT.RooFit.Label(pad.GetTitle()),
+                ROOT.RooFit.What("H"),
+                ROOT.RooFit.Layout(0.65, 0.95, 0.95))
 
     pdf_fit.plotOn(plot_frame, 
+                   ROOT.RooFit.NormRange("fitRange"),
                    ROOT.RooFit.LineColor(ROOT.kRed),
                    ROOT.RooFit.Name("Fit"))
-        
+    
+
     for comp in pdf_fit.getComponents():
         if "bkg" in comp.GetName():
             bkg_set = ROOT.RooArgSet(comp)
             pdf_fit.plotOn(plot_frame,
+                ROOT.RooFit.NormRange("fitRange"),
+                ROOT.RooFit.Name("Bkg pdf"),
                 ROOT.RooFit.Components(bkg_set),
                 ROOT.RooFit.LineColor(ROOT.kBlue),
-                ROOT.RooFit.LineStyle(ROOT.kDashed))
+                ROOT.RooFit.LineStyle(ROOT.kDashed),
+                ROOT.RooFit.LineWidth(4))
+
     plot_frame.Draw()
 
-    CMS_lumi(subpad_plot, 5, 0, simulation=True)
-    pad.Update() 
-
-    if pull:
-        subpad_pull.cd()
-        pull_frame = plot_frame.pullHist("Data", "Fit", False)
-        pull_frame.SetTitle("")
-        pull_axis = pull_frame.GetXaxis()
-        pull_axis.SetTitle(axis.GetTitle())
-        pull_axis.SetTitleSize(0.07)
-        pull_axis.SetLabelSize(0.07)
-        pull_axis.SetTitleOffset(1)
-        pull_frame.Draw()
-        pad.Update()
+    CMS_lumi(pad, 5, 0, simulation=False)
+    pad.Update()
 
 ###############################################################################
 
-def plot_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figpath=""): 
+def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figpath=""): 
     """
+    Function that creates and saves the plot containing the passing and failing
+    probes histograms, together with the post-fit pdfs and the efficiency 
+    inferred. The objects to be plotted are contained in the "plot_objects" 
+    dictionary, which must be structured as follows:
+        plot_objects = { "pass(fail)" : { "axis" : RooRealVar,  "data" : RooDataHist, 
+                                          "model" : RooAbsPdf,  "res" : RooFitResult },
+                         "efficiency" : [eff, deff],
+                         "efficiency_mc" : [eff_mc, deff_mc],
+                         "scale_factor" : [scale_factor, dscale_factor]
+                        }
     """
     c = ROOT.TCanvas(f"pf_plot_{bin_key}", f"pf_plot_{bin_key}", 900, 1200)
     c.cd()
 
     style_settings()
 
-    pad_title_eff = ROOT.TPad("pad_title_eff", "pad_title_eff", 0, 0.9, 1, 1)
-    pad_plot_pass = ROOT.TPad("pad_plot_pass", "Passing probes", 0, 0.3, 0.5, 0.9)
-    pad_plot_fail = ROOT.TPad("pad_plot_fail", "Failing probes", 0.5, 0.3, 1, 0.9)
-    pad_info_pass = ROOT.TPad("pad_info_pass", "pad_info_pass", 0, 0, 0.5, 0.3)
-    pad_info_fail = ROOT.TPad("pad_info_fail", "pad_info_fail", 0.5, 0, 1, 0.3)
+    title_plot_edge = 0.8
+    plot_info_edge = 0.25 
 
+    pad_title_eff = ROOT.TPad("pad_title_eff", "pad_title_eff", 0, title_plot_edge, 1, 1)
+    pad_plot_pass = ROOT.TPad("pad_plot_pass", "Passing probes", 0, plot_info_edge, 0.5, title_plot_edge)
+    pad_plot_fail = ROOT.TPad("pad_plot_fail", "Failing probes", 0.5, plot_info_edge, 1, title_plot_edge)
+    pad_info_pass = ROOT.TPad("pad_info_pass", "pad_info_pass", 0, 0, 0.5, plot_info_edge)
+    pad_info_fail = ROOT.TPad("pad_info_fail", "pad_info_fail", 0.5, 0, 1, plot_info_edge)
 
-    for pad_core in [pad_plot_pass, pad_plot_fail, pad_info_pass, pad_info_fail]:
-        pad_core.SetMargin(0.15, 0.05, 0.15, 0.05)
-        pad_core.Draw()
+    
+    pad_title_eff.SetMargin(0.15, 0.15, 0.1, 0.1)
+    pad_title_eff.Draw()
 
+    pad_plot_pass.SetMargin(0.15, 0.05, 0.05, 0.05)
+    pad_plot_pass.Draw()
+
+    pad_plot_fail.SetMargin(0.15, 0.05, 0.05, 0.05)
+    pad_plot_fail.Draw()
+
+    pad_info_pass.SetMargin(0.15, 0.05, 0.05, 0.05)
+    pad_info_pass.Draw()
+
+    pad_info_fail.SetMargin(0.15, 0.05, 0.05, 0.05)
+    pad_info_fail.Draw()
 
     pad_title_eff.cd()
-    main_info_box = ROOT.TPaveText(0, 0, 1, 1, "NDC NB")
+    main_info_box = ROOT.TPaveText(0, 0.1, 1, 0.9, "NDC NB")
     main_info_box.SetFillColor(0)
     # titlebox.SetTextFont(42)
-    main_info_box.SetTextSize(0.35)
+    main_info_box.SetTextSize(0.12)
     main_info_box.AddText(f"Bin {bin_key}")
+    main_info_box.AddText( "----------------------------------------")
     eff, deff = plot_objects["efficiency"]
     main_info_box.AddText(f"Efficiency = {round(eff*100,2)} #pm {round(deff*100,2)} %")
+    eff_mc, deff_mc = plot_objects["efficiency_mc"]
+    main_info_box.AddText(f"Efficiency MC = {round(eff_mc*100,2)} #pm {round(deff_mc*100,2)} %")
+    scale_factor, dscale_factor = plot_objects["scale_factor"]
+    main_info_box.AddText(f"Scale factor = {round(scale_factor,4)} #pm {round(dscale_factor,4)}")
+    # print(f"Scale factor = {round(scale_factor, 4)} #pm {round(dscale_factor, 4)}")   
     main_info_box.Draw()
     c.Update()
 
     pass_obj = plot_objects["pass"]
     fail_obj = plot_objects["fail"]
-
     pass_obj["axis"].setBins(60, "plot_binning")
     fail_obj["axis"].setBins(60, "plot_binning")
 
+    plot_minv_distrib_with_fit(pad_plot_pass, pass_obj["axis"], pass_obj["data"], pass_obj["model"])
+    plot_minv_distrib_with_fit(pad_plot_fail, fail_obj["axis"], fail_obj["data"], fail_obj["model"])
 
-    plot_minv_distrib_with_fit(pad_plot_pass, "pass", pass_obj["axis"], pass_obj["data"], pass_obj["model"], pull=pull)
-    plot_minv_distrib_with_fit(pad_plot_fail, "fail", fail_obj["axis"], fail_obj["data"], fail_obj["model"], pull=pull)
+   
+    pad_info_pass.cd()
+    stats_pass = ROOT.TPaveText(0, 0.05, 1., 0.95, "NDC NB")
+    stats_pass.SetFillColor(0)
+    stats_pass.SetTextSize(0.07)
+
+    [stats_pass.AddText(f"{par.GetTitle()} = {round(par.getVal(),3)} #pm {round(par.getError(),3)}") 
+     for par in pass_obj["res"].floatParsFinal()]
+
+    stats_pass.AddText("------------------------------")
+    # stats_box.AddText(f"Chi2/ndof = {round(res.chi2(), 2) / pars.getSize()}")
+    stats_pass.AddText(f"Status = {pass_obj['res'].status()}")
+    stats_pass.AddText(f"Cov quality = {pass_obj['res'].covQual()}")
+    stats_pass.AddText(f"Edm = {pass_obj['res'].edm()}")
+    stats_pass.Draw()
+    c.Update()
+
+
+    pad_info_fail.cd()
+    stats_fail = ROOT.TPaveText(0, 0.05, 1., 0.95, "NDC NB")
+    stats_fail.SetFillColor(0)
+    stats_fail.SetTextSize(0.07)
+
+    [stats_fail.AddText(f"{par.GetTitle()} = {round(par.getVal(),3)} #pm {round(par.getError(),3)}") 
+     for par in fail_obj["res"].floatParsFinal()]
+
+    stats_fail.AddText("------------------------------")
+    # stats_box.AddText(f"Chi2/ndof = {round(res.chi2(), 2) / pars.getSize()}")
+    stats_fail.AddText(f"Status = {fail_obj['res'].status()}")
+    stats_fail.AddText(f"Cov quality = {fail_obj['res'].covQual()}")
+    stats_fail.AddText(f"Edm = {fail_obj['res'].edm()}")
+    stats_fail.Draw()
+    c.Update()
+
     c.SaveAs(f"{figpath}/fit_pf_{type_analysis}_{bin_key}.pdf")
+
 
 ###############################################################################
 
@@ -214,6 +234,23 @@ def plot_eff_results(filename, results, binning_pt=(), binning_eta=()):
 
 def plot_bkg_on_histo(plot_objects, flag, bin_key, figpath=''):
     """
+    Function that creates and saves the plot containing a reference histogram 
+    (data or signal MC), the distributions of the various bkg processes and the
+    total bkg; for graphical choice, the bkg distributions of single processes 
+    and the signal MC distribution are plotted as RooHistPdf. The objects to be 
+    plotted are contained in the dictionary "plot_objects", which must be 
+    structured as follows:
+        plot_objects = { "axis" : RooRealVar,
+                         "total_bkg" : { "roohisto":RooDataHist, "lumi_scale":float, "integral":float, "color":int },
+                         "{bkg_process}_bkg" : { "roohisto":RooDataHist, "histo_pdf":RooHistPdf,
+                                                 "lumi_scale":float, "integral":float, "color":int },
+                         "MC_signal (optional)" : as above,
+                         "data (optional)" : RooDataHist,
+                         "fit_pars (optional)" : { "nsig":RooRealVar, "nbkg":RooRealVar },
+                         "pdf_bkg_fit (optional)" : {"pdf":RooAbsPdf, "norm":RooRealVar, "color":int }
+                        }
+            }
+    
     """
 
     imported_data, imported_mc_sig, imported_pdf_bkg = False, False, False
@@ -398,7 +435,7 @@ if __name__ == '__main__':
 
     pad_plot = ROOT.TPad("pad_plot", "pad_plot", 0, 0.25, 0.7, 0.95)
     pad_plot.Draw()
-    plot_minv_distrib_with_fit(pad_plot, axis, data, gaus, pull=True)
+    plot_minv_distrib_with_fit(pad_plot, "pass",axis, data, gaus, pull=False)
     
-    c.SaveAs("test.pdf")
+    c.SaveAs("../prova_plot.pdf")
 

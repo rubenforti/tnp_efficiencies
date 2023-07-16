@@ -144,11 +144,11 @@ if __name__ == '__main__':
         
     bins = bin_dictionary("pt", "eta_8bins")
 
-    '''
+    
     bin_prova = {
-        "[24.0to26.0][-2.4to-2.3]" : bins["[24.0to26.0][-2.4to-2.3]"]
+        "[24.0to26.0][-2.4to-1.8]" : bins["[24.0to26.0][-2.4to-1.8]"]
     }
-    '''
+    
 
 
     # -------------------------------------------------------------------------
@@ -193,14 +193,14 @@ if __name__ == '__main__':
     # workspace_name = f"root_files/ws/ws_bkg_studies.root"
     workspace_name = "root_files/ws/ws_bkg_prova.root"
     
-    ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
-    ws.writeToFile(workspace_name)
+    # ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
+    # ws.writeToFile(workspace_name)
 
     # ------------------------------------------------------------------------
    
     results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
 
-    ws = make_fits(workspace_name, type_eff, type_analysis, bins, savefigs=False)
+    ws = make_fits(workspace_name, type_eff, type_analysis, bins, savefigs=True)
 
     ws.writeToFile(workspace_name)
  

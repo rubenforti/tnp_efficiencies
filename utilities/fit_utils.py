@@ -54,16 +54,23 @@ def check_chi2(histo, pdf, res):
 
 ###############################################################################
 
-def fit_quality(res, old_checks=False):
+def fit_quality(res, type_checks="benchmark"):
     """
     """
     check_covm = (res.covQual() == 3)
-    if old_checks is True:
+
+    if type_checks == "benchmark":
         check_migrad = (res.status() == 0 or res.status() == 1)
         check_chi2 = (res.GetTitle() != "Chi2_not_passed")
         return bool(check_migrad*check_covm*check_chi2)
-    else:
-        check_migrad = (res.status()) == 0
+
+    elif type_checks == "bkg_fit":
+        check_migrad = (res.status()==0) or (res.status()==3 and res.edm()<0.01)
+        check_chi2 = (res.GetTitle() != "Chi2_not_passed")
+        return bool(check_migrad*check_covm)
+    
+    elif type_checks == "new_checks":
+        check_migrad = res.status() == 0
         check_edm = (res.edm() < 1e-4)
         return bool(check_migrad*check_covm*check_edm)
 

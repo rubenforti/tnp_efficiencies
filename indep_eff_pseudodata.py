@@ -5,14 +5,17 @@ import ROOT
 import time
 import os
 import sys
+from multiprocessing import Pool
 from utilities.results_utils import results_manager, efficiency_from_res
-from utilities.plot_utils import plot_bkg_on_histo, plot_fitted_pass_fail
-from utilities.dataset_utils import import_pdf_library
-from utilities.base_library import eval_efficiency, sumw2_error
+from utilities.plot_utils import plot_fitted_pass_fail
+from utilities.dataset_utils import ws_init
+from utilities.base_library import eval_efficiency, lumi_factors, bin_dictionary, binning, sumw2_error
 from utilities.fit_utils import fit_quality, check_chi2
 
 
-def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=False, verb=-1, figs=False):
+
+def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
+                           refit_numbkg=False, test_bkg=False, verb=-1, figs=False):
   
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
@@ -20,8 +23,8 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
     # ----------------------------------
     #  Initial parameters - MODIFY HERE
     # ----------------------------------
-    NBINS = [2000, 2000]
-    bufFractions = [0.5, 0.5]
+    NBINS = [10000, 1000]
+    bufFractions = [0.1, 0.4]
 
     fit_strategy = [2, 2]
 
@@ -31,11 +34,11 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
     mean_p = ROOT.RooRealVar(
         f"mean_pass_{bin_key}", "mean pass", 0, -5.0, 5.0)
     sigma_p = ROOT.RooRealVar(
-        f"sigma_pass_{bin_key}", "sigma pass", 0.5, 0.1, 5.0)
+        f"sigma_pass_{bin_key}", "sigma pass", 0.5, 0.05, 5.0)
     mean_f = ROOT.RooRealVar(
         f"mean_fail_{bin_key}", "mean fail", 0, -5.0, 5.0)
     sigma_f = ROOT.RooRealVar(
-        f"sigma_fail_{bin_key}", "sigma fail", 0.5, 0.1, 5.0)
+        f"sigma_fail_{bin_key}", "sigma fail", 0.5, 0.05, 5.0)
 
     if bkg_shape == "expo":
         tau_p = ROOT.RooRealVar(
@@ -55,7 +58,7 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
     #  Histograms and PDFs building
     # ------------------------------
     mean, sigma = [mean_f, mean_p], [sigma_f, sigma_p]
-    axis, histo_data, pdf_mc = [0, 0], [0, 0], [0, 0]
+    axis, histo_pseudodata, histo_total_bkg, pdf_mc = [0, 0], [0, 0], [0, 0], [0, 0]
     smearing, conv_pdf, background = [0, 0], [0, 0], [0, 0]
 
     nexp, Nsig, Nbkg = [0, 0], [0, 0], [0, 0]
@@ -73,8 +76,20 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
         axis[idx].setBinning(
             ROOT.RooUniformBinning(axis[idx].getRange("fitRange")[0],
                                    axis[idx].getRange("fitRange")[1], NBINS[idx]), "cache")
+    
+        axis[idx].setBins(60, "plot_binning")
+        
+        histo_total_bkg[idx] = ROOT.RooDataHist(f"Minv_bkg_{cond}_{bin_key}_total", "bkg_total_histo", 
+                                                ROOT.RooArgSet(axis[idx]), "plot_binning")
+        histo_pseudodata[idx] = ROOT.RooDataHist(f"Minv_pseudodata_{cond}_{bin_key}", "pseudodata_histo",
+                                                 ROOT.RooArgSet(axis[idx]), "plot_binning")
 
-        histo_data[idx] = ws.data(f"Minv_data_{cond}_{bin_key}")
+        for cat in bkg_categories:
+            histo_total_bkg[idx].add(ws.data(f"Minv_bkg_{cond}_{bin_key}_{cat}"))
+
+        histo_pseudodata[idx].add(ws.data(f"Minv_mc_{cond}_{bin_key}"))
+        histo_pseudodata[idx].add(histo_total_bkg[idx])
+
 
         pdf_mc[idx] = ROOT.RooHistPdf(
             f"pdf_mc_{cond}_{bin_key}", "pdf MC", axis[idx],
@@ -104,7 +119,7 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
         #  Final models and fits
         # -----------------------
 
-        n_events = histo_data[idx].sumEntries()
+        n_events = histo_pseudodata[idx].sumEntries()
 
         nexp[idx] = ROOT.RooRealVar(
             f"nexp_{cond}_{bin_key}", f"nexp {cond}",
@@ -120,9 +135,9 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
         '''
  
         Nsig[idx] = ROOT.RooRealVar(f"nsig_{cond}_{bin_key}", f"nsig {cond}",
-                                    0.9*nexp[idx].getVal(), 0.5, 1.5*nexp[idx].getVal())
+                                    nexp[idx].getVal(), 0.5, 5*nexp[idx].getVal())
         Nbkg[idx] = ROOT.RooRealVar(f"nbkg_{cond}_{bin_key}", f"nbkg {cond}",
-                                    0.1*nexp[idx].getVal(), 0.5, 1.5*nexp[idx].getVal())           
+                                    0.01*nexp[idx].getVal(), 0.5, 1.5*nexp[idx].getVal())           
 
         sum_func[idx] = ROOT.RooAddPdf(
                             f"sum_{cond}_{bin_key}", "Signal+Bkg",
@@ -131,23 +146,23 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
 
         # sum_func[idx].setNormRange("fitRange")
 
-        model[idx] = ROOT.RooAddPdf(
-            sum_func[idx], f'PDF_{cond}_{bin_key}')
+        model[idx] = ROOT.RooAddPdf(sum_func[idx], f'PDF_{cond}_{bin_key}')
 
         model[idx].setNormRange("fitRange")
 
-        results[idx] = model[idx].fitTo(histo_data[idx],
+        results[idx] = model[idx].fitTo(histo_pseudodata[idx],
                                         # ROOT.RooFit.Extended(1),
                                         ROOT.RooFit.Range("fitRange"),
                                         ROOT.RooFit.Minimizer("Minuit2"),
+                                        ROOT.RooFit.SumW2Error(False),
                                         ROOT.RooFit.Strategy(fit_strategy[idx]),
                                         # ROOT.RooFit.MaxCalls(100000),
                                         ROOT.RooFit.Save(1),
                                         ROOT.RooFit.PrintLevel(verb)
                                         )
 
-        status_chi2 = check_chi2(histo_data[idx], model[idx], results[idx])
-        status = bool(status_chi2*fit_quality(results[idx], old_checks=True))
+        status_chi2 = check_chi2(histo_pseudodata[idx], model[idx], results[idx])
+        status = bool(status_chi2*fit_quality(results[idx], type_checks="bkg_fit"))
 
         print(status_chi2)
         print(status)
@@ -165,20 +180,22 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
             Nbkg[idx].setConstant()
             print("REFITTING WITHOUT BACKGROUND")
             print("\n\n\n\n")
-            results[idx] = model[idx].fitTo(histo_data[idx],
+            results[idx] = model[idx].fitTo(histo_pseudodata[idx],
                                             # ROOT.RooFit.Extended(1),
                                             ROOT.RooFit.Range("fitRange"),
                                             ROOT.RooFit.Minimizer("Minuit2"),
+                                            ROOT.RooFit.SumW2Error(True),
+                                            # ROOT.RooFit.AsymptoticError(True),
                                             ROOT.RooFit.Strategy(fit_strategy[idx]),
                                             # ROOT.RooFit.MaxCalls(100000),
                                             ROOT.RooFit.Save(1),
                                             ROOT.RooFit.PrintLevel(verb)
                                             )
     
-        if check_chi2(histo_data[idx], model[idx], results[idx]) is False:
+        if check_chi2(histo_pseudodata[idx], model[idx], results[idx]) is False:
             results[idx].SetTitle("Chi2_not_passed")
 
-        fit_status[idx] = fit_quality(results[idx], old_checks=True)
+        fit_status[idx] = fit_quality(results[idx], type_checks="bkg_fit")
 
         results[idx].SetName(f"results_{cond}_{bin_key}")
 
@@ -188,29 +205,40 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
     # ----------------------------------
     #  Quality checks (and plots) - NEW
     # ----------------------------------
-    if bool(fit_status[0]*fit_status[1]) is True:
-        # ws.Import(model[0]), ws.Import(model[1])
-        # ws.Import(results[0]), ws.Import(results[1])
+
+    res_fail, res_pass = results
+
+
+    eff_mc, deff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
+                                            ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
+                                            sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
+                                            sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
+                
+    scale_factor = eff/eff_mc
+    d_scale_factor = scale_factor*((d_eff/eff)**2 + (deff_mc/eff_mc)**2)**0.5
+    nsigma = (eff-eff_mc)/(d_eff**2 + deff_mc**2)**0.5 
+
+
+    status = bool(fit_status[0]*fit_status[1])
+            
+
+    if status:
+        ws.Import(histo_pseudodata[0]), ws.Import(histo_pseudodata[1])
+        ws.Import(model[0]), ws.Import(model[1])
+        ws.Import(results[0]), ws.Import(results[1])
+
         if figs:
-            
-            eff_mc, deff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
-                                              ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
-                                              sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
-                                              sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
-            
-            scale_factor = eff/eff_mc
-            d_scale_factor = scale_factor*((d_eff/eff)**2 + (deff_mc/eff_mc)**2)**0.5
 
             plot_objects = {
                 "pass" : {
                     "axis" : axis[1],
-                    "data" : histo_data[1],
+                    "data" : histo_pseudodata[1],
                     "model" : model[1],
                     "res" : results[1],
                 },
                 "fail" : {
                     "axis": axis[0],
-                    "data": histo_data[0],
+                    "data": histo_pseudodata[0],
                     "model": model[0],
                     "res": results[0],
                 },
@@ -219,28 +247,23 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
                 "scale_factor" : [scale_factor, d_scale_factor]
             }
             plot_fitted_pass_fail("indep", plot_objects, bin_key, pull=False,
-                                  figpath=f"figs/fit_iso_indep_mergedbins")
-            
-            
-    else:
-        if figs:
-            pass
-            '''
-            bkg_names =[background[0].GetName(), background[1].GetName()]
-            plot_pass_and_fail(axis, histo_data, model, bkg_names, 
-                                name=f"figs/check_fits/bin_{bin_key}.pdf")
-            '''
-        
-    res_pass, res_fail = results
+                                  figpath=f"figs/fit_iso_indep_mergedbins_pseudodata")
+                        
+    if not status:
+        res_pass.Print()
+        res_pass.correlationMatrix().Print()
+        print("****")
+        res_fail.Print()
+        res_fail.correlationMatrix().Print()
+        print("****")
+        print(res_pass.status(), res_fail.status())
+        print(res_pass.covQual(), res_fail.covQual())
+        print(res_pass.edm(), res_fail.edm())
+        print('\n')
 
-    '''
-    if test_bkg is True:
-        null_bkg = llr_test_bkg(histo_data, model)
-        present_bkg = not null_bkg
-        print(f"Background is accepted? {present_bkg}")
-    '''
+        # prob_bins.append(bin_key)
 
-    return res_pass, res_fail
+    return res_pass, res_fail, status
 
 
 
@@ -251,37 +274,67 @@ if __name__ == '__main__':
 
     t0 = time.time()
 
-    custom_pdfs = ['RooCBExGaussShape',
-                   'RooDoubleCBFast', 'RooCMSShape', 'my_double_CB']
-    import_pdf_library(custom_pdfs[2])
+    type_eff = "iso"
+    type_analysis = "indep"
 
-    type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
-    t = type_eff[3]
+    filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
+    filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
+    dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
+    
+    bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
+    
+    bkg_filenames = {}
+    [bkg_filenames.update({cat : 
+        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_categories]    
 
-    # results = results_manager("indep")
+    lumi_scales = lumi_factors(type_eff, bkg_categories)
 
-    '''
-    bins_pt = [num for num in range(1, 2)]
-    bins_eta = [num for num in range(1, 49)]
-    '''
+    lumi_scale_signal = lumi_scales.pop("Zmumu")
 
-    '''
-    # BIN NEI QUALI NON SI È RIUSCITO AD AVERE UN BUON FIT CON STRATEGIA "MIXED"
-    bin_keys = ['1,1', '1,4', '1,11', '1,14', '1,17', '1,19', '1,20',
-                '1,24', '1,27', '1,30', '1,31', '1,40', '1,41', '1,42', '1,45']
-    '''
+    bins = bin_dictionary("pt", "eta_8bins")
 
-    bin_keys = ['6,7', '6,17', '6,23', '9,22', '10,21']
+    import_dictionary = {
+        # "data" : filename_data,
+        "mc" : {
+            "filename": filename_mc,
+            "lumi_scale" : lumi_scale_signal
+        },
+        "bkg" : {
+            "filenames" : bkg_filenames,
+            "lumi_scales" : lumi_scales
+        }
+    }
 
-    bins_pt, bins_eta = [], []
+    workspace_name = "root_files/ws/ws_bkg_pseudodata.root"
+    
+    # ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
+    # ws.writeToFile(workspace_name)
+    
+    file = ROOT.TFile(workspace_name, "READ")
+    ws = file.Get("w")
 
-    for key in bin_keys:
-        bins_pt.append(key.split(',')[0])
-        bins_eta.append(key.split(',')[1])
+    resfile = ROOT.TFile("root_files/pseudodata_eff_comparison.root", "RECREATE")
+    resfile.cd()
 
-    bins = (bins_pt, bins_eta)
-    # independent_efficiency(ws, bbi)
+
+    print(len(bins.keys()))
+ 
+    prob_bins = []
+
+    # pool = Pool()
+    # pool.map(independent_efficiency(), bins.keys())
+
+    
+    for bin_key in bins.keys():
+        res_pass, res_fail = independent_efficiency(ws, bin_key, "expo", bkg_categories, histos_result, prob_bins,
+                                                    refit_numbkg=True, figs=True)
+
+
+
+    
+    
 
     t1 = time.time()
 
     print(f"TIME ELAPSED = {t1-t0}")
+    

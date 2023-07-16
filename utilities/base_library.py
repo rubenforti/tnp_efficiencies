@@ -80,7 +80,6 @@ def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
                     [binning_pt[idx_pt-1], binning_pt[idx_pt]], [binning_eta[idx_eta-1], binning_eta[idx_eta]])
                 index_dictionary.update({bin_key : [global_idx, bounds_idx_pt, bounds_idx_eta]})
 
-    
     return index_dictionary
 
 ###############################################################################
@@ -191,18 +190,26 @@ def sumw2_error(histo):
 
 if __name__ == '__main__':
     
-    '''
-    a, b, c = get_idx_from_bounds([24, 28], [-2.4, -1.3])
+    x = ROOT.RooRealVar("x", "x", 0, 100)
+    mu = ROOT.RooRealVar("mu", "mu", 50, 0, 100)
+    sigma = ROOT.RooRealVar("sigma", "sigma", 10, 0.5, 100)
 
-    print(len(a))
-    print(b[0], b[1], c[0], c[1])
+    unif = ROOT.RooUniform("gaussian", "gaussian", x)
 
-    '''
+    data = unif.generateBinned(ROOT.RooArgSet(x), 100000)
 
-    ## Print all the bkg_lumi_scales
-    bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
+    histo = data.createHistogram("histo", x, ROOT.RooFit.Binning(100, 0, 100))
+    histo2 = data.createHistogram("histo", x, ROOT.RooFit.Binning(100, 0, 100))
 
-    lumi_scales = bkg_lumi_scales("iso", bkg_categories)
+ 
 
-    for key in lumi_scales:
-        print(lumi_scales[key])
+    histo.Scale(1.5)
+    histo2.Scale(2.7)
+
+
+    histo.Add(histo2)
+
+    roohisto = ROOT.RooDataHist("roohisto", "roohisto", ROOT.RooArgList(x), histo)
+
+    print(roohisto.sumEntries())
+    print(sumw2_error(roohisto))
