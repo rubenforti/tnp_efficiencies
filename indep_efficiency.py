@@ -147,7 +147,7 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
                                         )
 
         status_chi2 = check_chi2(histo_data[idx], model[idx], results[idx])
-        status = bool(status_chi2*fit_quality(results[idx], old_checks=True))
+        status = bool(status_chi2*fit_quality(results[idx], type_checks="benchmark"))
 
         print(status_chi2)
         print(status)
@@ -178,19 +178,21 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
         if check_chi2(histo_data[idx], model[idx], results[idx]) is False:
             results[idx].SetTitle("Chi2_not_passed")
 
-        fit_status[idx] = fit_quality(results[idx], old_checks=True)
+        fit_status[idx] = fit_quality(results[idx], type_checks="benchmark")
 
         results[idx].SetName(f"results_{cond}_{bin_key}")
 
 
     eff, d_eff = efficiency_from_res(results[1], results[0])
 
+    status = bool(fit_status[0]*fit_status[1])
+
     # ----------------------------------
     #  Quality checks (and plots) - NEW
     # ----------------------------------
-    if bool(fit_status[0]*fit_status[1]) is True:
-        # ws.Import(model[0]), ws.Import(model[1])
-        # ws.Import(results[0]), ws.Import(results[1])
+    if status:
+        ws.Import(model[0]), ws.Import(model[1])
+        ws.Import(results[0]), ws.Import(results[1])
         if figs:
             
             eff_mc, deff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
@@ -219,7 +221,7 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
                 "scale_factor" : [scale_factor, d_scale_factor]
             }
             plot_fitted_pass_fail("indep", plot_objects, bin_key, pull=False,
-                                  figpath=f"figs/fit_iso_indep_mergedbins")
+                                  figpath=f"figs/fit_iso_old")
             
             
     else:
@@ -240,7 +242,7 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
         print(f"Background is accepted? {present_bkg}")
     '''
 
-    return res_pass, res_fail
+    return res_pass, res_fail, status
 
 
 

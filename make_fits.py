@@ -8,10 +8,13 @@ import time
 import argparse
 from utilities.base_library import bin_dictionary, binning, lumi_factors
 from indep_efficiency import independent_efficiency
+# from indep_eff_mcbkg import independent_efficiency
 # from sim_efficiency import simultaneous_efficiency
 from utilities.fit_utils import check_existing_fit, fit_quality
 from utilities.dataset_utils import ws_init
 
+
+bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
 
 
 def make_fits(ws_name, type_eff, type_analysis, bins_dictionary,
@@ -26,7 +29,10 @@ def make_fits(ws_name, type_eff, type_analysis, bins_dictionary,
     ws = file_ws.Get("w")
 
     Nproblems = 0
-    problematic_bins = {}
+    prob_bins = []
+
+    # key_prova = "[24.0to26.0][-2.4to-2.3]"
+    # bins_dictionary = {key_prova : bins_dictionary[key_prova]}
 
     for bin_key in bins_dictionary:
 
@@ -36,21 +42,19 @@ def make_fits(ws_name, type_eff, type_analysis, bins_dictionary,
 
         if type_analysis == 'indep':
 
-            print(type(existingRes[0]), type(existingRes[1]))
-
             if (existingRes[0] == 0 and existingRes[1] == 0):
-                res_pass, res_fail = independent_efficiency(ws, bin_key, bkg_pdf, 
-                                                            test_bkg=False, refit_numbkg=True, 
-                                                            verb=fit_verbosity, figs=savefigs)
+                res_pass, res_fail, status = independent_efficiency(ws, bin_key, bkg_pdf, 
+                                                                    refit_numbkg=True, 
+                                                                    verb=fit_verbosity, figs=savefigs)
             else:
                 res_pass, res_fail = existingRes
-            
-            status = bool(
-                fit_quality(res_pass, old_checks=True)*fit_quality(res_fail, old_checks=True))
+                status = True
+    
 
-            if status is False or 1!=0:
+            if status is False:
                 print(f"\nBin {bin_key} ({bin_pt}|{bin_eta}) has problems!\n")
                 Nproblems += 1
+                prob_bins.append(bin_key)
                 print("****")
                 res_pass.Print()
                 res_pass.correlationMatrix().Print()
@@ -108,11 +112,14 @@ def make_fits(ws_name, type_eff, type_analysis, bins_dictionary,
             sys.exit()
     
         
-    print(f"NUM of problematic bins = {Nproblems}\n")
+    print(f"NUM of problematic bins = {Nproblems}")
+    print(prob_bins)
 
+    '''
     print("List of non fitted bins:")
     for probl_bin_key in problematic_bins:
         print(problematic_bins[probl_bin_key][1], problematic_bins[probl_bin_key][2])
+    '''
 
     return ws
 
@@ -142,13 +149,7 @@ if __name__ == '__main__':
     bkg_pdf = 'expo'
 
         
-    bins = bin_dictionary("pt", "eta_8bins")
-
-    
-    bin_prova = {
-        "[24.0to26.0][-2.4to-1.8]" : bins["[24.0to26.0][-2.4to-1.8]"]
-    }
-    
+    bins = bin_dictionary("pt", "eta")
 
 
     # -------------------------------------------------------------------------
@@ -161,7 +162,7 @@ if __name__ == '__main__':
     filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
     dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
     
-    bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
+    
     
     bkg_filenames = {}
     [bkg_filenames.update({cat : 
@@ -183,22 +184,25 @@ if __name__ == '__main__':
         "mc" : {
             "filename": filename_mc,
             "lumi_scale" : lumi_scale_signal
-        },
-        "bkg" : {
-            "filenames" : bkg_filenames,
-            "lumi_scales" : lumi_scales
         }
+        # "bkg" : {
+        #     "filenames" : bkg_filenames,
+        #     "lumi_scales" : lumi_scales
+        # } 
     }
 
     # workspace_name = f"root_files/ws/ws_bkg_studies.root"
-    workspace_name = "root_files/ws/ws_bkg_prova.root"
+    #  workspace_name = "root_files/ws_iso_indep_mcbkg_mergedbins.root"
+
+    workspace_name = "root_files/ws_iso_indep_benchmark.root"
     
-    # ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
-    # ws.writeToFile(workspace_name)
+    ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
+    ws.writeToFile(workspace_name)
+
 
     # ------------------------------------------------------------------------
    
-    results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
+    # results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
 
     ws = make_fits(workspace_name, type_eff, type_analysis, bins, savefigs=True)
 

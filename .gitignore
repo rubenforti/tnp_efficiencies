@@ -147,4 +147,5 @@ root_files/
 
 figs/
 results/benchmark_iso/fit_plots/
+results/benchmark_iso/fit_plots_old/
 results/benchmark_iso_sim/fit_plots/

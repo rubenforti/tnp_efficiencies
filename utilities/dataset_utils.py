@@ -115,8 +115,8 @@ def ws_init(import_datasets, type_analysis, bins, bins_mass):
                                         bins_mass[0], bins_mass[-1], unit="GeV/c^2")
                 x_fail.setBinning(x_binning)
                 axis = (x_fail, x_pass)
-                w.Import(x_pass)
-                w.Import(x_fail)
+                # w.Import(x_pass)
+                # w.Import(x_fail)
             elif type_analysis == 'sim':
                 x_sim = ROOT.RooRealVar(f"x_sim_{bin_key}", "TP M_inv",
                                         bins_mass[0], bins_mass[-1], unit="GeV/c^2")

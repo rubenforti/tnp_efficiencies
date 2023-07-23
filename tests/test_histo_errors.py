@@ -130,7 +130,8 @@ class TestHistoIntegral(unittest.TestCase):
     def test_sumEntries_scaled(self):
         """
         Check that the sumEntries() method of a RooDataHist returns the same value as the integral of the
-        corresponding TH1, in the case the TH1 is scaled        """
+        corresponding TH1, in the case the TH1 is scaled 
+        """
         h_th1 = generate_th1_from_randgen("h_th1", weight=1.5)
         axis = ROOT.RooRealVar("x", "x", 50, 130)
         h_roohist = ROOT.RooDataHist("h_roohist", "h_roohist", ROOT.RooArgList(axis), h_th1)
@@ -161,11 +162,11 @@ class TestHistoIntegral(unittest.TestCase):
             errors_etype0 += h_roohist.weightError(0)**2
             errors_etype1 += h_roohist.weightError(1)**2
         
-        errors_etype0 = errors_etype0**0.5
-        errors_etype1 = errors_etype1**0.5
+        # errors_etype0 = errors_etype0**0.5
+        # errors_etype1 = errors_etype1**0.5
 
-        print(h_roohist.sumEntries()**0.5, errors_etype0, h_roohist.get_sumw2()**0.5, errors_etype1)
-        print(h_roohist.sumEntries(), h_roohist.get_sumw2())
+        # print(h_roohist.sumEntries()**0.5, errors_etype0, h_roohist.get_sumw2()**0.5, errors_etype1)
+        # print(h_roohist.sumEntries(), h_roohist.get_sumw2())
             
 
 

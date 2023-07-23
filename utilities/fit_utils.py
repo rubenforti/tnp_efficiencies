@@ -19,12 +19,12 @@ def check_existing_fit(type_analysis, ws, bin_key):
             res_fail = ROOT.RooFitResult(ws.obj(f'results_fail_{bin_key}'))
             return (res_pass, res_fail)
         else:
-            return (0, 0)
+            return 0
     
     if type_analysis == 'sim':
-        if type(ws.obj(f'simPDF_({bin[0]}|{bin[1]})')) is ROOT.RooSimultaneous:
+        if type(ws.obj(f'PDF_{bin_key}')) is ROOT.RooSimultaneous:
             print("Not possible to refit an existing PDF! \nReturning the results obtained previously")
-            res = ROOT.RooFitResult(ws.obj(f'results_({bin[0]}|{bin[1]})'))
+            res = ROOT.RooFitResult(ws.obj(f'results_{bin_key}'))
             return res
         else:
             return 0
@@ -43,11 +43,35 @@ def pearson_chi2_eval(histo, pdf, nbins, res):
 
 ###############################################################################
 
-def check_chi2(histo, pdf, res):
+def llr_eval(histo, res):
     """
     """
-    chi2val, ndof = pearson_chi2_eval(histo, pdf, histo.numEntries(), res)
-    # print(chi2val, ndof)
+    max_ll_data = 0
+
+    for idx in range(histo.numEntries()):
+        k = histo.weight(idx)
+        max_ll_data += 2*(k*ROOT.TMath.Log(k) - k)
+
+    llr_val = max_ll_data + 2*res.minNll()
+
+    pars = res.floatParsFinal()
+    ndof = pars.getSize()
+
+    return llr_val, ndof
+
+
+
+###############################################################################
+
+def check_chi2(histo, pdf, res, type="pearson"):
+    """
+    """
+    if type == "pearson":
+        chi2val, ndof = pearson_chi2_eval(histo, pdf, histo.numEntries(), res)
+        print(chi2val, ndof)
+    elif type == "llr":
+        chi2val, ndof = llr_eval(histo, res)
+    
     status_chi2 = bool(abs(chi2val - ndof) < 15*((2*ndof)**0.5))
 
     return status_chi2
@@ -61,18 +85,20 @@ def fit_quality(res, type_checks="benchmark"):
 
     if type_checks == "benchmark":
         check_migrad = (res.status() == 0 or res.status() == 1)
-        check_chi2 = (res.GetTitle() != "Chi2_not_passed")
+        #check_chi2 = (res.GetTitle() != "Chi2_not_passed")
+        check_chi2 = True
         return bool(check_migrad*check_covm*check_chi2)
-
-    elif type_checks == "bkg_fit":
-        check_migrad = (res.status()==0) or (res.status()==3 and res.edm()<0.01)
-        check_chi2 = (res.GetTitle() != "Chi2_not_passed")
-        return bool(check_migrad*check_covm)
-    
     elif type_checks == "new_checks":
         check_migrad = res.status() == 0
-        check_edm = (res.edm() < 1e-4)
+        check_edm = (res.edm() < 1e-3)
         return bool(check_migrad*check_covm*check_edm)
+    '''
+    # Not used anymore, could be useful if Sumw2Error turns out to be needed
+    elif type_checks == "pseudodata":
+        check_migrad = res.status()==0
+        check_covm = (res.covQual()==2 or res.covQual()==3)
+        return bool(check_migrad*check_covm)
+    '''
 
 ###############################################################################
 

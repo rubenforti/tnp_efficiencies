@@ -5,7 +5,7 @@ import os
 import pickle
 from array import array
 from utilities.fit_utils import fit_quality, pearson_chi2_eval
-from utilities.base_library import eval_efficiency
+from utilities.base_library import eval_efficiency, binning, bin_dictionary
 
 
 def efficiency_from_res(res_pass, res_fail):
@@ -30,12 +30,73 @@ class results_manager:
     """
     """
 
-    def __init__(self, type_estimate):
+    def __init__(self, type_analysis, binning_pt, binning_eta, import_ws = ""):
         """
         """
         self._dict_results = {}
-        self._analysis = type_estimate
-        # self._ws = workspace
+        self._analysis = type_analysis if type_analysis in ["indep", "sim"] else ""
+        
+        if type(import_ws) is ROOT.RooWorkspace:
+            bin_dict = bin_dictionary(binning_pt, binning_eta)
+            for bin_key in bin_dict.keys():
+
+                if self._analysis == 'indep':
+                    res_pass = import_ws.obj(f"results_pass_{bin_key}")
+                    res_fail = import_ws.obj(f"results_fail_{bin_key}")
+                    self.add_result({"pass":res_pass, "fail":res_fail}, bin_key)
+                elif self._analysis == 'sim':
+                    self.add_result({"sim":import_ws.obj(f"results_{bin_key}")}, bin_key)
+                else:
+                    print("ERROR: analysis type not recognized")
+                
+
+    def add_result(self, res, bin_key):
+        """
+        """
+        Npass, sigma_Npass = 0, 0
+        Nfail, sigma_Nfail = 0, 0
+
+        if self._analysis == 'indep':
+            # res_pass = ws.obj(f"results_pass_({bin_pt}|{bin_eta})")
+            # res_fail = ws.obj(f"results_fail_({bin_pt}|{bin_eta})")
+
+            res_pass, res_fail = res["pass"], res["fail"]
+            
+            # histo_pass = self._ws.data(f"Minv_data_pass_({bin_pt}|{bin_eta})")
+            # histo_fail = self._ws.data(f"Minv_data_fail_({bin_pt}|{bin_eta})")
+
+            if type(res_pass) is ROOT.RooFitResult and type(res_fail) is ROOT.RooFitResult:
+
+                new_res = {
+                    bin_key : {
+                        "efficiency" : efficiency_from_res(res_pass, res_fail),
+                        "pars_pass" : res_pass.floatParsFinal(),
+                        "corrmatrix_pass" : res_pass.correlationMatrix(),
+                        "status_pass" : (res_pass.status(), res_pass.covQual(), res_pass.edm()),
+                        "pars_fail": res_fail.floatParsFinal(),
+                        "corrmatrix_fail": res_fail.correlationMatrix(),
+                        "status_fail" : (res_fail.status(), res_fail.covQual(), res_fail.edm())
+                        }
+                    }
+                self._dict_results.update(new_res)
+
+        elif self._analysis == 'sim':
+            # res = ws.obj(f"results_({bin_pt}|{bin_eta})")
+            results = res["sim"]
+            #new_res = {f"{bin_pt},{bin_eta}": {
+            new_res = {f"{bin_key}": {
+                # "efficiency" : (res.floatParsFinal().find(f"efficiency_({bin_pt}|{bin_eta})").getVal(),
+                #                 res.floatParsFinal().find(f"efficiency_({bin_pt}|{bin_eta})").getError()),
+                "efficiency" : (results.floatParsFinal().find(f"efficiency_{bin_key}").getVal(),
+                                results.floatParsFinal().find(f"efficiency_{bin_key}").getError()),
+                "parameters": results.floatParsFinal(),
+                "corrmatrix": results.covarianceMatrix(),
+                "status": (results.status(), results.covQual(), results.edm())
+                }
+            }
+            self._dict_results.update(new_res)
+        else:
+            pass
 
     def Open(self, filename):
         with open(filename, "rb") as file:
@@ -49,70 +110,50 @@ class results_manager:
     def dictionary(self):
         return self._dict_results
 
-    def add_result(self, ws, bin_pt, bin_eta, check=False, old_checks=False):
+    def getEff(self, bin_key='', bin_pt=0, bin_eta=0):
         """
         """
-        Npass, sigma_Npass = 0, 0
-        Nfail, sigma_Nfail = 0, 0
-
-        if check is True:
-            # SISTEMARE, COSÌ NON FUNZIONA !!!!!!!!
-            quality = 1
-            for result in res:
-                quality = quality*fit_quality(result, old_checks=old_checks)
-            goodfit = bool(quality)
+        if bin_key == "all":
+            eff = [] 
+            [eff.append(self._dict_results[key]["efficiency"]) for key in self._dict_results.keys()]
+        elif bin_key=='' and bin_pt!=0 and bin_eta != 0:
+            pass
         else:
-            goodfit = True
-        
+            eff = self._dict_results[bin_key]["efficiency"]
 
-        if goodfit and (f"{bin_pt},{bin_eta}" not in self._dict_results) and self._analysis == 'indep':
-            res_pass = ws.obj(f"results_pass_({bin_pt}|{bin_eta})")
-            res_fail = ws.obj(f"results_fail_({bin_pt}|{bin_eta})")
-            
-            # histo_pass = self._ws.data(f"Minv_data_pass_({bin_pt}|{bin_eta})")
-            # histo_fail = self._ws.data(f"Minv_data_fail_({bin_pt}|{bin_eta})")
+        return eff
+    
+    
+    def printStatus(self, bin_key=''):
+        """
+        """
+        if bin_key=='':
+            bin_keys = self._dict_results.keys()
+        elif type(bin_key) is str and bin_key!='':
+            bin_keys = [bin_key]
+        else:
+            print("ERROR: bin_key not recognized")
+            sys.exit()
 
-            new_res = {
-                f"{bin_pt},{bin_eta}": {
-                    "efficiency" : efficiency_from_res(res_pass, res_fail),
-                    "pars_pass" : res_pass.floatParsFinal(),
-                    "corrmatrix_pass" : res_pass.correlationMatrix(),
-                    "status_pass" : (res_pass.status(), res_pass.covQual(), res_pass.edm()),
-                    "pars_fail": res_fail.floatParsFinal(),
-                    "corrmatrix_fail": res_fail.correlationMatrix(),
-                    "status_fail" : (res_fail.status(), res_fail.covQual(), res_fail.edm())
-                    }
-                }
-
-            self._dict_results.update(new_res)
-
-        elif goodfit and self._analysis == 'sim':
-            res = ws.obj(f"results_({bin_pt}|{bin_eta})")
-            new_res = {f"{bin_pt},{bin_eta}": {
-                "efficiency" : (res.floatParsFinal().find(f"efficiency_({bin_pt}|{bin_eta})").getVal(),
-                                res.floatParsFinal().find(f"efficiency_({bin_pt}|{bin_eta})").getError()),
-                "parameters": res.floatParsFinal(),
-                "corrmatrix": res.covarianceMatrix(),
-                "status": (res.status(), res.covQual(), res.edm())
-                }
-            }
-            self._dict_results.update(new_res)
+        if self._analysis == 'indep':
+            [print(f"{b_key}: {self._dict_results[b_key]['status_pass']}, {self._dict_results[b_key]['status_fail']}")
+                for b_key in bin_keys]
+        elif self._analysis == 'sim':
+            [print(f"{b_key}: {self._dict_results[b_key]['status']}") for b_key in bin_keys]
         else:
             pass
 
-    def getEfficiency(self, bin_pt=0, bin_eta=0):
 
-        if bin_pt == 0 and bin_eta == 0:
-            eff = [] 
-            [eff.append(self._dict_results[key]["efficiency"]) for key in self._dict_results.keys()]
-                # d_eff.append(self._dict_results[key]["efficiency"][1])
-        else:
-            eff = self._dict_results[f"{bin_pt},{bin_eta}"]["efficiency"]
-            # d_eff = self._dict_results[f"{bin_pt},{bin_eta}"]["efficiency"][1]
-        return eff
 
-    def getCorr(self, bin_pt=0, bin_eta=0):
 
+
+    '''
+    # THE FOLLOWING METHODS ARE NOT NECCESSARY ANYMORE, DUE TO THE DIFFERENT ROLE ASSIGNED TO THE CLASS
+    # IT'S BETTER TO KEEP THEM HERE AS REFERENCES FOR THE FUTURE
+
+    def getCorrmatrix(self, bin_pt=0, bin_eta=0):
+        """
+        """
         if bin_pt == 0 and bin_eta == 0:
             corr = [] 
             if self._analysis == 'indep':
@@ -178,6 +219,8 @@ class results_manager:
                 print(f'Bin {key} has {status} problems')
                 bins.append(key)
         return bins
+
+    '''
     
 ###############################################################################
 
@@ -287,70 +330,88 @@ def compare_with_benchmark(results, ref_txt):
 
 ###############################################################################
 
-def compare_analysis(res_1, res_2):
+def compare_eff_results(ws_bmark, ws_new, binning_pt, binning_eta, file_output, aux_filename="", aux_dict={}):
     """
     Compare the efficiencies and their error between two results files. The first file is 
     considered as benchmark
     """
     
-
-    file = ROOT.TFile("prova_histo2d.root", "RECREATE")
+    for t_an in ["indep", "sim"]:
+        an_bmark = t_an if t_an in ws_bmark.GetName() else ""
+        an_new = t_an if t_an in ws_new.GetName() else ""
 
     
-    binning_pt = array('d', [24., 26., 28., 30., 32., 34.,
-                       36., 38., 40., 42., 44., 47., 50., 55., 60., 65.])
-    binning_eta = array('d', [round(-2.4 + i*0.1, 2) for i in range(49)])
+    res_benchmark = results_manager("indep", binning_pt, binning_eta, import_ws=ws_bmark)
+    res_new = results_manager("indep", binning_pt, binning_eta, import_ws=ws_new)
+
+    if aux_filename!="":
+        aux_file = ROOT.TFile(aux_filename, "READ")
+        aux_ws = aux_file.Get("w")
+
+
+    for key_aux in aux_dict.keys():
+
+        res_pass = aux_ws.obj(f"results_pass_{aux_dict[key_aux]}")
+        res_fail = aux_ws.obj(f"results_fail_{aux_dict[key_aux]}")
+        new_res = {"pass":res_pass, "fail":res_fail}
+
+        res_new.add_result(new_res, key_aux)
+
+    file_out = ROOT.TFile(file_output, "RECREATE")
+
+    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
+
+    bin_dict = bin_dictionary(binning_pt, binning_eta)
     
-    h_delta_eff = ROOT.TH1D("delta_eff", "delta eff", 50, -1e-4, 1e-4)
-    h2d_delta_eff = ROOT.TH2D("delta_eff_2d", "delta eff", len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
-    h_delta_deff = ROOT.TH1D("delta_deff", "delta deff", 50, -1e-5, 1e-5)
-    h2d_pull = ROOT.TH2D("pull_delta_eff_2d", "pull delta eff", len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
+    bmark_dict = res_benchmark.dictionary()
+ 
 
-    for i in range(1, 16):
-        for j in range(1, 49):
-            eff_1, deff_1 = res_1.getEfficiency(i,j)
-            eff_2, deff_2 = res_2.getEfficiency(i,j)
-            
-            h_delta_eff.Fill(eff_1-eff_2)
-            h_delta_deff.Fill(deff_1-deff_2)
 
-            h2d_delta_eff.SetBinContent(i, j, eff_1-eff_2)
-            h2d_pull.SetBinContent(i, j, abs(eff_1-eff_2)/eff_1)
+    h_delta_eff = ROOT.TH1D("delta_eff", "delta eff", 50, -1e-2, 1e-2)
+    h2d_delta_eff = ROOT.TH2D("delta_eff_2d", "delta eff", nbins_pt, bins_pt, nbins_eta, bins_eta)
+    h_delta_deff = ROOT.TH1D("delta_error_eff", "delta error eff", 50, -1e-3, 1e-2)
+    h2d_delta_deff = ROOT.TH2D("delta_error_eff_2d", "delta error eff", nbins_pt, bins_pt, nbins_eta, bins_eta)
+    h_pull = ROOT.TH1D("pull_eff", "pull eff", 50, -2, 2)
+    h2d_pull = ROOT.TH2D("pull_eff_2d", "pull eff", nbins_pt, bins_pt, nbins_eta, bins_eta)
 
-    c0 = ROOT.TCanvas("", "", 1200, 900)
-    c0.Divide(2)
-    c0.cd(1)
-    ROOT.gStyle.SetOptStat("men")
-    ROOT.gPad.SetLogy()
-    h_delta_eff.Draw()
-    c0.cd(2)
-    ROOT.gPad.SetLogy()
-    h_delta_deff.Draw()
-    c0.SaveAs("figs/delta_eff.pdf")
 
-    c1 = ROOT.TCanvas("delta_eff", "delta_eff", 1200, 900)
-    c1.cd()
-    ROOT.gStyle.SetOptStat("en")
-    ROOT.gPad.SetRightMargin(0.15)
-    ROOT.gStyle.SetPalette(57)
-    h2d_delta_eff.Draw("COLZ")
-    h2d_delta_eff.SetContour(25)
-    c1.SaveAs("figs/delta_eff_2d.pdf")
+    for bin_key in bmark_dict.keys():
 
-    c2 = ROOT.TCanvas("pull_delta_eff", "pull_delta_eff", 1200, 900)
-    c2.cd()
-    ROOT.gStyle.SetOptStat("en")
-    ROOT.gPad.SetRightMargin(0.15)
-    h2d_pull.Draw("COLZ")
-    h2d_pull.SetContour(25)
-    c2.SaveAs("figs/pull_delta_eff_2d.pdf")
+        _, bin_pt, bin_eta = bin_dict[bin_key]
 
+        print(bin_key, bin_pt, bin_eta)
+
+        # Bin transformation needed in case the bins are merged
+        if type(bin_pt) is list:
+            bin_pt = int(1+(nbins_pt*(bin_pt[0]-1)/15.))
+        if type(bin_eta) is list:
+            bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
+
+        eff_1, deff_1 = res_benchmark.getEff(bin_key)
+        eff_2, deff_2 = res_new.getEff(bin_key)
+
+        delta_eff = eff_2-eff_1
+        delta_deff = deff_2-deff_1
+
+        h_delta_eff.Fill(delta_eff)
+        h2d_delta_eff.SetBinContent(bin_pt, bin_eta, delta_eff)
+
+        h_delta_deff.Fill(delta_deff)
+        h2d_delta_deff.SetBinContent(bin_pt, bin_eta, delta_deff)
+
+        h_pull.Fill(delta_eff/deff_2)
+        h2d_pull.SetBinContent(bin_pt, bin_eta, delta_eff/deff_1)
+
+    file_out.cd()
     h_delta_eff.Write()
-    h_delta_deff.Write()
     h2d_delta_eff.Write()
+    h_delta_deff.Write()
+    h2d_delta_deff.Write()
+    h_pull.Write()
     h2d_pull.Write()
 
-    file.Close()
+    file_out.Close()
     
         
 ###############################################################################

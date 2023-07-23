@@ -4,7 +4,7 @@
 import ROOT
 import sys
 from utilities.base_library import lumi_factors, binning, bin_dictionary, sumw2_error, eval_efficiency
-from utilities.results_utils import init_pass_fail_histos, init_pass_fail_h2d
+from utilities.results_utils import init_pass_fail_histos, init_pass_fail_h2d, efficiency_from_res
 from utilities.dataset_utils import ws_init
 from utilities.plot_utils import plot_bkg_on_histo
 from utilities.fit_utils import check_existing_fit
@@ -29,15 +29,16 @@ colors = {
 
 ###############################################################################
 
-def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, import_data=False, 
-                        import_mc_signal=False, import_fit_pars=False, import_fit_pdf_bkg=False, pdf_bkg_shape="expo"):
+def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
+                        import_data=False, import_mc_signal=False, 
+                        import_fit_pars=False, import_fit_pdf_bkg=False, pdf_bkg_shape="expo"):
     """
     Creates a dictionary containing the bkg MC datasets and the useful information related to them.
     """
     lumi_scales = lumi_factors(type_eff, bkg_categories)
 
     axis = ws.var(f"x_{flag}_{bin_key}")
-    axis.setBins(20, "plot_binning")
+    axis.setBins(60, "plot_binning")
 
     datasets = {}
     datasets.update({"axis" : axis})
@@ -156,9 +157,11 @@ def fit_bkg(type_eff, type_analysis, ws, flag, bin_key, fit_shape="expo"):
 
 ###############################################################################
 
-def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta, 
-                plot_on_data=False, plot_on_signal=False, figpath='figs/bkg_and_sig_mc'):
+def bkg_mass_distribution(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta, 
+                           plot_on_data=False, plot_on_signal=False, figpath='figs/bkg_and_sig_mc'):
     """
+    Plots the M_inv distribution of the total bkg and the various background samples, for each (pt,eta) bin.
+    These bkg distributions can be compared to the MC signal or the data distributions.
     """
 
     if plot_on_data and plot_on_signal:
@@ -179,11 +182,9 @@ def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta,
 
     binning_sigma = [round(-10.0 + i, 2) for i in range(91)]
 
-
     histos = {}
 
     if plot_on_data:
-        
         histos.update(init_pass_fail_h2d("h2d_nsigma", "Nbkg fit vs MC [sigma]", binning_pt, binning_eta))
         histos.update(init_pass_fail_histos("h_nsigma", "Nbkg fit vs MC [sigma]", array('d', binning_sigma)))
         
@@ -192,8 +193,6 @@ def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta,
         histos.update(init_pass_fail_histos("h_bkgfrac_ratio", "Bkg fraction mc/fit ratio", array('d', binning_ratio)))
         histos.update(init_pass_fail_h2d("h2d_bkgfrac_pull",  "Bkg fraction mc vs fit pull", binning_pt, binning_eta))
         histos.update(init_pass_fail_histos("h_bkgfrac_pull", "Bkg fraction mc vs fit pull", array('d', binning_sigma)))
-    
-        ratios = []
 
 
     for bin_key in bin_dict:
@@ -256,7 +255,7 @@ def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta,
                 bkg_frac_pull = (bkgfrac_mc - bkgfrac_fit)/((err_bkgfrac_mc**2 + (err_bkgfrac_fit**2))**0.5)
 
                 if bkgfrac_fit == 0:
-                    bkgfrac_ratio = 199.9
+                    bkgfrac_ratio = 199.55
                     err_bkgfrac_ratio = bkgfrac_mc
                 else:
                     bkgfrac_ratio = bkgfrac_mc/bkgfrac_fit
@@ -274,8 +273,8 @@ def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta,
     if plot_on_data:
         filename = f"bkg_results/nsigma_bkg_vs_datafit.root"
     elif plot_on_signal:
-        # filename = f"bkg_results/bkgfrac_mc_vs_datafit.root"
-        filename = "prova.root"
+        filename = f"bkg_results/bkgfrac_mc_vs_datafit.root"
+        #filename = "prova.root"
 
     file = ROOT.TFile(filename, "RECREATE")
     file.cd()
@@ -283,50 +282,14 @@ def bkg_distrib(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta,
         histo.Write()
     file.Close()
 
-    '''    
-    if plot_on_data:
-        c1 = ROOT.TCanvas()
-        c1.Divide(1,2)
-        c1.cd(1)
-        histos["h2d_nsigma_pass"].Draw("COLZ")
-        c1.cd(2)
-        histos["h2d_nsigma_fail"].Draw("COLZ")
-        c1.SaveAs("bkg_results/nsigma_bkg_mc_vs_datafit.pdf")
-    
-    if plot_on_signal:
-        c2 = ROOT.TCanvas()
-        c2.Divide(1,2)
-        c2.cd(1)
-        histos["h2d_bkg_fraction_pass"].Draw("COLZ")
-        c2.cd(2)
-        histos["h2d_bkg_fraction_fail"].Draw("COLZ")
-        c2.SaveAs("bkg_results/bkgfrac_ratio_mc_datafit_2d.pdf")
-
-        c3 = ROOT.TCanvas()
-        c3.Divide(2,1)
-        c3_1 = c3.GetPad(1)
-        c3_1.cd()
-        c3_1.SetLogx()
-        c3_1.SetLogy()
-        histos["h_bkgfrac_pass"].SetNormFactor(1)
-        histos["h_bkgfrac_pass"].Draw()
-        c3_2 = c3.GetPad(2)
-        c3_2.cd()
-        c3_2.SetLogx()
-        c3_2.SetLogy()
-        histos["h_bkgfrac_fail"].SetNormFactor(1)
-        histos["h_bkgfrac_fail"].Draw()
-        c3.SaveAs("figs/backgrounds/bkg_fraction_ratio_mc_datafit.pdf")
-
-    print(ratios)
-    '''
 
 
 ###############################################################################
 
 def fit_on_pseudodata(ws, binning_pt, binning_eta, bkg_shape, bkg_categories,
-                      refit_numbkg=False, test_bkg=False, verb=-1, figs=False, save_root_file=False):
+                      refit_numbkg=False, test_bkg=False, verb=-1, figs=False):
     """
+
     """
 
     bin_dict = bin_dictionary(binning_pt, binning_eta)
@@ -338,33 +301,25 @@ def fit_on_pseudodata(ws, binning_pt, binning_eta, bkg_shape, bkg_categories,
 
     nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
 
-    histos_result = { "ratio" : ROOT.TH1D("histo_ratio", "ratio_eff", 50, 0.995, 1.005),
-                      "ratio_2d" : ROOT.TH2D("histo_ratio_2d", "ratio eff 2d", 
-                                             len(bins_pt)-1, bins_pt, len(bins_eta)-1, bins_eta),
-                      "nsigma" : ROOT.TH1D("histo_nsigma", "nsigma delta_eff", 50, -2.5, 2.5),
-                      "nsigma_2d" : ROOT.TH2D("histo_nsigma_2d", "nsigma delta_eff 2d",
-                                              len(bins_pt)-1, bins_pt, len(bins_eta)-1, bins_eta),
-                    }
     
     Nproblems = 0
+
+    # key_prova = "[24.0to26.0][0.6to1.2]"
+    # bin_dict = {key_prova : bin_dict[key_prova]}
+
 
     for bin_key in bin_dict:
 
         _, bin_pt, bin_eta = bin_dict[bin_key]
 
-        # Bin transformation needed in case the bins are merged
-        if type(bin_pt) is list:
-            bin_pt = int(1+(nbins_pt*(bin_pt[0]-1)/15.))
-        if type(bin_eta) is list:
-            bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
-
         existingRes = check_existing_fit("indep", ws, bin_key)
 
-        if (existingRes[0] == 0 and existingRes[1] == 0):
-            res_pass, res_fail, status = independent_efficiency(
-                ws, bin_key, bkg_shape, bkg_categories, prob_bins, 
-                refit_numbkg=refit_numbkg, test_bkg=test_bkg, verb=verb, figs=figs)
+        print(existingRes)
 
+        if existingRes == 0:
+            res_pass, res_fail, status = independent_efficiency(
+                ws, bin_key, bkg_shape, bkg_categories,
+                refit_numbkg=refit_numbkg, test_bkg=test_bkg, verb=verb, figs=figs)
         else:
             res_pass, res_fail = existingRes
             status = True
@@ -373,7 +328,7 @@ def fit_on_pseudodata(ws, binning_pt, binning_eta, bkg_shape, bkg_categories,
         if status is False:
             print(f"\nBin {bin_key} ({bin_pt}|{bin_eta}) has problems!\n")
             Nproblems += 1
-            prob_bins.append({"bin_key" : (bin_pt, bin_eta)})
+            prob_bins.append(f"{bin_key}")
             print("****")
             res_pass.Print()
             res_pass.correlationMatrix().Print()
@@ -400,32 +355,85 @@ def fit_on_pseudodata(ws, binning_pt, binning_eta, bkg_shape, bkg_categories,
             pass
             #res_object.add_result(ws, bin_pt, bin_eta)
 
-        if status==True and save_root_file: 
-            histos_result["nsigma"].Fill(nsigma)
-            histos_result["nsigma_2d"].SetBinContent(bin_pt, bin_eta, nsigma)
-            histos_result["ratio"].Fill(sf)
-            histos_result["ratio_2d"].SetBinContent(bin_pt, bin_eta, sf)
-        elif save_root_file:
-            histos_result["ratio_2d"].SetBinContent(bin_pt, bin_eta, 1.0000000000000000000000000000000000000000000000000)
-        else:
-            pass
-    
-    if save_root_file:
-        resfile = ROOT.TFile("root_files/pseudodata_eff_comparison.root", "RECREATE")
-        resfile.cd()
-        histos_result["ratio"].Write()
-        histos_result["ratio_2d"].Write()
-        histos_result["nsigma"].Write()
-        histos_result["nsigma_2d"].Write()
-        resfile.Close()
 
     print(len(prob_bins))
+    print(prob_bins)
     
     
             
 
-def plot_pseudodata_eff_comparison():
-    pass
+def plot_pseudodata_eff_comparison(ws, binning_pt, binning_eta, filename):
+    """
+    """
+
+    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    bin_dict = bin_dictionary(binning_pt, binning_eta)
+
+    nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
+
+    histos_result = {"pull" : ROOT.TH1D("histo_pull", "Pull efficiency", 50, -1.5, 1.5),
+                     "pull_2d" : ROOT.TH2D("histo_pull_2d", "Pull efficiency",
+                                            len(bins_pt)-1, bins_pt, len(bins_eta)-1, bins_eta),
+                     "ratio" : ROOT.TH1D("histo_ratio", "Ratio efficiency", 50, 0.995, 1.005),
+                     "ratio_2d" : ROOT.TH2D("histo_ratio_2d", "Ratio efficiency", 
+                                            len(bins_pt)-1, bins_pt, len(bins_eta)-1, bins_eta),
+                     "ratio_errors" : ROOT.TH1D("histo_ratio_errors", "Ratio of efficiency errors", 50, 0.9, 1.5),
+                     "ratio_errors_2d" : ROOT.TH2D("histo_ratio_errors_2d", "Ratio of efficiency errors",
+                                                 len(bins_pt)-1, bins_pt, len(bins_eta)-1, bins_eta)
+
+                    }          
+
+    for bin_key in bin_dict:
+        
+        if (type(ws.obj(f"results_pass_{bin_key}")) is ROOT.RooFitResult):
+
+            _, bin_pt, bin_eta = bin_dict[bin_key]
+
+            # Bin transformation needed in case the bins are merged
+            if type(bin_pt) is list:
+                bin_pt = int(1+(nbins_pt*(bin_pt[0]-1)/15.))
+            if type(bin_eta) is list:
+                bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
+            
+            res_pass, res_fail = ws.obj(f"results_pass_{bin_key}"), ws.obj(f"results_fail_{bin_key}")
+            
+            eff, d_eff = efficiency_from_res(res_pass, res_fail)
+
+            eff_mc, d_eff_mc = eval_efficiency(
+                ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
+                sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")), sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
+            
+            # nsigma = (eff - eff_mc) / (d_eff_mc**2 + d_eff**2)**0.5
+
+            pull = (eff-eff_mc)/d_eff_mc
+            ratio = eff / eff_mc
+            ratio_errors  = d_eff/d_eff_mc
+
+            histos_result["ratio"].Fill(ratio)
+            histos_result["ratio_2d"].SetBinContent(bin_pt, bin_eta, ratio)
+            histos_result["pull"].Fill(pull)
+            histos_result["pull_2d"].SetBinContent(bin_pt, bin_eta, pull)
+            histos_result["ratio_errors"].Fill(ratio_errors)
+            histos_result["ratio_errors_2d"].SetBinContent(bin_pt, bin_eta, ratio_errors)
+
+
+    resfile = ROOT.TFile(filename, "RECREATE")
+    resfile.cd()
+    histos_result["pull"].Write()
+    histos_result["pull_2d"].Write() 
+    histos_result["ratio"].Write()
+    histos_result["ratio_2d"].Write()
+    histos_result["ratio_errors"].Write()
+    histos_result["ratio_errors_2d"].Write()
+                
+    resfile.Close()
+
+
+
+
+        
+
+    
 
 
     
@@ -433,8 +441,12 @@ def plot_pseudodata_eff_comparison():
 
 ###############################################################################
 
-def plot_backgrounds_2d(ws, bkg_categories, lumi_scales, bin_dict, binning_pt, binning_eta, 
+def plot_backgrounds_2d(ws, binning_pt, binning_eta, bkg_categories, 
                         norm_data=False, norm_tot_bkg=False, filename="root_files/backgrounds/bkg_2d_distributions.root"):
+    """
+    Makes 2d histograms containing the differential distribution of the various background samples; these
+    distributions can be normalized w.r.t. data or the total amount of bkg events.
+    """
 
     if norm_data and norm_tot_bkg:
         print("ERROR: can't normalize both on data and total bkg")
@@ -446,28 +458,33 @@ def plot_backgrounds_2d(ws, bkg_categories, lumi_scales, bin_dict, binning_pt, b
     else:
         add_title = ""
 
-    histos = {}
+    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    bin_dict = bin_dictionary(binning_pt, binning_eta)    
 
     nbins_pt = len(binning_pt) - 1
     nbins_eta = len(binning_eta) - 1
 
     rootfile_distrib = ROOT.TFile(filename, "RECREATE")
-
+    histos = {}
 
     for cat in bkg_categories:
 
         histos.update(init_pass_fail_h2d(cat, cat, binning_pt, binning_eta, ))
-
 
         if add_title != "":
             histos[f"{cat}_pass"].SetTitle(f"{histos[f'{cat}_pass'].GetTitle()} {add_title}")
             histos[f"{cat}_fail"].SetTitle(f"{histos[f'{cat}_fail'].GetTitle()} {add_title}")
 
 
-        print(len(binning_pt), len(binning_eta))
         for bin_key in bin_dict:
 
             _, bin_pt, bin_eta = bin_dict[bin_key]
+
+            # Bin transformation needed in case the bins are merged
+            if type(bin_pt) is list:
+                bin_pt = int(1+(nbins_pt*(bin_pt[0]-1)/15.))
+            if type(bin_eta) is list:
+                bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
 
             print(bin_pt, bin_eta)
 
@@ -477,6 +494,13 @@ def plot_backgrounds_2d(ws, bkg_categories, lumi_scales, bin_dict, binning_pt, b
             d_npass = sumw2_error(h_pass)
             nfail = h_fail.sumEntries()
             d_nfail = sumw2_error(h_fail)
+
+            if npass<0 or nfail<0:
+                print(bin_pt, bin_eta, cat)
+                print("ERROR: negative number of events")
+                sys.exit()
+            if npass==0 or nfail==0:
+                print("**********\nWARNING: zero number of events\n**********\n")
                 
             if norm_data:
                 h_data_pass = ws.data(f"Minv_data_pass_{bin_key}")
@@ -485,28 +509,14 @@ def plot_backgrounds_2d(ws, bkg_categories, lumi_scales, bin_dict, binning_pt, b
                 npass, nfail = npass/h_data_pass.sumEntries(), nfail/h_data_fail.sumEntries()
                 d_npass, d_nfail = d_npass/h_data_pass.sumEntries(), d_nfail/h_data_fail.sumEntries()
 
-            
             if norm_tot_bkg:
                 h_totbkg_pass = ws.data(f"Minv_bkg_pass_{bin_key}_total")
                 h_totbkg_fail = ws.data(f"Minv_bkg_fail_{bin_key}_total")
                 # print(n_pass, h_data_pass.sumEntries())
                 npass, nfail = npass/h_data_pass.sumEntries(), nfail/h_data_fail.sumEntries()
                 d_npass, d_nfail = d_npass/h_data_pass.sumEntries(), d_nfail/h_data_fail.sumEntries()
-
-            # Bin transformation needed in case the bins are merged
-            if type(bin_pt) is list:
-                bin_pt = int(1+(nbins_pt*(bin_pt[0]-1)/15.))
-            if type(bin_eta) is list:
-                bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
-
-            if npass<0 or nfail<0 or lumi_scales[cat]<0:
-                print(bin_pt, bin_eta, cat)
-                print("ERROR: negative number of events")
-                sys.exit()
             
-            if npass==0 or nfail==0:
-                print("WARNING: zero number of events\n******************************\n")
-
+        
             histos[f"{cat}_pass"].SetBinContent(bin_pt, bin_eta, npass)
             histos[f"{cat}_pass"].SetBinError(bin_pt, bin_eta, d_npass)  
             histos[f"{cat}_fail"].SetBinContent(bin_pt, bin_eta, nfail)
@@ -573,9 +583,9 @@ if __name__ == "__main__":
 
 
     import_dictionary = {
-        "data" : filename_data,
+        #"data" : filename_data,
         "mc" : {
-            "filename" : filename_mc_weightsum,
+            "filename" : filename_mc,
             "lumi_scale" : sig_lumi_scale
         },
         "bkg" : {
@@ -596,28 +606,31 @@ if __name__ == "__main__":
     # bin_set = bin_dict()
     bin_set = bin_dictionary(binning_pt_key, binning_eta_key)
 
-    # ws = ws_init(import_dictionary, an, bin_set, binning_mass)
-    # ws.writeToFile("root_files/ws/ws_bkg_studies.root")
+    ws_filename = "bkg_results/ws_bkg_pseudodata.root"
 
-    # file = ROOT.TFile("root_files/ws/ws_bkg_studies.root", "READ")
-    # file = ROOT.TFile("root_files/ws/ws_bkg_prova.root", "READ")
-    file = ROOT.TFile("root_files/ws/ws_bkg_pseudodata.root", "READ")
+    #ws = ws_init(import_dictionary, an, bin_set, binning_mass)
+    # ws.writeToFile("root_files/ws_bkg_pseudodata.root")
 
+    # file = ROOT.TFile("root_files/ws_bkg_studies.root", "READ")
+    # file = ROOT.TFile("root_files/ws_bkg_pseudodata.root", "READ")
+
+    file = ROOT.TFile(ws_filename, "READ")
     ws = file.Get("w")
-
 
     #plot_backgrounds_2d(ws, bkg_categories, lumi_scales, bin_set, new_binning_pt, new_binning_eta,
     #                    norm_data=True, norm_tot_bkg=False, filename="root_files/backgrounds/bkg_2d_distr_norm_mc_signal.root")
     
-    '''
-    bkg_distrib("iso", bkg_categories, ws, bin_set, new_binning_pt, new_binning_eta, 
-                plot_on_data=False, plot_on_signal=True)
-    '''
+    
+    # bkg_mass_distribution("iso", bkg_categories, ws, bin_set, new_binning_pt, new_binning_eta, 
+    #                       plot_on_data=False, plot_on_signal=True)
+    
 
-    fit_on_pseudodata(ws, "pt", "eta_8bins", "expo", bkg_categories, refit_numbkg=True, save_root_file=False)
+    # fit_on_pseudodata(ws, "pt", "eta_8bins", "expo", bkg_categories, refit_numbkg=True, verb=-1, figs=True)
+    # ws.writeToFile(ws_filename)
 
+    # ws.Print()
 
-    ws.writeToFile("root_files/ws/ws_bkg_pseudodata.root")
+    plot_pseudodata_eff_comparison(ws, "pt", "eta_8bins", "bkg_results/pseudodata_eff_comparison.root")
 
 
     #ws.writeToFile("root_files/ws/ws_data_bkg.root")

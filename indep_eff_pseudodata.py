@@ -14,7 +14,7 @@ from utilities.fit_utils import fit_quality, check_chi2
 
 
 
-def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
+def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories,
                            refit_numbkg=False, test_bkg=False, verb=-1, figs=False):
   
     path = os.path.dirname(__file__)
@@ -23,18 +23,17 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
     # ----------------------------------
     #  Initial parameters - MODIFY HERE
     # ----------------------------------
-    NBINS = [10000, 1000]
-    bufFractions = [0.1, 0.4]
+    NBINS = [5000, 5000]
+    bufFractions = [0.3, 0.3]
+
+    sumw2_error_option = False
 
     fit_strategy = [2, 2]
-
-    # Lower limit for NSIG and upper limit for NBKG, in terms of total events in the histogram, for pass and fail respectively
-    lims_num = [[0.5, 0.2], [0.5, 0.2]]
 
     mean_p = ROOT.RooRealVar(
         f"mean_pass_{bin_key}", "mean pass", 0, -5.0, 5.0)
     sigma_p = ROOT.RooRealVar(
-        f"sigma_pass_{bin_key}", "sigma pass", 0.5, 0.05, 5.0)
+        f"sigma_pass_{bin_key}", "sigma pass", 1, 0.01, 5.0)
     mean_f = ROOT.RooRealVar(
         f"mean_fail_{bin_key}", "mean fail", 0, -5.0, 5.0)
     sigma_f = ROOT.RooRealVar(
@@ -84,21 +83,20 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
         histo_pseudodata[idx] = ROOT.RooDataHist(f"Minv_pseudodata_{cond}_{bin_key}", "pseudodata_histo",
                                                  ROOT.RooArgSet(axis[idx]), "plot_binning")
 
-        for cat in bkg_categories:
-            histo_total_bkg[idx].add(ws.data(f"Minv_bkg_{cond}_{bin_key}_{cat}"))
+        
+        [histo_total_bkg[idx].add(ws.data(f"Minv_bkg_{cond}_{bin_key}_{cat}")) for cat in bkg_categories]
 
         histo_pseudodata[idx].add(ws.data(f"Minv_mc_{cond}_{bin_key}"))
         histo_pseudodata[idx].add(histo_total_bkg[idx])
 
 
-        pdf_mc[idx] = ROOT.RooHistPdf(
-            f"pdf_mc_{cond}_{bin_key}", "pdf MC", axis[idx],
-            ws.data(f"Minv_mc_{cond}_{bin_key}"), 3)
+        pdf_mc[idx] = ROOT.RooHistPdf(f"pdf_mc_{cond}_{bin_key}", "pdf MC", axis[idx],
+                                      ws.data(f"Minv_mc_{cond}_{bin_key}"), 3)
 
         smearing[idx] = ROOT.RooGaussian(f"smearing_{cond}_{bin_key}",
                                          "Gaussian smearing", axis[idx], mean[idx], sigma[idx])
 
-        conv_pdf[idx] = ROOT.RooFFTConvPdf(f"conv_{cond}_{bin_key}", f"Convolution pdf",
+        conv_pdf[idx] = ROOT.RooFFTConvPdf(f"conv_{cond}_{bin_key}", "Convolution pdf",
                                            axis[idx], pdf_mc[idx], smearing[idx])
         conv_pdf[idx].setBufferFraction(bufFractions[idx])
         # conv_pdf[idx].setBufferStrategy(0)
@@ -125,19 +123,11 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
             f"nexp_{cond}_{bin_key}", f"nexp {cond}",
             n_events, n_events-5*(n_events**0.5), n_events+5*(n_events**0.5))
 
-        '''
-        Nsig[idx] = ROOT.RooRealVar(
-            f"nsig_{cond}_{bin_key}", "#signal events",
-            nexp[idx].getVal(), lims_num[idx][0]*nexp[idx].getVal(), nexp[idx].getMax())
-        Nbkg[idx] = ROOT.RooRealVar(
-            f"nbkg_{cond}_{bin_key}", "#background events",
-            lims_num[idx][1]*nexp[idx].getVal()/2., 0.0, lims_num[idx][1]*nexp[idx].getVal())
-        '''
- 
+
         Nsig[idx] = ROOT.RooRealVar(f"nsig_{cond}_{bin_key}", f"nsig {cond}",
                                     nexp[idx].getVal(), 0.5, 5*nexp[idx].getVal())
         Nbkg[idx] = ROOT.RooRealVar(f"nbkg_{cond}_{bin_key}", f"nbkg {cond}",
-                                    0.01*nexp[idx].getVal(), 0.5, 1.5*nexp[idx].getVal())           
+                                    0.01*nexp[idx].getVal(), 0.5, 0.5*nexp[idx].getVal())           
 
         sum_func[idx] = ROOT.RooAddPdf(
                             f"sum_{cond}_{bin_key}", "Signal+Bkg",
@@ -153,16 +143,17 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
         results[idx] = model[idx].fitTo(histo_pseudodata[idx],
                                         # ROOT.RooFit.Extended(1),
                                         ROOT.RooFit.Range("fitRange"),
-                                        ROOT.RooFit.Minimizer("Minuit2"),
-                                        ROOT.RooFit.SumW2Error(False),
+                                        ROOT.RooFit.Minimizer("Minuit2", "migrad"),
+                                        ROOT.RooFit.SumW2Error(sumw2_error_option),
                                         ROOT.RooFit.Strategy(fit_strategy[idx]),
+                                        # ROOT.RooFit.AsymptoticError(True),
                                         # ROOT.RooFit.MaxCalls(100000),
                                         ROOT.RooFit.Save(1),
                                         ROOT.RooFit.PrintLevel(verb)
                                         )
 
-        status_chi2 = check_chi2(histo_pseudodata[idx], model[idx], results[idx])
-        status = bool(status_chi2*fit_quality(results[idx], type_checks="bkg_fit"))
+        status_chi2 = check_chi2(histo_pseudodata[idx], model[idx], results[idx], type="pearson")
+        status = bool(status_chi2*fit_quality(results[idx], type_checks="benchmark"))
 
         print(status_chi2)
         print(status)
@@ -183,8 +174,8 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
             results[idx] = model[idx].fitTo(histo_pseudodata[idx],
                                             # ROOT.RooFit.Extended(1),
                                             ROOT.RooFit.Range("fitRange"),
-                                            ROOT.RooFit.Minimizer("Minuit2"),
-                                            ROOT.RooFit.SumW2Error(True),
+                                            ROOT.RooFit.Minimizer("Minuit2", "migrad"),
+                                            ROOT.RooFit.SumW2Error(sumw2_error_option),
                                             # ROOT.RooFit.AsymptoticError(True),
                                             ROOT.RooFit.Strategy(fit_strategy[idx]),
                                             # ROOT.RooFit.MaxCalls(100000),
@@ -192,10 +183,10 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
                                             ROOT.RooFit.PrintLevel(verb)
                                             )
     
-        if check_chi2(histo_pseudodata[idx], model[idx], results[idx]) is False:
+        if check_chi2(histo_pseudodata[idx], model[idx], results[idx], type="pearson") is False:
             results[idx].SetTitle("Chi2_not_passed")
 
-        fit_status[idx] = fit_quality(results[idx], type_checks="bkg_fit")
+        fit_status[idx] = fit_quality(results[idx], type_checks="benchmark")
 
         results[idx].SetName(f"results_{cond}_{bin_key}")
 
@@ -210,9 +201,9 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
 
 
     eff_mc, deff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
-                                            ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
-                                            sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
-                                            sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
+                                      ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
+                                      sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
+                                      sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
                 
     scale_factor = eff/eff_mc
     d_scale_factor = scale_factor*((d_eff/eff)**2 + (deff_mc/eff_mc)**2)**0.5
@@ -220,16 +211,11 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
 
 
     status = bool(fit_status[0]*fit_status[1])
-            
 
-    if status:
-        ws.Import(histo_pseudodata[0]), ws.Import(histo_pseudodata[1])
-        ws.Import(model[0]), ws.Import(model[1])
-        ws.Import(results[0]), ws.Import(results[1])
+    figpath = "figs/fit_iso_indep_mergedbins_pseudodata" if status is True else "figs/check_fits/pseudodata"
 
-        if figs:
-
-            plot_objects = {
+    if figs:
+        plot_objects = {
                 "pass" : {
                     "axis" : axis[1],
                     "data" : histo_pseudodata[1],
@@ -246,28 +232,23 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories, prob_bins,
                 "efficiency_mc" : [eff_mc, deff_mc],
                 "scale_factor" : [scale_factor, d_scale_factor]
             }
-            plot_fitted_pass_fail("indep", plot_objects, bin_key, pull=False,
-                                  figpath=f"figs/fit_iso_indep_mergedbins_pseudodata")
-                        
-    if not status:
-        res_pass.Print()
-        res_pass.correlationMatrix().Print()
-        print("****")
-        res_fail.Print()
-        res_fail.correlationMatrix().Print()
-        print("****")
-        print(res_pass.status(), res_fail.status())
-        print(res_pass.covQual(), res_fail.covQual())
-        print(res_pass.edm(), res_fail.edm())
-        print('\n')
+        plot_fitted_pass_fail("indep", plot_objects, bin_key, pull=False, figpath=figpath)
 
-        # prob_bins.append(bin_key)
+    if status is True:
+        ws.Import(histo_pseudodata[0]), ws.Import(histo_pseudodata[1])
+        ws.Import(model[0]), ws.Import(model[1])
+        ws.Import(results[0]), ws.Import(results[1])
+
 
     return res_pass, res_fail, status
 
 
+'''
+
 
 if __name__ == '__main__':
+
+    
 
     ROOT.gROOT.SetBatch(True)
     ROOT.PyConfig.IgnoreCommandLineOptions = True
@@ -305,10 +286,10 @@ if __name__ == '__main__':
         }
     }
 
-    workspace_name = "root_files/ws/ws_bkg_pseudodata.root"
+    workspace_name = "root_files/ws_bkg_pseudodata.root"
     
-    # ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
-    # ws.writeToFile(workspace_name)
+    ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
+    ws.writeToFile(workspace_name)
     
     file = ROOT.TFile(workspace_name, "READ")
     ws = file.Get("w")
@@ -326,15 +307,13 @@ if __name__ == '__main__':
 
     
     for bin_key in bins.keys():
-        res_pass, res_fail = independent_efficiency(ws, bin_key, "expo", bkg_categories, histos_result, prob_bins,
+        res_pass, res_fail = independent_efficiency(ws, bin_key, "expo", bkg_categories,
                                                     refit_numbkg=True, figs=True)
 
 
-
-    
-    
 
     t1 = time.time()
 
     print(f"TIME ELAPSED = {t1-t0}")
     
+    '''
