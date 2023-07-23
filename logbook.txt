@@ -443,7 +443,7 @@ errors in the presence of weights. This is slower but more accurate than SumW2Er
 14-15/07/2023
 -------------
 Indicazioni da Bianchini:
-  - SumW2 è giusto per il fit sugli pseudodati
+  - SumW2 è giusto per il fit sugli pseudodati (EDIT: e invece no!)
   - "AsymptoticError" non si sa esattamente cosa faccia... ma nulla di particolarmente promettente
   - Vanno bene come controllo i parametri "status" e "edm" di HESSE
 
@@ -461,25 +461,150 @@ a cambiare i valori iniziali di nsig e nbkg: mi sembra che infatti alcuni proble
 sulla sigma sono stati risolti abbatanza direttamente.
 
 
+17-19/07/2023
+-------------
+Sistemati i plot dei bkg con un binning in massa variabile, a seconda di quanti bin hanno riempimento nullo
+o soto una certa soglia. I plot sono tutti salvati nella cartella "figs/bkg_and_sig_mc"
+
+Modificata la funzione che confronta i risultati, che adesso riceve in input il workspace di "benchmark" e
+di "test", oltre che ai binning necessari a creare gli istogrammi. Per queste modifiche è stata modificata 
+la classe results_manager: adesso può importare un ws già completo (utile ad es. per un ciclo di fit finito),
+oppure può caricare via via dei risultati (utile durante un ciclo di fit per salvare i bin dove il fit
+fallisce).
+
+Notato che un sumW2 era messo False nel fit sugli pseudodata -> Vanno quindi rifatti...
+ATTENZIONE: il valore di EDM riportato quando sumw2 è attivo non è quello corretto, poiché probabilmente è 
+calcolato sulla matrice di covarianza non corretta; viene dato qualche dettaglio in più sul forum.
+
+Fit su pseudodata corretto (workspace "ws_bkg_pseudodata", su merged bins pt-eta_8bins):
+  - Run 1: default settings   ->  97 problematic bins 
+  - Run 2: Nbins->10000, bufFrac=0.1  ->  94 prob. bins
+  - Run 3: sigma(*1*, *0.05*, 5), nbkg(*0.01nexp*, 0.5, 1.5nexp), nsig(*nexp*, 0.5, *5nexp*) ->  89 prob. bins
+  - Run 4: Nbins->5000, bufFrac->0.25 ->  89 prob. bins
+  - Run 5: nbkg(*0.5nexp*, 0.5, 1.5nexp), nsig(*0.5nexp*, 0.5, *1.5nexp*)   ->  89 prob. bins
+  - Run 6: check_chi2 tolto   ->  85 prob. bins
+  - Run 7: Nbins->1000, bufFrac->0.5, sigma(1, *0.2*, 5)  ->  84 prob. bins
+  - Run 8: sigma(1, *0.4*, *2*)   ->  82 prob. bins
 
 
+Per ora questo è ciò che si riesce a raggiungere. Si potrebbe provare a mettere constraint più stretti
+sulla sigma di convoluzione, però ho la sensazione che questo vada a falsare un po' la procedura, poiché
+tale parametro post-fit risulta al limite. È un problema questa cosa?
+Ho provato a fare un giro con AsymptoticError (che usa gli sWeights forse...) e il numero di bin problematici
+scende a 26. Potrebbe meritare approfondire questa opzione, dato che con Sumw2 si arriva a un punto morto
 
 
+20/07/2023
+----------
+Fit sui dati, sui 720 bin di default, con ipotesi di bkg data dalla pdf che si estrae dai MC (per ora si
+considera solo la pdf a ordine zero, che quindi non tiene di conto delle incertezze del dataset MC; esiste
+il metodo di BARLOW-BEESTON, implementato anche nei tutorial, che permette di affrontare questo problema):
+  - Run 1: default settings   ->  18 problematic bins
+  - Run 2: NBINS->10000   ->  14 prob. bins
+  - Run 3: bufFrac_fail->0.1  -> 13 prob. bins
+  - Run 4: sigma(*1*, *0.4*, 5)  -> 7 prob. bins 
+
+I bin problematici presentano praticamente tutti lo stesso problema: il minimizer riesce a trovare un minimo
+che gli sembra buono e riesce a invertire la covMatrix, ma non viene passato il test di chi2, poiché la pdf 
+post-fit risulta grandemente influenzata da eventi di bkg concentrati in singoli bin di Minv. Quello che si
+potrebbe fare è ridurre il binning in massa, seguendo una procedura adattiva simile a quella utilizzata per
+plottare i background stessi
+
+QUESTIONI APERTE:
+  - Fit su pseudodata: che strategia si usa per andare avanti? Possibilità:
+      1) covQual ==3 or covQual==2 e status==0
+      2) AsymptoticError sui bin problematici
+      3) SumW2=False
+  - Fit con ipotesi mcbkg: come si trattano i bin con pochi eventi di bkg? La pdf può essere prodotta anche
+    con un binning inferiore? Oppure merita più lavorare su merged bins in eta come per i bkg_studies?
+
+
+Fit sui dati, con mergedbins (pt, eta_8bins), con ipotesi di bkg data dalla pdf che si estrae dai MC (sempre
+all'ordine 0): girano tutti alla prima! Ora va visto come eventualmente estrarre l'incertezza sugli SF nel 
+binnaggio più fine, ma è già qualcosa averlo come riferimento. Per esempio, per i bin fini dove il fit
+fallisce si potrebbe utilizzare l'informazione del corrispondente macro-bin
+
+Questione fit su pseudodati: vogliamo valutare quanto è impattante settare sumW2=False e/o poter permettere 
+covQual=2. Sono stati fatti quindi due run di fit:
+  F) sumW2=False, covQual==3, status==0,1
+  T) sumW2=True, covQual==2,3, status==0
+  -> confrontiamo quindi le efficienze ottenute con queste due settings e con le efficienze ottenute con la
+     run di fit precedente "G" (che aveva par. di qualità "massimi" e sumw2 attivo):
+      - G vs F: si testa l'impatto di sumW2=False; la differenza sulle efficienze ha mean~1e-7 e std~1e-6;
+                la differenza tra gli errori ha mean~std~1e-5, con un evento a 2e-4 che indicherebbe una
+                (possibile) sottostima dell'errore da parte del metodo sumw2=False.
+      - G vs T: si testa l'impatto di covQual>2, tenendo sumW2=True; la differenza sulle efficienze ha
+                mean~1e-7 e std~1e-6; la differenza tra gli errori ha mean~1e-5 e std~1e-4, con due eventi 
+                staccati verso 1e-3 (sovrastima dell'errore da parte di covQual>2?); questi due bin sono
+                bin diversi da quello particolare osservato sopra
+      - F vs T: impatto combinato, valutato su tutti i 120 bin, della variazione nelle richieste di qualità;
+                differenza sulle efficienze ha mean~1e-7 e std~1e-6; differenza sugli errori ha mean~7e-4 e
+                std~1e-3, con però una coda che comprende una ventina di eventi circa tra 1e-3 a 1e-2 -> in 
+                parte questo è anche atteso dalla combinazione dei due effetti
+
+I workspace relativi a questi fit sono nella cartella root_files/prove_sumw2.
+
+
+21/07/2023
+----------
+Confronto con Bianchini: l'opzione sumW2=True non si capisce come possa essere utile. Di fatto, quello che
+verrebbe apportato è una correzione all'errore calcolando la matrice di covarianza corretta V'=V(C^-1)V, 
+dove C è la matrice di covarianza calcolata usando i pesi al quadrato, ma essendo il nostro un fit di
+Likelihood non ha senso fare questa cosa. Se si vuole tenere conto degli errori (non poissoniani) sul valore 
+centrale bisogna implementare il metodo di BARLOW-BEESTON.
+
+METRICHE da utilizzare d'ora in poi per il confronto tra due risultati di efficienza ottenuti da diverse 
+modellizzazioni del background ("test" e "bmark"):
+    - DELTA: test-bmark
+    - DELTA ERROR (eventuale): d_test-d_bmark
+    - PULL: (test-bmark)/d_bmark
+
+Quindi adesso ripetiamo la run di fit sugli pseudodati con sumW2=False, covQual=3, status=0,1 e estraiamo dai
+risultati il bias sull'efficienza dovuto alla procedura di fit. Fit completato in 4/5 run.
+Essendo l'obbiettivo di questa analisi valutare il bias dovuto alla procedura di fit (con ipotesi expo),
+si calcola il PULL (dove l'ipotesi expo ha il ruolo di test), il RATIO e il RATIO_ERROR (per verificare che
+l'errore che si ricava dal fit sia consistente con quello ricavato dal MC)Ratio_error
+
+Risultati:
+    - il pull ha una distribuzione circa gaussiana, da un rapido fit da TBrowser si stima mu=-0.12+-0.04 e
+      sigma=0.082+-0.005.
+    - il rapporto fra gli errori tende ad avere valori maggiori di 1, come ci possiamo anche aspettare dato
+      che il fit aggiunge delle correlazioni tra parametri che inevitabilmente fanno crescere l'incertezza.
 
 
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-TO-DO LIST BACKGROUNDS
-----------------------
-- Ottenere da Rajarshi il weightsum del sample di segnale Z->mumu e normalizzare talew dataset a lumi_data
-- Fare un plot dei bkg confrontati con il dataset di segnale, per vedere che la normalizzazione abbia senso
-- Confrontare il rapporto B/(S+B) che si ottiene con i MC con quello ottenuto col fit sui dati
-- Valutare l'impatto delle differenze del punto prima sulle efficienze: 
-    1) costruire pseudodata composto da segnale e bkg conf frazione nota;
-    2) far girare l'algoritmo di fit su questo dataset
-    3) confrontare le efficienze ottenute un questo modo con quelle vere (note dai MC) -> eventuali bias
+
+To-do list:
+ - fit con bin da 2 Gev, sia nominale che con ipotesi mcbkg (se va bene quello ) -> confronto eff 
+ - 2 nuisance par. di background, uno per Ztautau uno per TT 
+ - background pdf data da roohistpdf da mc tot in macro bin (merge sia di pt sia in eta)
+ - forme funzionali per i mc (se sopra non si hanno risultati buoni)
+ - applichiamo ai trigger
+ - guardiamo i tracking
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+
+SCHEMA DI TESI 
+--------------
+- MS e fit ew
+- LHC e CMS
+- ricostruzione mu -> TDR e articoli   (riguardare la ricostruzione anche nel tracker, che non 
+  si era fatta inizialmente, vedere articoli su allineamento e strategia di determinazione delle hit)
+- w mass: dettagli di misura in generale (lep, cdf, d0) e specifiche a LHC (atlas, lhcb) 
+- Misure di efficienza di mu in CMS:
+  - Tnp 
+  - Selezioni Steve 
+  - Tool in uso -> dettagli di roofit, integrazioni, convoluzioni, minuit 
+  - Risultati: confronto con tool standard, bkg nuovi
+- Impatto delle attuali incertezze di ricostruzione dei mu su mW
+
 
 
 
