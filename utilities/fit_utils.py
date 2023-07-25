@@ -50,12 +50,15 @@ def llr_eval(histo, res):
 
     for idx in range(histo.numEntries()):
         k = histo.weight(idx)
-        max_ll_data += 2*(k*ROOT.TMath.Log(k) - k)
+        if k == 0:
+            max_ll_data += 2
+        elif k>0:
+            max_ll_data += 2*(k*ROOT.TMath.Log(k) - k)
 
     llr_val = max_ll_data + 2*res.minNll()
 
     pars = res.floatParsFinal()
-    ndof = pars.getSize()
+    ndof = histo.numEntries() - pars.getSize()
 
     return llr_val, ndof
 
@@ -63,7 +66,7 @@ def llr_eval(histo, res):
 
 ###############################################################################
 
-def check_chi2(histo, pdf, res, type="pearson"):
+def check_chi2(histo, pdf, res, type="pearson", nsigma=15):
     """
     """
     if type == "pearson":
@@ -72,7 +75,7 @@ def check_chi2(histo, pdf, res, type="pearson"):
     elif type == "llr":
         chi2val, ndof = llr_eval(histo, res)
     
-    status_chi2 = bool(abs(chi2val - ndof) < 15*((2*ndof)**0.5))
+    status_chi2 = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
 
     return status_chi2
 

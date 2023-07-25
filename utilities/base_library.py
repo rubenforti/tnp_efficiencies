@@ -18,7 +18,8 @@ binnings = {
     "eta_16bins" : array('d', [round(-2.4 + i*0.3, 2) for i in range(17)]),
     "eta_8bins" : array('d', [round(-2.4 + i*0.6, 2) for i in range(9)]),
     "eta_4bins" : array('d', [round(-2.4 + i*1.2, 2) for i in range(5)]),
-    "mass_custom" : array('d', [60 + 4*i for i in range(16)]),
+    "mass_2GeV" : array('d', [60 + 2*i for i in range(31)]),
+    "mass_3GeV" : array('d', [60 + 3*i for i in range(21)]),
     }
 
 lumi_data = 16.8  # fb^-1

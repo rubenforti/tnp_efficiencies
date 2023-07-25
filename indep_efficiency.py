@@ -5,6 +5,7 @@ import ROOT
 import time
 import os
 import sys
+import copy
 from utilities.results_utils import results_manager, efficiency_from_res
 from utilities.plot_utils import plot_bkg_on_histo, plot_fitted_pass_fail
 from utilities.dataset_utils import import_pdf_library
@@ -12,189 +13,151 @@ from utilities.base_library import eval_efficiency, sumw2_error
 from utilities.fit_utils import fit_quality, check_chi2
 
 
-def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=False, verb=-1, figs=False):
-  
+def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-1, 
+                           figs=False, figpath={"good":"figs/stuff", "check":"figs/check/stuff"}):
+    """
+    """
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
+    
+    settings = copy.deepcopy(settings_dict)
 
-    # ----------------------------------
-    #  Initial parameters - MODIFY HERE
-    # ----------------------------------
-    NBINS = [2000, 2000]
-    bufFractions = [0.5, 0.5]
+    axis, histo_data = {}, {}
+    smearing, pdf_mc, conv_pdf, bkg_pdf, sum_pdf, model_pdf = {}, {}, {}, {}, {}, {}
+    results, fit_status = {}, {}
 
-    fit_strategy = [2, 2]
 
-    # Lower limit for NSIG and upper limit for NBKG, in terms of total events in the histogram, for pass and fail respectively
-    lims_num = [[0.5, 0.2], [0.5, 0.2]]
+    for flag in ["pass", "fail"]:
 
-    mean_p = ROOT.RooRealVar(
-        f"mean_pass_{bin_key}", "mean pass", 0, -5.0, 5.0)
-    sigma_p = ROOT.RooRealVar(
-        f"sigma_pass_{bin_key}", "sigma pass", 0.5, 0.1, 5.0)
-    mean_f = ROOT.RooRealVar(
-        f"mean_fail_{bin_key}", "mean fail", 0, -5.0, 5.0)
-    sigma_f = ROOT.RooRealVar(
-        f"sigma_fail_{bin_key}", "sigma fail", 0.5, 0.1, 5.0)
+        axis.update({flag : ws.var(f"x_{flag}_{bin_key}")})
+        axis[flag].setRange("fitRange", settings["fit_range"][0], settings["fit_range"][1])
+        axis[flag].setBinning(ROOT.RooUniformBinning(axis[flag].getRange("fitRange")[0], 
+                                                     axis[flag].getRange("fitRange")[1], 
+                                                     settings[flag]["Nbins"]), "cache")
 
-    if bkg_shape == "expo":
-        tau_p = ROOT.RooRealVar(
-            f"tau_pass_{bin_key}", "tau pass", 0.0, -5, 5)
-        tau_f = ROOT.RooRealVar(
-            f"tau_fail_{bin_key}", "tau fail", 0.0, -5, 5)
-        tau = [tau_f, tau_p]
-    elif bkg_shape == "mixed":
-        pass
-    elif bkg_shape == "cmsshape":
-        pass
-    else:
-        print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
-        sys.exit()
+        histo_data.update({flag : ws.data(f"Minv_data_{flag}_{bin_key}")})
 
-    # ------------------------------
-    #  Histograms and PDFs building
-    # ------------------------------
-    mean, sigma = [mean_f, mean_p], [sigma_f, sigma_p]
-    axis, histo_data, pdf_mc = [0, 0], [0, 0], [0, 0]
-    smearing, conv_pdf, background = [0, 0], [0, 0], [0, 0]
+        # --------------------- Parameters definition -------------------------------------------------------
+        for obj_key in settings[flag]["pars"].keys():
+            pars_obj = settings[flag]["pars"]
+            settings[flag]["pars"].update({
+                obj_key : ROOT.RooRealVar(f"{obj_key}_{flag}_{bin_key}", f"{obj_key} {flag}", 
+                                          pars_obj[obj_key][0], pars_obj[obj_key][1], pars_obj[obj_key][2])})
+        
+        for obj_key in settings[flag]["norm"].keys():
+            norm_obj = settings[flag]["norm"][obj_key]
+            for idx in range(3):
+                if (type(norm_obj[idx]) is str) and ("n" in norm_obj[idx]):
+                    norm_obj[idx] = float(norm_obj[idx].replace("n",""))*histo_data[flag].sumEntries()
+                else:
+                    norm_obj[idx] = float(norm_obj[idx])
+            settings[flag]["norm"].update({
+                obj_key : ROOT.RooRealVar(f"{obj_key}_{flag}_{bin_key}", f"{obj_key} {flag}",
+                                          norm_obj[0], norm_obj[1], norm_obj[2])})
+        
+        # -------------------- Signal PDF -------------------------------------------------------------------
+        smearing.update({
+            flag : ROOT.RooGaussian(f"smearing_{flag}_{bin_key}", "Gaussian smearing", 
+                                    axis[flag], settings[flag]["pars"]["mu"], settings[flag]["pars"]["sigma"])})
+        print(type(smearing[flag])) 
+        pdf_mc.update({
+            flag : ROOT.RooHistPdf(f"pdf_mc_{flag}_{bin_key}", "pdf MC", 
+                                   axis[flag], ws.data(f"Minv_mc_{flag}_{bin_key}"), 3)})
+        
+        conv_pdf.update({
+            flag : ROOT.RooFFTConvPdf(f"conv_{flag}_{bin_key}", f"Convolution pdf", 
+                                      axis[flag], pdf_mc[flag], smearing[flag])})
+        conv_pdf[flag].setBufferFraction(settings[flag]["bufFraction"])
 
-    nexp, Nsig, Nbkg = [0, 0], [0, 0], [0, 0]
-    sum_func, model, results, fit_status = [0, 0], [0, 0], [0, 0], [0, 0]
-
-    for cond in ["pass", "fail"]:  # PASS has index 1, FAIL has index 0
-
-        idx = 1 if cond == "pass" else 0
-
-        axis[idx] = ws.var(f"x_{cond}_{bin_key}")
-        axis[idx].setRange("fitRange", 60.0, 120.0)
-
-        # binning = ROOT.RooUniformBinning(
-        #     axis.getRange("fitRange")[0], axis.getRange("fitRange")[1], NBINS[idx])
-        axis[idx].setBinning(
-            ROOT.RooUniformBinning(axis[idx].getRange("fitRange")[0],
-                                   axis[idx].getRange("fitRange")[1], NBINS[idx]), "cache")
-
-        histo_data[idx] = ws.data(f"Minv_data_{cond}_{bin_key}")
-
-        pdf_mc[idx] = ROOT.RooHistPdf(
-            f"pdf_mc_{cond}_{bin_key}", "pdf MC", axis[idx],
-            ws.data(f"Minv_mc_{cond}_{bin_key}"), 3)
-
-        smearing[idx] = ROOT.RooGaussian(f"smearing_{cond}_{bin_key}",
-                                         "Gaussian smearing", axis[idx], mean[idx], sigma[idx])
-
-        conv_pdf[idx] = ROOT.RooFFTConvPdf(f"conv_{cond}_{bin_key}", f"Convolution pdf",
-                                           axis[idx], pdf_mc[idx], smearing[idx])
-        conv_pdf[idx].setBufferFraction(bufFractions[idx])
-        # conv_pdf[idx].setBufferStrategy(0)
-        # conv_pdf[idx].setOperMode(3)
-
-        if bkg_shape == "expo":
-            background[idx] = ROOT.RooExponential(f"expo_bkg_{cond}_{bin_key}",
-                                                  "Exponential background", axis[idx], tau[idx])
-        elif bkg_shape == "mixed":
+        # -------------------- Background PDF ---------------------------------------------------------------
+        if settings[flag]["bkg_shape"] == "expo":
+            bkg_pdf.update({
+                flag : ROOT.RooExponential(f"expo_bkg_{flag}_{bin_key}", "Exponential background",
+                                           axis[flag], settings[flag]["pars"]["tau"])})
+        elif settings[flag]["bkg_shape"] == "mixed":
             pass
-        elif bkg_shape == "cmsshape":
+        elif settings[flag]["bkg_shape"] == "cmsshape":
             pass
         else:
             print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
             sys.exit()
 
-        # -----------------------
-        #  Final models and fits
-        # -----------------------
+        # -------------------- Final models and fits --------------------------------------------------------
+        sum_pdf.update({
+            flag : ROOT.RooAddPdf(f"sum_{flag}_{bin_key}", "Signal+Bkg", 
+                                  ROOT.RooArgList(conv_pdf[flag], bkg_pdf[flag]), 
+                                  ROOT.RooArgList(settings[flag]["norm"]["nsig"], 
+                                                  settings[flag]["norm"]["nbkg"]))})
+        sum_pdf[flag].setNormRange("fitRange")
 
-        n_events = histo_data[idx].sumEntries()
+        model_pdf.update({flag : ROOT.RooAddPdf(sum_pdf[flag], f'PDF_{flag}_{bin_key}')})
+        model_pdf[flag].setNormRange("fitRange")
 
-        nexp[idx] = ROOT.RooRealVar(
-            f"nexp_{cond}_{bin_key}", f"nexp {cond}",
-            n_events, n_events-5*(n_events**0.5), n_events+5*(n_events**0.5))
+        res = model_pdf[flag].fitTo(histo_data[flag],
+                                    # ROOT.RooFit.Extended(1),
+                                    ROOT.RooFit.Range("fitRange"),
+                                    ROOT.RooFit.Minimizer("Minuit2"),
+                                    ROOT.RooFit.Strategy(settings[flag]["fit_strategy"]),
+                                    # ROOT.RooFit.MaxCalls(100000),
+                                    ROOT.RooFit.Save(1),
+                                    ROOT.RooFit.PrintLevel(verb)
+                                    )
+        results.update({flag : res})
 
-        '''
-        Nsig[idx] = ROOT.RooRealVar(
-            f"nsig_{cond}_{bin_key}", "#signal events",
-            nexp[idx].getVal(), lims_num[idx][0]*nexp[idx].getVal(), nexp[idx].getMax())
-        Nbkg[idx] = ROOT.RooRealVar(
-            f"nbkg_{cond}_{bin_key}", "#background events",
-            lims_num[idx][1]*nexp[idx].getVal()/2., 0.0, lims_num[idx][1]*nexp[idx].getVal())
-        '''
- 
-        Nsig[idx] = ROOT.RooRealVar(f"nsig_{cond}_{bin_key}", f"nsig {cond}",
-                                    0.9*nexp[idx].getVal(), 0.5, 1.5*nexp[idx].getVal())
-        Nbkg[idx] = ROOT.RooRealVar(f"nbkg_{cond}_{bin_key}", f"nbkg {cond}",
-                                    0.1*nexp[idx].getVal(), 0.5, 1.5*nexp[idx].getVal())           
-
-        sum_func[idx] = ROOT.RooAddPdf(
-                            f"sum_{cond}_{bin_key}", "Signal+Bkg",
-                            ROOT.RooArgList(conv_pdf[idx], background[idx]),
-                            ROOT.RooArgList(Nsig[idx], Nbkg[idx]))
-
-        # sum_func[idx].setNormRange("fitRange")
-
-        model[idx] = ROOT.RooAddPdf(
-            sum_func[idx], f'PDF_{cond}_{bin_key}')
-
-        model[idx].setNormRange("fitRange")
-
-        results[idx] = model[idx].fitTo(histo_data[idx],
-                                        # ROOT.RooFit.Extended(1),
-                                        ROOT.RooFit.Range("fitRange"),
-                                        ROOT.RooFit.Minimizer("Minuit2"),
-                                        ROOT.RooFit.Strategy(fit_strategy[idx]),
-                                        # ROOT.RooFit.MaxCalls(100000),
-                                        ROOT.RooFit.Save(1),
-                                        ROOT.RooFit.PrintLevel(verb)
-                                        )
-
-        status_chi2 = check_chi2(histo_data[idx], model[idx], results[idx])
-        status = bool(status_chi2*fit_quality(results[idx], type_checks="benchmark"))
+        status_chi2 = check_chi2(histo_data[flag], model_pdf[flag], results[flag], type="pearson")
+        status = bool(status_chi2*fit_quality(results[flag], type_checks="benchmark"))
 
         print(status_chi2)
         print(status)
+        
+        pars_final = results[flag].floatParsFinal()
+        nsig_fitted = pars_final.find(f"nsig_{flag}_{bin_key}")
+        nbkg_fitted = pars_final.find(f"nbkg_{flag}_{bin_key}")
 
-        low_nbkg = (Nbkg[idx].getVal() < 0.005*Nsig[idx].getVal())
-        print(Nbkg[idx].getVal())
-        print(Nsig[idx].getVal())
+        low_nbkg = (nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal())
+        print(settings[flag]["norm"]["nbkg"].getVal())
+        print(settings[flag]["norm"]["nsig"].getVal())
         print(low_nbkg)
 
-        if (status is False) and refit_numbkg and low_nbkg and bkg_shape=='expo':
-            results[idx].Print()
-            tau[idx].setVal(1)
-            tau[idx].setConstant()
-            Nbkg[idx].setVal(0)
-            Nbkg[idx].setConstant()
+        if (status is False) and refit_numbkg and low_nbkg:
+            results[flag].Print()
+            settings[flag]["pars"]["tau"].setVal(1)
+            settings[flag]["pars"]["tau"].setConstant()
+            settings[flag]["norm"]["nbkg"].setVal(0)
+            settings[flag]["norm"]["nbkg"].setConstant()
             print("REFITTING WITHOUT BACKGROUND")
             print("\n\n\n\n")
-            results[idx] = model[idx].fitTo(histo_data[idx],
-                                            # ROOT.RooFit.Extended(1),
-                                            ROOT.RooFit.Range("fitRange"),
-                                            ROOT.RooFit.Minimizer("Minuit2"),
-                                            ROOT.RooFit.Strategy(fit_strategy[idx]),
-                                            # ROOT.RooFit.MaxCalls(100000),
-                                            ROOT.RooFit.Save(1),
-                                            ROOT.RooFit.PrintLevel(verb)
-                                            )
+            res = model_pdf[flag].fitTo(histo_data[flag],
+                                       # ROOT.RooFit.Extended(1),
+                                       ROOT.RooFit.Range("fitRange"),
+                                       ROOT.RooFit.Minimizer("Minuit2"),
+                                       ROOT.RooFit.Strategy(settings[flag]["fit_strategy"]),
+                                       # ROOT.RooFit.MaxCalls(100000),
+                                       ROOT.RooFit.Save(1),
+                                       ROOT.RooFit.PrintLevel(verb)
+                                       )
+            results.update({flag : res})
     
-        if check_chi2(histo_data[idx], model[idx], results[idx]) is False:
-            results[idx].SetTitle("Chi2_not_passed")
+        if check_chi2(histo_data[flag], model_pdf[flag], results[flag]) is False:
+            results[flag].SetTitle("Chi2_not_passed")
 
-        fit_status[idx] = fit_quality(results[idx], type_checks="benchmark")
+        fit_status[flag] = fit_quality(results[flag], type_checks="benchmark")
 
-        results[idx].SetName(f"results_{cond}_{bin_key}")
+        results[flag].SetName(f"results_{flag}_{bin_key}")
 
 
-    eff, d_eff = efficiency_from_res(results[1], results[0])
-
-    status = bool(fit_status[0]*fit_status[1])
+    status = bool(fit_status["pass"]*fit_status["fail"])
 
     # ----------------------------------
     #  Quality checks (and plots) - NEW
     # ----------------------------------
     if status:
-        ws.Import(model[0]), ws.Import(model[1])
-        ws.Import(results[0]), ws.Import(results[1])
+        ws.Import(model_pdf["pass"]), ws.Import(model_pdf["fail"])
+        ws.Import(results["pass"]), ws.Import(results["fail"])
         if figs:
             
+            eff, d_eff = efficiency_from_res(results["pass"], results["fail"])
+
             eff_mc, deff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
                                               ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
                                               sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
@@ -203,87 +166,82 @@ def independent_efficiency(ws, bin_key, bkg_shape, refit_numbkg=False, test_bkg=
             scale_factor = eff/eff_mc
             d_scale_factor = scale_factor*((d_eff/eff)**2 + (deff_mc/eff_mc)**2)**0.5
 
-            plot_objects = {
-                "pass" : {
-                    "axis" : axis[1],
-                    "data" : histo_data[1],
-                    "model" : model[1],
-                    "res" : results[1],
-                },
-                "fail" : {
-                    "axis": axis[0],
-                    "data": histo_data[0],
-                    "model": model[0],
-                    "res": results[0],
-                },
-                "efficiency" : [eff, d_eff],
-                "efficiency_mc" : [eff_mc, deff_mc],
-                "scale_factor" : [scale_factor, d_scale_factor]
-            }
-            plot_fitted_pass_fail("indep", plot_objects, bin_key, pull=False,
-                                  figpath=f"figs/fit_iso_old")
-            
-            
-    else:
-        if figs:
-            pass
-            '''
-            bkg_names =[background[0].GetName(), background[1].GetName()]
-            plot_pass_and_fail(axis, histo_data, model, bkg_names, 
-                                name=f"figs/check_fits/bin_{bin_key}.pdf")
-            '''
-        
-    res_pass, res_fail = results
+            plot_objects={}
 
-    '''
-    if test_bkg is True:
-        null_bkg = llr_test_bkg(histo_data, model)
-        present_bkg = not null_bkg
-        print(f"Background is accepted? {present_bkg}")
-    '''
+            fig_folder = figpath["good"] if status is True else figpath["check"]
 
-    return res_pass, res_fail, status
+            for flag in ["pass", "fail"]:
+                plot_objects.update({flag : {
+                                        "axis" : axis[flag],
+                                        "data" : histo_data[flag],
+                                        "model" : model_pdf[flag],
+                                        "res" : results[flag]}
+                                    })
+            plot_objects.update({"efficiency" : [eff, d_eff],
+                                 "efficiency_mc" : [eff_mc, deff_mc],
+                                 "scale_factor" : [scale_factor, d_scale_factor]
+                                })
+            plot_fitted_pass_fail("indep", plot_objects, bin_key, pull=False, figpath=fig_folder)
 
 
+    return results["pass"], results["fail"], status
+
+      
 
 if __name__ == '__main__':
+
+
+    dizionario = {
+        "strategy" : "indep",
+        "id_name" : "AAAAAAAAAAAAAAAAAA",
+        "fit_range" : [60.0, 120.0],
+        "run" : 1,
+        "pass" : {
+            "fit_strategy" : 2,
+            "Nbins" : 2000,
+            "bufFraction" : 0.5,
+            "bkg_shape" : "expo", 
+            "pars" : {
+                "mu" : [0.0, -5.0, 5.0],
+                "sigma" : [0.5, 0.1, 5.0],
+                "tau" : [0.0, -5.0, 5.0],
+            },
+            "norm" : {
+                "nsig" : ["0.9n", 0.5, "1.5n"],
+                "nbkg" : ["0.1n", 0.5, "1.5n"],
+            },
+        },
+        "fail" : {
+            "fit_strategy" : 2,
+            "Nbins" : 2000,
+            "bufFraction" : 0.5,
+            "bkg_shape" : "expo", 
+            "pars" : {
+                "mu" : [0.0, -5.0, 5.0],
+                "sigma" : [0.5, 0.1, 5.0],
+                "tau" : [0.0, -5.0, 5.0],
+            },
+            "norm" : {
+                "nsig" : ["0.9n", 0.5, "1.5n"],
+                "nbkg" : ["0.1n", 0.5, "1.5n"],
+            }
+        }
+    }
+
 
     ROOT.gROOT.SetBatch(True)
     ROOT.PyConfig.IgnoreCommandLineOptions = True
 
     t0 = time.time()
 
-    custom_pdfs = ['RooCBExGaussShape',
-                   'RooDoubleCBFast', 'RooCMSShape', 'my_double_CB']
-    import_pdf_library(custom_pdfs[2])
-
     type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
     t = type_eff[3]
 
-    # results = results_manager("indep")
+    bin_key = "[24.0to26.0][-2.4to-2.3]"
 
-    '''
-    bins_pt = [num for num in range(1, 2)]
-    bins_eta = [num for num in range(1, 49)]
-    '''
+    file = ROOT.TFile("results/benchmark_iso/ws_iso_indep_benchmark.root")
+    ws = file.Get("w")
 
-    '''
-    # BIN NEI QUALI NON SI È RIUSCITO AD AVERE UN BUON FIT CON STRATEGIA "MIXED"
-    bin_keys = ['1,1', '1,4', '1,11', '1,14', '1,17', '1,19', '1,20',
-                '1,24', '1,27', '1,30', '1,31', '1,40', '1,41', '1,42', '1,45']
-    '''
+    results_pass, results_fail, status = independent_efficiency(ws, bin_key, "expo", dizionario)
 
-    bin_keys = ['6,7', '6,17', '6,23', '9,22', '10,21']
-
-    bins_pt, bins_eta = [], []
-
-    for key in bin_keys:
-        bins_pt.append(key.split(',')[0])
-        bins_eta.append(key.split(',')[1])
-
-    bins = (bins_pt, bins_eta)
-    # independent_efficiency(ws, bbi)
-
-    t1 = time.time()
-
-    print(f"TIME ELAPSED = {t1-t0}")
+    results_pass.Print("v")
