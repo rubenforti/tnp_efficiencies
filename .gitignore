@@ -154,3 +154,9 @@ results/bmark_iso_2gev/fit_plots/
 bkg_results/fit_iso_indep_mcbkg_2gev/
 
 
+# Workspaces (risk that become too heavy)
+bkg_results/ws/
+results/ws/
+
+
+
