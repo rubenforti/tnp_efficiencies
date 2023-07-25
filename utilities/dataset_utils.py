@@ -62,12 +62,12 @@ def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_sca
         print(f"{bin_pt}, {bin_eta}")
         #sys.exit()
 
-    # Needed a temporary roodatahist to correctly set the binning (the axis binning instead of the th1 one)
-    # to the output one
-    tmp_roohisto = ROOT.RooDataHist("tmp_roohisto", "tmp_roohisto", ROOT.RooArgList(axis), th1_histo)
+    numBins = axis.getBinning().numBins()
+    th1_histo.Rebin(int(th1_histo.GetNbinsX()/numBins))
+
     
     roohisto = ROOT.RooDataHist(f"Minv_{type_set}_{flag}_{bin_key}", f"Minv_{type_set}_{flag}_{bin_key}",
-                                ROOT.RooArgList(axis), tmp_roohisto)
+                                ROOT.RooArgList(axis), th1_histo)
     
     return roohisto
 

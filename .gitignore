@@ -143,9 +143,14 @@ libCpp/*.d
 root_files/*.root
 root_files/
 
-# Temporary fig repository
 
+# Temporary fig repository
 figs/
 results/benchmark_iso/fit_plots/
 results/benchmark_iso/fit_plots_old/
 results/benchmark_iso_sim/fit_plots/
+results/bmark_iso_2gev/fit_plots/
+
+bkg_results/fit_iso_indep_mcbkg_2gev/
+
+

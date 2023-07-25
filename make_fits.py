@@ -14,20 +14,18 @@ from utilities.fit_utils import check_existing_fit, fit_quality
 from utilities.dataset_utils import ws_init
 
 
-bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
-
-
 
 settings_dict = {
     "strategy" : "indep",
     "id_name" : "AAAAAAAAAAAAAAAAAA",
     "fit_range" : [60.0, 120.0],
+    "bkg_categories" : ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"],
     "run" : 1,
     "pass" : {
         "fit_strategy" : 2,
         "Nbins" : 2000,
         "bufFraction" : 0.5, 
-        "bkg_shape": "expo",
+        "bkg_shape": "mc_raw",
         "pars" : {
             "mu" : [0.0, -5.0, 5.0],
             "sigma" : [0.5, 0.1, 5.0],
@@ -40,17 +38,17 @@ settings_dict = {
     },
     "fail" : {
         "fit_strategy" : 2,
-        "Nbins" : 2000,
+        "Nbins" : 5000,
         "bufFraction" : 0.5,
-        "bkg_shape" : "expo",
+        "bkg_shape" : "mc_raw",
         "pars" : {
             "mu" : [0.0, -5.0, 5.0],
-            "sigma" : [0.5, 0.1, 5.0],
+            "sigma" : [1, 0.35, 5.0],
             "tau" : [0.0, -5.0, 5.0],
         },
         "norm" : {
-            "nsig" : ["0.9n", 0.5, "1.5n"],
-            "nbkg" : ["0.1n", 0.5, "1.5n"]
+            "nsig" : ["1n", "0.5n", "3n"],
+            "nbkg" : ["0.05n", 0.05, "1n"]
         }
     }
 }
@@ -183,21 +181,25 @@ if __name__ == '__main__':
     # ------------------
 
 
-
+    '''
     filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
     filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
     dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
-    
+    '''
+
+    filename_data = "root_files/datasets/tnp_iso_data_vertexWeights1_oscharge1.root"
+    filename_mc = "root_files/datasets/tnp_iso_mc_vertexWeights1_oscharge1.root"
+    dirname_bkg = "root_files/datasets"
     
     
     bkg_filenames = {}
     [bkg_filenames.update({cat : 
-        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_categories]
+        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in settings_dict["bkg_categories"]]
     
     print(bkg_filenames)
     
 
-    lumi_scales = lumi_factors(type_eff, bkg_categories)
+    lumi_scales = lumi_factors(type_eff, settings_dict["bkg_categories"])
 
     print(lumi_scales)
 
@@ -210,27 +212,27 @@ if __name__ == '__main__':
         "mc" : {
             "filename": filename_mc,
             "lumi_scale" : lumi_scale_signal
-        }
-        # "bkg" : {
-        #     "filenames" : bkg_filenames,
-        #     "lumi_scales" : lumi_scales
-        # } 
+        },
+        "bkg" : {
+            "filenames" : bkg_filenames,
+            "lumi_scales" : lumi_scales
+        } 
     }
 
     # workspace_name = f"root_files/ws/ws_bkg_studies.root"
     #  workspace_name = "root_files/ws_iso_indep_mcbkg_mergedbins.root"
 
-    workspace_name = "root_files/ws_iso_indep_bmark_2gev.root"
+    workspace_name = "root_files/ws_iso_indep_mcbkg_2gev.root"
     
-    ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_2GeV"))
-    ws.writeToFile(workspace_name)
+    # ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_2GeV"))
+    #  ws.writeToFile(workspace_name)
 
 
     # ------------------------------------------------------------------------
    
     # results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
    
-    figpath = {"good": "figs/fit_iso_indep_2gev", "check": "figs/check_fits"}
+    figpath = {"good": "figs/fit_iso_indep_mcbkg_2gev", "check": "figs/check_fits"}
 
     ws = make_fits(workspace_name, type_eff, type_analysis, bins, settings_dict, savefigs=True, figpath=figpath)
 

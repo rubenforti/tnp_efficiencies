@@ -3,9 +3,9 @@
 
 import ROOT
 import sys
-from utilities.base_library import lumi_factors, binning, bin_dictionary, sumw2_error, eval_efficiency
-from utilities.results_utils import init_pass_fail_histos, init_pass_fail_h2d, efficiency_from_res
-from utilities.dataset_utils import ws_init
+from utilities.base_library import lumi_factors, binning, bin_dictionary, sumw2_error
+from utilities.base_library import eval_efficiency as eval_bkgfrac  #La formula è la stessa
+from utilities.results_utils import init_pass_fail_histos
 from utilities.plot_utils import plot_bkg_on_histo
 from utilities.fit_utils import check_existing_fit
 from array import array
@@ -157,7 +157,7 @@ def fit_bkg(type_eff, type_analysis, ws, flag, bin_key, fit_shape="expo"):
 
 ###############################################################################
 
-def bkg_mass_distribution(type_eff, bkg_categories, ws, bin_dict, binning_pt, binning_eta, 
+def bkg_mass_distribution(type_eff, bkg_categories, ws, binning_pt, binning_eta, 
                            plot_on_data=False, plot_on_signal=False, figpath='figs/bkg_and_sig_mc'):
     """
     Plots the M_inv distribution of the total bkg and the various background samples, for each (pt,eta) bin.
@@ -168,32 +168,29 @@ def bkg_mass_distribution(type_eff, bkg_categories, ws, bin_dict, binning_pt, bi
         print("ERROR: plotting on data AND signal is not available now")
         sys.exit()
 
-    nbins_pt, nbins_eta = len(binning_pt)-1, len(binning_eta)-1
 
-    '''
-    binning_ratio_1 = [round(0.0 + 0.2*i, 2) for i in range(6)]
-    binning_ratio_2 = [round(1 + i, 2) for i in range(1, 10)]
-    binning_ratio_3 = [round(10 + 20*i, 2) for i in range(1, 10)]
-    binning_ratio = binning_ratio_1 + binning_ratio_2 + binning_ratio_3 + [200]
-    '''
-    binning_ratio = [round(0.0 + 0.2*i, 2) for i in range(6)] + \
+    bins_pt, bins_pt = binning(binning_pt), binning(binning_eta)
+    nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_pt)-1
+    bin_dict = bin_dictionary(binning_pt, binning_eta)
+    
+
+    bins_ratio = [round(0.0 + 0.2*i, 2) for i in range(6)] + \
                     [round(1.0 + i, 2) for i in range(1, 10)] + \
                     [round(10.0 + 20*i, 2) for i in range(1, 10)] + [200.0]
 
-    binning_sigma = [round(-10.0 + i, 2) for i in range(91)]
+    bins_sigma = [round(-10.0 + i, 2) for i in range(51)]
+    bins_pull = [round(-2 + 0.08*i, 2) for i in range(51)]
 
     histos = {}
 
     if plot_on_data:
-        histos.update(init_pass_fail_h2d("h2d_nsigma", "Nbkg fit vs MC [sigma]", binning_pt, binning_eta))
-        histos.update(init_pass_fail_histos("h_nsigma", "Nbkg fit vs MC [sigma]", array('d', binning_sigma)))
-        
+        histos.update(init_pass_fail_histos("h_nbkg_pull", "Nbkg MC vs fit [nsigma]", 
+                                            array('d', bins_sigma), bins_pt, bins_pt))
     if plot_on_signal:
-        histos.update(init_pass_fail_h2d("h2d_bkgfrac_ratio",  "Bkg fraction mc/fit ratio", binning_pt, binning_eta))
-        histos.update(init_pass_fail_histos("h_bkgfrac_ratio", "Bkg fraction mc/fit ratio", array('d', binning_ratio)))
-        histos.update(init_pass_fail_h2d("h2d_bkgfrac_pull",  "Bkg fraction mc vs fit pull", binning_pt, binning_eta))
-        histos.update(init_pass_fail_histos("h_bkgfrac_pull", "Bkg fraction mc vs fit pull", array('d', binning_sigma)))
-
+        histos.update(init_pass_fail_histos("h_bkgfrac_pull", "Bkg fraction mc vs fit pull", 
+                                            array('d', bins_pull), bins_pt, bins_pt))
+        histos.update(init_pass_fail_histos("h_bkgfrac_ratio", "Bkg fraction mc/fit ratio", 
+                                            array('d', bins_ratio), bins_pt, bins_pt))
 
     for bin_key in bin_dict:
 
@@ -218,8 +215,9 @@ def bkg_mass_distribution(type_eff, bkg_categories, ws, bin_dict, binning_pt, bi
                 norm_bkg = datasets["pdf_bkg_fit"]["norm"]
                 err_integral_histo_bkg = sumw2_error(datasets["total_bkg"]["roohisto"])
 
-                nsigma = (integral_histo_bkg - norm_bkg.getVal())/((err_integral_histo_bkg**2 + (norm_bkg.getError()**2))**0.5)
-                histos[f"h2d_nsigma_{flag}"].SetBinContent(bin_pt, bin_eta, nsigma)
+                nbkg_pull = (integral_histo_bkg - norm_bkg.getVal())/norm_bkg.getError()
+                histos[f"h_nbkg_pull_{flag}"].Fill(nbkg_pull)
+                histos[f"h_nbkg_pull_{flag}_2d"].SetBinContent(bin_pt, bin_eta, nbkg_pull)
                 
                 plot_bkg_on_histo(datasets, flag, bin_key, figpath='figs/bkg_mc_on_data') 
 
@@ -247,9 +245,9 @@ def bkg_mass_distribution(type_eff, bkg_categories, ws, bin_dict, binning_pt, bi
                 else:
                     fit_par_nbkg = ROOT.RooRealVar(fit_par_nbkg.GetName(), fit_par_nbkg.GetTitle(), 0)
 
-                bkgfrac_mc, err_bkgfrac_mc = eval_efficiency(nbkg, nsignal, err_nbkg, err_nsignal)
+                bkgfrac_mc, err_bkgfrac_mc = eval_bkgfrac(nbkg, nsignal, err_nbkg, err_nsignal)
                 
-                bkgfrac_fit, err_bkgfrac_fit = eval_efficiency(fit_par_nbkg.getVal(), fit_par_nsig.getVal(),
+                bkgfrac_fit, err_bkgfrac_fit = eval_bkgfrac(fit_par_nbkg.getVal(), fit_par_nsig.getVal(),
                                                                 fit_par_nbkg.getError(), fit_par_nsig.getError())
                 
                 bkg_frac_pull = (bkgfrac_mc - bkgfrac_fit)/((err_bkgfrac_mc**2 + (err_bkgfrac_fit**2))**0.5)
@@ -261,17 +259,16 @@ def bkg_mass_distribution(type_eff, bkg_categories, ws, bin_dict, binning_pt, bi
                     bkgfrac_ratio = bkgfrac_mc/bkgfrac_fit
                     err_bkgfrac_ratio = bkgfrac_ratio*((err_bkgfrac_mc/bkgfrac_mc)**2 + (err_bkgfrac_fit/bkgfrac_fit)**2)**0.5
 
-                histos[f"h2d_bkgfrac_ratio_{flag}"].SetBinContent(bin_pt, bin_eta, bkgfrac_ratio)
-                histos[f"h2d_bkgfrac_ratio_{flag}"].SetBinError(bin_pt, bin_eta, err_bkgfrac_ratio)
                 histos[f"h_bkgfrac_ratio_{flag}"].Fill(bkgfrac_ratio)
-                histos[f"h2d_bkgfrac_pull_{flag}"].SetBinContent(bin_pt, bin_eta, bkg_frac_pull)
+                histos[f"h_bkgfrac_ratio_{flag}_2d"].SetBinContent(bin_pt, bin_eta, bkgfrac_ratio)
                 histos[f"h_bkgfrac_pull_{flag}"].Fill(bkg_frac_pull)
+                histos[f"h_bkgfrac_pull_{flag}_2d"].SetBinContent(bin_pt, bin_eta, bkg_frac_pull)
 
                 plot_bkg_on_histo(datasets, flag, bin_key, figpath=figpath) 
 
     
     if plot_on_data:
-        filename = f"bkg_results/nsigma_bkg_vs_datafit.root"
+        filename = f"bkg_results/nbkg_mc_vs_datafit.root"
     elif plot_on_signal:
         filename = f"bkg_results/bkgfrac_mc_vs_datafit.root"
         #filename = "prova.root"
@@ -358,86 +355,6 @@ def fit_on_pseudodata(ws, binning_pt, binning_eta, bkg_shape, bkg_categories,
 
     print(len(prob_bins))
     print(prob_bins)
-    
-    
-            
-
-def plot_pseudodata_eff_comparison(ws, binning_pt, binning_eta, filename):
-    """
-    """
-
-    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
-    bin_dict = bin_dictionary(binning_pt, binning_eta)
-
-    nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
-
-    histos_result = {"pull" : ROOT.TH1D("histo_pull", "Pull efficiency", 50, -1.5, 1.5),
-                     "pull_2d" : ROOT.TH2D("histo_pull_2d", "Pull efficiency",
-                                            len(bins_pt)-1, bins_pt, len(bins_eta)-1, bins_eta),
-                     "ratio" : ROOT.TH1D("histo_ratio", "Ratio efficiency", 50, 0.995, 1.005),
-                     "ratio_2d" : ROOT.TH2D("histo_ratio_2d", "Ratio efficiency", 
-                                            len(bins_pt)-1, bins_pt, len(bins_eta)-1, bins_eta),
-                     "ratio_errors" : ROOT.TH1D("histo_ratio_errors", "Ratio of efficiency errors", 50, 0.9, 1.5),
-                     "ratio_errors_2d" : ROOT.TH2D("histo_ratio_errors_2d", "Ratio of efficiency errors",
-                                                 len(bins_pt)-1, bins_pt, len(bins_eta)-1, bins_eta)
-
-                    }          
-
-    for bin_key in bin_dict:
-        
-        if (type(ws.obj(f"results_pass_{bin_key}")) is ROOT.RooFitResult):
-
-            _, bin_pt, bin_eta = bin_dict[bin_key]
-
-            # Bin transformation needed in case the bins are merged
-            if type(bin_pt) is list:
-                bin_pt = int(1+(nbins_pt*(bin_pt[0]-1)/15.))
-            if type(bin_eta) is list:
-                bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
-            
-            res_pass, res_fail = ws.obj(f"results_pass_{bin_key}"), ws.obj(f"results_fail_{bin_key}")
-            
-            eff, d_eff = efficiency_from_res(res_pass, res_fail)
-
-            eff_mc, d_eff_mc = eval_efficiency(
-                ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
-                sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")), sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
-            
-            # nsigma = (eff - eff_mc) / (d_eff_mc**2 + d_eff**2)**0.5
-
-            pull = (eff-eff_mc)/d_eff_mc
-            ratio = eff / eff_mc
-            ratio_errors  = d_eff/d_eff_mc
-
-            histos_result["ratio"].Fill(ratio)
-            histos_result["ratio_2d"].SetBinContent(bin_pt, bin_eta, ratio)
-            histos_result["pull"].Fill(pull)
-            histos_result["pull_2d"].SetBinContent(bin_pt, bin_eta, pull)
-            histos_result["ratio_errors"].Fill(ratio_errors)
-            histos_result["ratio_errors_2d"].SetBinContent(bin_pt, bin_eta, ratio_errors)
-
-
-    resfile = ROOT.TFile(filename, "RECREATE")
-    resfile.cd()
-    histos_result["pull"].Write()
-    histos_result["pull_2d"].Write() 
-    histos_result["ratio"].Write()
-    histos_result["ratio_2d"].Write()
-    histos_result["ratio_errors"].Write()
-    histos_result["ratio_errors_2d"].Write()
-                
-    resfile.Close()
-
-
-
-
-        
-
-    
-
-
-    
-
 
 ###############################################################################
 
@@ -469,12 +386,8 @@ def plot_backgrounds_2d(ws, binning_pt, binning_eta, bkg_categories,
 
     for cat in bkg_categories:
 
-        histos.update(init_pass_fail_h2d(cat, cat, binning_pt, binning_eta, ))
-
-        if add_title != "":
-            histos[f"{cat}_pass"].SetTitle(f"{histos[f'{cat}_pass'].GetTitle()} {add_title}")
-            histos[f"{cat}_fail"].SetTitle(f"{histos[f'{cat}_fail'].GetTitle()} {add_title}")
-
+        histos.update(init_pass_fail_histos(cat, cat+" add_title", 
+                                            binning_pt, binning_pt, binning_eta))
 
         for bin_key in bin_dict:
 
@@ -621,7 +534,7 @@ if __name__ == "__main__":
     #                    norm_data=True, norm_tot_bkg=False, filename="root_files/backgrounds/bkg_2d_distr_norm_mc_signal.root")
     
     
-    # bkg_mass_distribution("iso", bkg_categories, ws, bin_set, new_binning_pt, new_binning_eta, 
+    # bkg_mass_distribution("iso", bkg_categories, ws, binning_pt_key, binning_eta_key,
     #                       plot_on_data=False, plot_on_signal=True)
     
 

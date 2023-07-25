@@ -22,7 +22,7 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
     
     settings = copy.deepcopy(settings_dict)
 
-    axis, histo_data = {}, {}
+    axis, histo_data, bkg_tothist = {}, {}, {}
     smearing, pdf_mc, conv_pdf, bkg_pdf, sum_pdf, model_pdf = {}, {}, {}, {}, {}, {}
     results, fit_status = {}, {}
 
@@ -80,13 +80,13 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
             pass
         elif settings[flag]["bkg_shape"] == "mc_raw":
             # histo_binning = axis.getBinning()
-            bkg_tothist = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo",
+            bkg_tothist[flag] = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo",
                                           ROOT.RooArgSet(axis[flag]), "")
             for cat in settings["bkg_categories"]:
-                bkg_tothist.add(ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}"))
+                bkg_tothist[flag].add(ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}"))
             bkg_pdf.update({
                 flag : ROOT.RooHistPdf(f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
-                                       ROOT.RooArgSet(axis[flag]), bkg_tothist)})        
+                                       ROOT.RooArgSet(axis[flag]), bkg_tothist[flag])})        
         else:
             print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
             sys.exit()
@@ -157,40 +157,39 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
 
     status = bool(fit_status["pass"]*fit_status["fail"])
 
-    # ----------------------------------
-    #  Quality checks (and plots) - NEW
-    # ----------------------------------
     if status:
         ws.Import(model_pdf["pass"]), ws.Import(model_pdf["fail"])
         ws.Import(results["pass"]), ws.Import(results["fail"])
-        if figs:
-            
-            eff, d_eff = efficiency_from_res(results["pass"], results["fail"])
+    
 
-            eff_mc, deff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
-                                              ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
-                                              sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
-                                              sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
-            
-            scale_factor = eff/eff_mc
-            d_scale_factor = scale_factor*((d_eff/eff)**2 + (deff_mc/eff_mc)**2)**0.5
+    if figs:
+        
+        eff, d_eff = efficiency_from_res(results["pass"], results["fail"])
 
-            plot_objects={}
+        eff_mc, deff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
+                                            ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
+                                            sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
+                                            sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
+        
+        scale_factor = eff/eff_mc
+        d_scale_factor = scale_factor*((d_eff/eff)**2 + (deff_mc/eff_mc)**2)**0.5
 
-            fig_folder = figpath["good"] if status is True else figpath["check"]
+        plot_objects={}
 
-            for flag in ["pass", "fail"]:
-                plot_objects.update({flag : {
-                                        "axis" : axis[flag],
-                                        "data" : histo_data[flag],
-                                        "model" : model_pdf[flag],
-                                        "res" : results[flag]}
-                                    })
-            plot_objects.update({"efficiency" : [eff, d_eff],
-                                 "efficiency_mc" : [eff_mc, deff_mc],
-                                 "scale_factor" : [scale_factor, d_scale_factor]
+        fig_folder = figpath["good"] if status is True else figpath["check"]
+
+        for flag in ["pass", "fail"]:
+            plot_objects.update({flag : {
+                                    "axis" : axis[flag],
+                                    "data" : histo_data[flag],
+                                    "model" : model_pdf[flag],
+                                    "res" : results[flag]}
                                 })
-            plot_fitted_pass_fail("indep", plot_objects, bin_key, pull=False, figpath=fig_folder)
+        plot_objects.update({"efficiency" : [eff, d_eff],
+                                "efficiency_mc" : [eff_mc, deff_mc],
+                                "scale_factor" : [scale_factor, d_scale_factor]
+                            })
+        plot_fitted_pass_fail("indep", plot_objects, bin_key, pull=False, figpath=fig_folder)
 
 
     return results["pass"], results["fail"], status

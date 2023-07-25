@@ -177,62 +177,6 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
 
     c.SaveAs(f"{figpath}/fit_pf_{type_analysis}_{bin_key}.pdf")
 
-
-###############################################################################
-
-def plot_eff_results(filename, results, binning_pt=(), binning_eta=()):
-    """
-    """
-
-    file = ROOT.TFile.Open(filename, "UPDATE")
-
-    if len(binning_pt) == 0:
-        binning_pt = binning("pt")
-    if len(binning_eta) == 0:
-        binning_eta = binning("eta")
-
-    ROOT.gStyle.SetOptStat("n")
-
-    res_dict = results.dictionary()
-
-    idx_pt, idx_eta = 0, 0
-
-    h_eff = ROOT.TH2D("efficiency_th2", "Efficiency (pt,eta)", len(binning_pt)-1, binning_pt,
-                      len(binning_eta)-1, binning_eta)
-    h_deff = ROOT.TH2D(
-        "eff_rel_error_th2", "Relative error on efficiency (pt,eta)",
-        len(binning_pt)-1, binning_pt, len(binning_eta)-1, binning_eta)
-    
-    '''
-    if results._analysis == 'indep':
-        corr_pass = ROOT.TH2
-    '''
-
-    for key in res_dict.keys():
-        idx_pt = int(key.split(",")[0])
-        idx_eta = int(key.split(",")[1])
-        eff = res_dict[key]["efficiency"]
-        # print(eff[0], eff[1])
-        h_eff.SetBinContent(idx_pt, idx_eta, eff[0])
-        h_eff.SetBinError(idx_pt, idx_eta, eff[1])
-        h_deff.SetBinContent(idx_pt, idx_eta, eff[1]/eff[0])
-
-    c1 = ROOT.TCanvas("efficiency", "efficiency", 1600, 900)
-    c1.cd()
-    ROOT.gPad.SetRightMargin(0.15)
-    h_eff.Draw("COLZ")
-    c1.SaveAs("figs/efficiency_sim.pdf")
-
-    c2 = ROOT.TCanvas("error efficiency", "error efficiency", 1600, 900)
-    c2.cd()
-    ROOT.gPad.SetRightMargin(0.15)
-    h_deff.Draw("COLZ")
-    c2.SaveAs("figs/efficiency_sim_rel_errors.pdf")
-
-    #file.Write("efficiency_th2")
-    # file.Write("eff_rel_error_th2")
-    file.Close()
-
 ###############################################################################
 
 def plot_bkg_on_histo(plot_objects, flag, bin_key, figpath=''):

@@ -24,9 +24,11 @@ binnings = {
 
 lumi_data = 16.8  # fb^-1
 
-sig_mc_repo = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS"
-bkg_repo = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
+# sig_mc_repo = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS"
+# bkg_repo = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
 
+sig_mc_repo = "root_files/datasets"
+bkg_repo = "root_files/datasets"
 
 BR_TAUToMU = 0.1739
 BR_TAUToE = 0.1782
