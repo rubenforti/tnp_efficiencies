@@ -78,6 +78,15 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
             pass
         elif settings[flag]["bkg_shape"] == "cmsshape":
             pass
+        elif settings[flag]["bkg_shape"] == "mc_raw":
+            # histo_binning = axis.getBinning()
+            bkg_tothist = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo",
+                                          ROOT.RooArgSet(axis[flag]), "")
+            for cat in settings["bkg_categories"]:
+                bkg_tothist.add(ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}"))
+            bkg_pdf.update({
+                flag : ROOT.RooHistPdf(f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
+                                       ROOT.RooArgSet(axis[flag]), bkg_tothist)})        
         else:
             print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
             sys.exit()

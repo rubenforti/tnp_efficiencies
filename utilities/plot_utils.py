@@ -131,8 +131,12 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
 
     pass_obj = plot_objects["pass"]
     fail_obj = plot_objects["fail"]
-    pass_obj["axis"].setBins(30, "plot_binning")
-    fail_obj["axis"].setBins(30, "plot_binning")
+
+    binning_pass = pass_obj["axis"].getBinning()
+    binning_fail = fail_obj["axis"].getBinning()
+    
+    pass_obj["axis"].setBins(binning_pass.numBins(), "plot_binning")
+    fail_obj["axis"].setBins(binning_fail.numBins(), "plot_binning")
 
     plot_minv_distrib_with_fit(pad_plot_pass, pass_obj["axis"], pass_obj["data"], pass_obj["model"])
     plot_minv_distrib_with_fit(pad_plot_fail, fail_obj["axis"], fail_obj["data"], fail_obj["model"])
