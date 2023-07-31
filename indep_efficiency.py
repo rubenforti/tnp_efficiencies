@@ -13,7 +13,7 @@ from utilities.base_library import eval_efficiency, sumw2_error
 from utilities.fit_utils import fit_quality, check_chi2
 
 
-def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-1, 
+def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-1, import_pdfs=False,
                            figs=False, figpath={"good":"figs/stuff", "check":"figs/check/stuff"}):
     """
     """
@@ -22,9 +22,19 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
     
     settings = copy.deepcopy(settings_dict)
 
-    axis, histo_data, bkg_tothist = {}, {}, {}
+    axis, histo_data = {}, {}
     smearing, pdf_mc, conv_pdf, bkg_pdf, sum_pdf, model_pdf = {}, {}, {}, {}, {}, {}
     results, fit_status = {}, {}
+
+
+    bkg_tothist = {}
+    bkg_pdf_ztautau, bkg_pdf_ttsemi = {}, {}
+
+    if "ws_bkg_merged" in settings.keys():
+        ws_bkg = settings["ws_bkg_merged"]
+
+    if bin_key!="[24.0to26.0][-2.4to-2.3]":
+        sys.exit()
 
 
     for flag in ["pass", "fail"]:
@@ -37,6 +47,7 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
 
         histo_data.update({flag : ws.data(f"Minv_data_{flag}_{bin_key}")})
 
+        # ---------------------------------------------------------------------------------------------------
         # --------------------- Parameters definition -------------------------------------------------------
         for obj_key in settings[flag]["pars"].keys():
             pars_obj = settings[flag]["pars"]
@@ -55,6 +66,7 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
                 obj_key : ROOT.RooRealVar(f"{obj_key}_{flag}_{bin_key}", f"{obj_key} {flag}",
                                           norm_obj[0], norm_obj[1], norm_obj[2])})
         
+        # ---------------------------------------------------------------------------------------------------
         # -------------------- Signal PDF -------------------------------------------------------------------
         smearing.update({
             flag : ROOT.RooGaussian(f"smearing_{flag}_{bin_key}", "Gaussian smearing", 
@@ -69,28 +81,70 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
                                       axis[flag], pdf_mc[flag], smearing[flag])})
         conv_pdf[flag].setBufferFraction(settings[flag]["bufFraction"])
 
+        # ---------------------------------------------------------------------------------------------------
         # -------------------- Background PDF ---------------------------------------------------------------
         if settings[flag]["bkg_shape"] == "expo":
             bkg_pdf.update({
                 flag : ROOT.RooExponential(f"expo_bkg_{flag}_{bin_key}", "Exponential background",
                                            axis[flag], settings[flag]["pars"]["tau"])})
+            
         elif settings[flag]["bkg_shape"] == "mixed":
             pass
         elif settings[flag]["bkg_shape"] == "cmsshape":
             pass
+
         elif settings[flag]["bkg_shape"] == "mc_raw":
             # histo_binning = axis.getBinning()
             bkg_tothist[flag] = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo",
-                                          ROOT.RooArgSet(axis[flag]), "")
+                                                 ROOT.RooArgSet(axis[flag]), "")
             for cat in settings["bkg_categories"]:
                 bkg_tothist[flag].add(ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}"))
             bkg_pdf.update({
                 flag : ROOT.RooHistPdf(f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
-                                       ROOT.RooArgSet(axis[flag]), bkg_tothist[flag])})        
+                                       ROOT.RooArgSet(axis[flag]), bkg_tothist[flag])})
+            
+        elif settings[flag]["bkg_shape"] == "mc_merged":
+            bkg_tothist[flag] = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo",
+                                                 ROOT.RooArgSet(ws_bkg.var(f"x_{flag}_{bin_key}")), "")
+            for cat in settings["bkg_categories"]:
+                bkg_tothist[flag].add(ws_bkg.data(f"Minv_bkg_{flag}_{bin_key}_{cat}"))
+            bkg_pdf.update({
+                flag : ROOT.RooHistPdf(f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
+                                       ROOT.RooArgSet(axis[flag]), bkg_tothist[flag])}, 3)
         else:
             print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
             sys.exit()
+        '''
+        elif settings[flag]["bkg_shape"] == "mc_double_pdf":
+            n_ztautau = ws.data(f"Minv_bkg_{flag}_{bin_key}_Ztautau").sumEntries()
+            n_ttsemileptonic = ws.data(f"Minv_bkg_{flag}_{bin_key}_TTSemileptonic").sumEntries()
+            settings[flag]["norm"].update({
+                "ztautau": ROOT.RooRealVar(f"nbkg_ztautau_{flag}_{bin_key}", f"Nbkg {flag} Ztautau", 
+                                           n_ztautau, 0.5, 1.5*n_ztautau)})
+            settings[flag]["norm"].update({
+                "ttsemi": ROOT.RooRealVar(f"nbkg_ttsemileptonic_{flag}_{bin_key}", f"Nbkg {flag} TTSemi", 
+                                          n_ttsemileptonic, 0.5, 1.5*n_ttsemileptonic)})
+            settings[flag]["norm"].update({
+                "nbkg" : ROOT.RooAddition(f"nbkg_{flag}_{bin_key}", f"Nbkg {flag}", 
+                                          ROOT.RooArgList(settings[flag]["norm"]["ztautau"], 
+                                                          settings[flag]["norm"]["ttsemi"]))})
+            bkg_pdf_ztautau.update({
+                flag: ROOT.RooHistPdf(f"mcbkg_ztautau_{flag}_{bin_key}",
+                                      "MC-driven bkg Ztautau", ROOT.RooArgSet(axis[flag]), 
+                                       ws.data(f"Minv_bkg_{flag}_{bin_key}_Ztautau"), 3)})
+            bkg_pdf_ttsemi.update({
+                flag: ROOT.RooHistPdf(f"mcbkg_ttsemileptonic_{flag}_{bin_key}", 
+                                      "MC-driven bkg TTSemi", ROOT.RooArgSet(axis[flag]), 
+                                      ws.data(f"Minv_bkg_{flag}_{bin_key}_TTSemileptonic"), 3)})
+            bkg_pdf.update({
+                flag : ROOT.RooAddPdf(
+                    f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
+                    ROOT.RooArgList(bkg_pdf_ztautau[flag], bkg_pdf_ttsemi[flag]), 
+                    ROOT.RooArgList(settings[flag]["norm"]["ztautau"], settings[flag]["norm"]["ttsemi"]))})
+        '''
+        
 
+        # ---------------------------------------------------------------------------------------------------
         # -------------------- Final models and fits --------------------------------------------------------
         sum_pdf.update({
             flag : ROOT.RooAddPdf(f"sum_{flag}_{bin_key}", "Signal+Bkg", 
@@ -119,9 +173,9 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
         print(status_chi2)
         print(status)
         
-        pars_final = results[flag].floatParsFinal()
-        nsig_fitted = pars_final.find(f"nsig_{flag}_{bin_key}")
-        nbkg_fitted = pars_final.find(f"nbkg_{flag}_{bin_key}")
+        nsig_fitted = settings[flag]["norm"]["nsig"]
+        nbkg_fitted = settings[flag]["norm"]["nbkg"]
+       
 
         low_nbkg = (nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal())
         print(settings[flag]["norm"]["nbkg"].getVal())
@@ -132,8 +186,12 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
             results[flag].Print()
             settings[flag]["pars"]["tau"].setVal(1)
             settings[flag]["pars"]["tau"].setConstant()
-            settings[flag]["norm"]["nbkg"].setVal(0)
-            settings[flag]["norm"]["nbkg"].setConstant()
+
+            for norm_key in settings[flag]["norm"].keys():
+                if "bkg" in norm_key and type(settings[flag]["norm"][norm_key]) is ROOT.RooRealVar:
+                    settings[flag]["norm"][norm_key].setVal(0)
+                    settings[flag]["norm"][norm_key].setConstant()
+
             print("REFITTING WITHOUT BACKGROUND")
             print("\n\n\n\n")
             res = model_pdf[flag].fitTo(histo_data[flag],
@@ -154,22 +212,21 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
 
         results[flag].SetName(f"results_{flag}_{bin_key}")
 
-
     status = bool(fit_status["pass"]*fit_status["fail"])
 
-    if status:
+    if status and import_pdfs:
         ws.Import(model_pdf["pass"]), ws.Import(model_pdf["fail"])
         ws.Import(results["pass"]), ws.Import(results["fail"])
-    
+
 
     if figs:
         
         eff, d_eff = efficiency_from_res(results["pass"], results["fail"])
 
         eff_mc, deff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
-                                            ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
-                                            sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
-                                            sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
+                                          ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
+                                          sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
+                                          sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
         
         scale_factor = eff/eff_mc
         d_scale_factor = scale_factor*((d_eff/eff)**2 + (deff_mc/eff_mc)**2)**0.5
@@ -179,16 +236,15 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
         fig_folder = figpath["good"] if status is True else figpath["check"]
 
         for flag in ["pass", "fail"]:
-            plot_objects.update({flag : {
-                                    "axis" : axis[flag],
-                                    "data" : histo_data[flag],
-                                    "model" : model_pdf[flag],
-                                    "res" : results[flag]}
-                                })
+            plot_objects.update({
+                flag : {"axis" : axis[flag],
+                        "data" : histo_data[flag],
+                        "model" : model_pdf[flag],
+                        "res" : results[flag]}
+                        })
         plot_objects.update({"efficiency" : [eff, d_eff],
-                                "efficiency_mc" : [eff_mc, deff_mc],
-                                "scale_factor" : [scale_factor, d_scale_factor]
-                            })
+                             "efficiency_mc" : [eff_mc, deff_mc],
+                             "scale_factor" : [scale_factor, d_scale_factor]})
         plot_fitted_pass_fail("indep", plot_objects, bin_key, pull=False, figpath=fig_folder)
 
 

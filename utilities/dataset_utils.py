@@ -4,7 +4,7 @@
 import sys
 import os
 import ROOT
-from utilities.base_library import binning, bin_dictionary, lumi_factors
+from utilities.base_library import binning, bin_dictionary, lumi_factors, get_idx_from_bounds
 
 
 def import_pdf_library(*functions):
@@ -60,7 +60,7 @@ def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_sca
     if th1_histo.Integral() < 0:
         print("ERROR: negative entries in TH1")
         print(f"{bin_pt}, {bin_eta}")
-        #sys.exit()
+        # sys.exit()
 
     numBins = axis.getBinning().numBins()
     th1_histo.Rebin(int(th1_histo.GetNbinsX()/numBins))
@@ -163,15 +163,35 @@ def ws_init(import_datasets, type_analysis, bins, bins_mass):
 
 ###############################################################################
 
-def show_empty_bins(ws, bkg_categories, binning, nbins_pt, nbins_eta):
+def show_negweighted_bins(ws, bkg_categories, binning_pt, binning_eta):
     """
     """
 
-    prob_bins_histo = ROOT.TH2D("prob_bins_histo", "prob_bins_histo", 
-                                nbins_pt, 1, nbins_pt, nbins_eta, 1, nbins_eta)
+    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
 
-    for bin_key in binning:
-        _, bin_pt, bin_eta = binning[bin_key]
+    bin_dict = bin_dictionary(binning_pt, binning_eta)
+
+    negweight_single_bkg = ROOT.TH2D("negweight_single_bkg", "negweight_single_bkg", 
+                                     nbins_pt, bins_pt, nbins_eta, bins_eta)
+    negweight_total_bkg = ROOT.TH2D("negweight_total_bkg", "negweight_total_bkg", 
+                                    nbins_pt, bins_pt, nbins_eta, bins_eta)
+
+    cnt_mergedpt=0
+
+    for bin_key in bin_dict.keys():
+
+        cnt_negweight_single = 0
+
+        _, bin_pt, bin_eta = bin_dict[bin_key]
+
+        # Bin transformation needed in case the bins are merged
+        if type(bin_eta) is list:
+            bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
+        if type(bin_pt) is list:
+            bin_pt_list = bin_pt
+            bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
+            cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
 
         n_ev_pass = 0
         n_ev_fail = 0
@@ -180,14 +200,69 @@ def show_empty_bins(ws, bkg_categories, binning, nbins_pt, nbins_eta):
             histo_fail = ws.data(f"Minv_bkg_fail_{bin_key}_{cat}")
             n_ev_pass += histo_pass.sumEntries()
             n_ev_fail += histo_fail.sumEntries()
+
+            if histo_pass.sumEntries()<0 or histo_fail.sumEntries()<0:
+                cnt_negweight_single += 1
         
-        if n_ev_pass<1 or n_ev_fail<1:
-            prob_bins_histo.Fill(bin_pt[0], bin_eta[0])
+        if cnt_negweight_single>0:
+            negweight_single_bkg.SetBinContent(bin_pt, bin_eta, cnt_negweight_single)
+                
+        if n_ev_pass<0 or n_ev_fail<0:
+            negweight_single_bkg.SetBinContent(bin_pt, bin_eta, 1)
     
     c = ROOT.TCanvas()
-    c.cd()
-    prob_bins_histo.Draw("colz")
-    c.SaveAs("../prob_bins_Ztautau.png")
+    c.Divide(1,2)
+    c.cd(1)
+    negweight_single_bkg.Draw("colz")
+    c.cd(2)
+    negweight_total_bkg.Draw("colz")
+    c.SaveAs(f"prob_bins_pt{nbins_pt}bins_eta{nbins_eta}bins.png")
+
+###############################################################################
+
+
+def extend_merged_datasets(ws, merged_bin_key, bkg_categories):
+    """
+    """
+    bin_dict = bin_dictionary("pt", "eta")
+
+    bkg_datasets = {}
+    for flag in ["pass", "fail"]:
+        [bkg_datasets.update({f"{cat}_{flag}" : ws.data(f"Minv_bkg_{flag}_{merged_bin_key}_{cat}")}) for cat in bkg_categories]
+        bkg_datasets.update({f"axis_{flag}" : ws.var(f"x_{flag}_{merged_bin_key}")})
+
+    string_pt, string_eta = merged_bin_key.split("][")
+    pt_min, pt_max = string_pt[1:].split("to")
+    eta_min, eta_max = string_eta[:-1].split("to")
+
+    pt_min, pt_max = float(pt_min), float(pt_max)
+    eta_min, eta_max = float(eta_min), float(eta_max)
+
+    global_merged_bins, _, _ = get_idx_from_bounds([pt_min, pt_max], [eta_min, eta_max])
+
+    for bin_key in bin_dict.keys():
+
+        gl_bin, _, _ = bin_dict[bin_key]
+
+        if gl_bin in global_merged_bins:
+
+            for flag in ["pass", "fail"]:
+                new_axis = bkg_datasets[f"axis_{flag}"].Clone(f"x_{flag}_{bin_key}")
+                ws.Import(new_axis)
+                for cat in bkg_categories:
+                    new_data = bkg_datasets[f"{cat}_{flag}"].Clone(f"Minv_bkg_{flag}_{bin_key}_{cat}")
+                    ws.Import(new_data)
+
+
+
+
+
+    
+
+
+
+
+
         
 ###############################################################################     
 ###############################################################################
@@ -205,43 +280,62 @@ if __name__ == '__main__':
     an = types_analysis[0]
 
 
-    lumi_scales = lumi_factors(t, bkg_categories)
-    # lumi_scales = {"WW":1, "WZ":1, "ZZ":1, "TTSemileptonic":1, "Ztautau":1}
-
-
-    filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
-    filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
-    dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
-
-
-    bkg_filepaths = {}
-    [bkg_filepaths.update({cat : 
+    filename_data = "root_files/datasets/tnp_iso_data_vertexWeights1_oscharge1.root"
+    filename_mc = "root_files/datasets/tnp_iso_mc_vertexWeights1_oscharge1.root"
+    dirname_bkg = "root_files/datasets"
+    
+    
+    bkg_filenames = {}
+    [bkg_filenames.update({cat : 
         f"{dirname_bkg}/tnp_{t}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_categories]
+    
+    print(bkg_filenames)
+    
+
+    lumi_scales = lumi_factors(t, bkg_categories)
+
+    print(lumi_scales)
 
 
+    lumi_scale_signal = lumi_scales.pop("Zmumu")
 
     import_dictionary = {
         "data" : filename_data,
-        "mc" : filename_mc,
+        "mc" : {
+            "filename": filename_mc,
+            "lumi_scale" : lumi_scale_signal
+        },
         "bkg" : {
-            "filepaths" : bkg_filepaths,
+            "filenames" : bkg_filenames,
             "lumi_scales" : lumi_scales
-        }
+        } 
     }
-
 
     binning_mass = binning("mass_60_120")
 
-    bin_set = bin_dictionary("pt_6bins", "eta_4bins")
+    binnings_list = [# ["pt", "eta"], ["pt", "eta_24bins"], ["pt", "eta_16bins"], 
+                     # ["pt", "eta_8bins"], ["pt_12bins", "eta"], ["pt_10bins", "eta"],
+                     # ["pt_8bins", "eta"], ["pt_12bins", "eta_24bins"]]
+                     ["pt_10bins", "eta_16bins"]]
+    
+    # bin_dict = bin_dictionary("pt_12bins", "eta_24bins")
 
-    w = ws_init(import_dictionary, an, bin_set, binning_mass)
+    for binning_pt, binning_eta in binnings_list:
+        bin_set = bin_dictionary(binning_pt, binning_eta)
+
+        w = ws_init(import_dictionary, an, bin_set, binning_mass)
+        
+        show_negweighted_bins(w, bkg_categories, binning_pt, binning_eta)
+
+
+
 
     # w = ws_init_backgrounds(dirname_bkg, bkg_categories, t, lumi_scales, bin_set, binning_mass)
     # w.Print()
 
-    # show_problematic_bins(w, bkg_categories, bin_set, 15, 48)
+   
 
 
 
 
-    w.writeToFile(f"root_files/ws/ws_data_mc_bkg.root")
+   #w.writeToFile(f"root_files/ws/ws_data_mc_bkg.root")

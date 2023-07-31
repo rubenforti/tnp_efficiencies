@@ -258,8 +258,10 @@ def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
 
 if __name__ == '__main__':
 
+    from fit_utils import fit_quality, pearson_chi2_eval
+    from base_library import eval_efficiency, binning, bin_dictionary
 
-    ws_name = "../root_files/ws_iso_indep_bmark_2gev.root"
+    ws_name = "../results/benchmark_iso/ws_iso_indep_benchmark.root"
     
     save_eff_results(ws_name, "indep", "pt", "eta")
     

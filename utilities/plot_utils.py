@@ -179,7 +179,7 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
 
 ###############################################################################
 
-def plot_bkg_on_histo(plot_objects, flag, bin_key, figpath=''):
+def plot_bkg_on_histo(plot_objects, flag, bin_key, logscale=True, figpath=''):
     """
     Function that creates and saves the plot containing a reference histogram 
     (data or signal MC), the distributions of the various bkg processes and the
@@ -202,20 +202,19 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, figpath=''):
 
     imported_data, imported_mc_sig, imported_pdf_bkg = False, False, False
 
-    c = ROOT.TCanvas(f"c_{bin_key}_{flag}", "c", 900, 1200)
+    c = ROOT.TCanvas(f"c_{bin_key}_{flag}", "c", 1200, 900)
     c.cd()
 
     style_settings()
 
-    pad_title = ROOT.TPad("pad_title", "pad_title", 0, 0.95, 1, 1)
-    pad_plot = ROOT.TPad("pad_plot", "pad_plot", 0, 0.25, 0.7, 0.95)
-    pad_pull = ROOT.TPad("pad_pull", "pad_pull", 0, 0, 0.7, 0.25)
-    pad_info = ROOT.TPad("pad_info", "pad_info", 0.7, 0, 1, 0.9)
+    pad_title = ROOT.TPad("pad_title", "pad_title", 0, 0.9, 1, 1)
+    pad_plot = ROOT.TPad("pad_plot", "pad_plot", 0, 0, 0.7, 0.9)
+    # pad_pull = ROOT.TPad("pad_pull", "pad_pull", 0, 0, 0.65, 0.25)
+    pad_info = ROOT.TPad("pad_info", "pad_info", 0.7, 0.1, 1, 0.9)
 
     pad_title.SetMargin(0.1, 0.1, 0.1, 0.1), pad_title.Draw()
-    pad_plot.SetMargin(0.15, 0.05, 0, 0.05), pad_plot.Draw()
-    pad_pull.SetMargin(0.15, 0.05, 0.2, 0), pad_pull.Draw()
-    pad_info.SetMargin(0, 0, 0.05, 0.05), pad_info.Draw()
+    pad_plot.SetMargin(0.15, 0.05, 0.05, 0.05), pad_plot.Draw()
+    pad_info.SetMargin(0.05, 0.05, 0.1, 0.9), pad_info.Draw()
 
     pad_title.cd()
     titlebox = ROOT.TPaveText(0, 0, 1, 1, "NDC NB")
@@ -230,7 +229,7 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, figpath=''):
 
 
     pad_plot.cd()
-    frame = axis.frame()
+    frame = axis.frame(ROOT.RooFit.Bins(axis.getBins("plot_binning")))
     frame.SetTitle("")
     frame.SetTitleSize(0)
     frame_yaxis = frame.GetYaxis()
@@ -239,6 +238,8 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, figpath=''):
     frame_axis.SetLabelSize(0)
     xtitle = frame_axis.GetTitle()
     frame_axis.SetTitleSize(0)
+
+    ctrl_plot_max = 0
 
 
     if "fit_pars" in plot_objects.keys():
@@ -250,6 +251,9 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, figpath=''):
         datahist.plotOn(frame, 
                         ROOT.RooFit.Binning("plot_binning"),
                         ROOT.RooFit.Name("Data"))
+        for bin_idx in range(datahist.numEntries()):
+            if datahist.weight(bin_idx) > ctrl_plot_max:
+                ctrl_plot_max = datahist.weight(bin_idx)
     
     if "MC_signal" in plot_objects.keys():
         imported_mc_sig = True
@@ -258,6 +262,9 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, figpath=''):
                                         ROOT.RooFit.Name("MC signal"),
                                         ROOT.RooFit.LineColor(mc_sig_dict["color"]),
                                         ROOT.RooFit.Normalization(mc_sig_dict["integral"], ROOT.RooAbsReal.NumEvent))
+        for bin_idx in range(mc_sig_dict["roohisto"].numEntries()):
+            if mc_sig_dict["roohisto"].weight(bin_idx) > ctrl_plot_max:
+                ctrl_plot_max = mc_sig_dict["roohisto"].weight(bin_idx)
 
     if "pdf_bkg_fit" in plot_objects.keys():
         imported_pdf_bkg = True
@@ -270,6 +277,9 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, figpath=''):
 
     total_bkg = plot_objects.pop("total_bkg")
 
+    for bin_idx in range(total_bkg["roohisto"].numEntries()):
+        if total_bkg["roohisto"].weight(bin_idx) > ctrl_plot_max:
+            ctrl_plot_max = total_bkg["roohisto"].weight(bin_idx)
     
     for nbins_total_bkg in [60, 30, 20]:
             
@@ -356,9 +366,10 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, figpath=''):
         textbox.AddText(f"Num {bkg_key} = {round(bkg_obj['integral'],2)} #pm {round(bkg_error, 2)}")
 
     pad_plot.cd()
-    pad_plot.SetLogy()
+    pad_plot.SetLogy() if logscale is True else pad_plot.SetLogy(False)
+    
+    frame.SetMaximum(1.5*ctrl_plot_max)      
     frame.SetMinimum(5e-2)
-    frame.SetMaximum(5e+5)
     frame.Draw()
     pad_plot.Update()
  

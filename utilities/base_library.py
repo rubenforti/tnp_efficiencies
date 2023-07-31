@@ -12,14 +12,17 @@ binnings = {
     "eta" : array('d', [round(-2.4 + i*0.1, 2) for i in range(49)]),
     "mass_50_130" : array('d', [50 + i for i in range(81)]),
     "mass_60_120" : array('d', [60 + i for i in range(61)]),
-    "pt_9bins" : array('d', [24., 26., 28., 30., 32., 36., 40., 44., 50., 65.]),
-    "pt_6bins" : array('d', [24., 26., 28., 32., 40., 50., 65.]),
+    "pt_12bins" : array('d', [24., 26., 28., 32., 36., 40., 42., 44., 47., 50., 55., 60., 65.]),
+    "pt_10bins" : array('d', [24., 28., 32., 36., 40., 44., 47., 50., 55., 60., 65.]),
+    "pt_8bins" : array('d', [24., 30., 36., 40., 44., 50., 55., 60., 65.]),
+    "pt_6bins" : array('d', [24., 30., 36., 42., 47., 55., 65.]),
     "eta_24bins" : array('d', [round(-2.4 + i*0.2, 2) for i in range(25)]),
     "eta_16bins" : array('d', [round(-2.4 + i*0.3, 2) for i in range(17)]),
     "eta_8bins" : array('d', [round(-2.4 + i*0.6, 2) for i in range(9)]),
     "eta_4bins" : array('d', [round(-2.4 + i*1.2, 2) for i in range(5)]),
     "mass_2GeV" : array('d', [60 + 2*i for i in range(31)]),
     "mass_3GeV" : array('d', [60 + 3*i for i in range(21)]),
+    "mass_4GeV" : array('d', [60 + 4*i for i in range(16)]),
     }
 
 lumi_data = 16.8  # fb^-1
@@ -58,35 +61,6 @@ def binning(type):
 
 ###############################################################################
 
-def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
-    """
-    Creates a dictionary that relates the bounds of every bin (keys) to the 
-    indexes useful for the bin selection. The indexes are returned in a 
-    3-element list containing the global index, the pt index and the eta index
-    in this order.
-    """
-    index_dictionary = {}
-    global_idx = 1
-
-    binning_pt, binning_eta = binnings[binning_pt_name], binnings[binning_eta_name]
-
-    for idx_pt in range(1, len(binning_pt)):
-        for idx_eta in range(1, len(binning_eta)):
-
-            bin_key = f"[{binning_pt[idx_pt-1]}to{binning_pt[idx_pt]}][{binning_eta[idx_eta-1]}to{binning_eta[idx_eta]}]"
-
-            if binning_pt_name == "pt" and binning_eta_name == "eta":
-                index_dictionary.update({bin_key : [global_idx, idx_pt, idx_eta]})
-                global_idx +=1
-            else:
-                global_idx, bounds_idx_pt, bounds_idx_eta = get_idx_from_bounds(
-                    [binning_pt[idx_pt-1], binning_pt[idx_pt]], [binning_eta[idx_eta-1], binning_eta[idx_eta]])
-                index_dictionary.update({bin_key : [global_idx, bounds_idx_pt, bounds_idx_eta]})
-
-    return index_dictionary
-
-###############################################################################
-
 def get_idx_from_bounds(bounds_pt, bounds_eta):
     """
     Function that, given the bin bounds (that have to be present in the binning
@@ -118,6 +92,35 @@ def get_idx_from_bounds(bounds_pt, bounds_eta):
             bounds_eta_idx.append(idx_eta)
             
     return global_bins, [min(bounds_pt_idx), max(bounds_pt_idx)], [min(bounds_eta_idx), max(bounds_eta_idx)]
+
+###############################################################################
+
+def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
+    """
+    Creates a dictionary that relates the bounds of every bin (keys) to the 
+    indexes useful for the bin selection. The indexes are returned in a 
+    3-element list containing the global index, the pt index and the eta index
+    in this order.
+    """
+    index_dictionary = {}
+    global_idx = 1
+
+    binning_pt, binning_eta = binnings[binning_pt_name], binnings[binning_eta_name]
+
+    for idx_pt in range(1, len(binning_pt)):
+        for idx_eta in range(1, len(binning_eta)):
+
+            bin_key = f"[{binning_pt[idx_pt-1]}to{binning_pt[idx_pt]}][{binning_eta[idx_eta-1]}to{binning_eta[idx_eta]}]"
+
+            if binning_pt_name == "pt" and binning_eta_name == "eta":
+                index_dictionary.update({bin_key : [global_idx, idx_pt, idx_eta]})
+                global_idx +=1
+            else:
+                global_idx, bounds_idx_pt, bounds_idx_eta = get_idx_from_bounds(
+                    [binning_pt[idx_pt-1], binning_pt[idx_pt]], [binning_eta[idx_eta-1], binning_eta[idx_eta]])
+                index_dictionary.update({bin_key : [global_idx, bounds_idx_pt, bounds_idx_eta]})
+
+    return index_dictionary
 
 ###############################################################################
 

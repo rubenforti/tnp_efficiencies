@@ -11,7 +11,7 @@ from indep_efficiency import independent_efficiency
 # from indep_eff_mcbkg import independent_efficiency
 # from sim_efficiency import simultaneous_efficiency
 from utilities.fit_utils import check_existing_fit, fit_quality
-from utilities.dataset_utils import ws_init
+from utilities.dataset_utils import ws_init, extend_merged_datasets
 
 
 
@@ -20,6 +20,7 @@ settings_dict = {
     "id_name" : "AAAAAAAAAAAAAAAAAA",
     "fit_range" : [60.0, 120.0],
     "bkg_categories" : ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"],
+    "ws_bkg_merged" : "root_files/ws_bkg_mergedbins_pt10_eta16.root",
     "run" : 1,
     "pass" : {
         "fit_strategy" : 2,
@@ -38,23 +39,23 @@ settings_dict = {
     },
     "fail" : {
         "fit_strategy" : 2,
-        "Nbins" : 5000,
+        "Nbins" : 2000,
         "bufFraction" : 0.5,
         "bkg_shape" : "mc_raw",
         "pars" : {
             "mu" : [0.0, -5.0, 5.0],
-            "sigma" : [1, 0.35, 5.0],
+            "sigma" : [0.5, 0.1, 5.0],
             "tau" : [0.0, -5.0, 5.0],
         },
         "norm" : {
-            "nsig" : ["1n", "0.5n", "3n"],
-            "nbkg" : ["0.05n", 0.05, "1n"]
+            "nsig" : ["0.9n", 0.5, "1.5n"],
+            "nbkg" : ["0.1n", 0.5, "1.5n"]
         }
     }
 }
 
 
-def make_fits(ws_name, type_eff, type_analysis, bins_dictionary, fit_settings, fit_verbosity=-1, 
+def make_fits(ws_name, type_eff, type_analysis, bins_dict, fit_settings, fit_verb=-1, import_pdfs=False, 
               savefigs=False, figpath={"good":"figs/stuff", "check":"figs/check/stuff"}):
     """
     """
@@ -69,18 +70,24 @@ def make_fits(ws_name, type_eff, type_analysis, bins_dictionary, fit_settings, f
     # key_prova = "[24.0to26.0][-2.4to-2.3]"
     # bins_dictionary = {key_prova : bins_dictionary[key_prova]}
 
-    for bin_key in bins_dictionary:
+    if "ws_bkg_merged" in fit_settings.keys():
+        file_bkg_merged = ROOT.TFile(fit_settings["ws_bkg_merged"], "READ")
+        ws_bkg_merged = file_bkg_merged.Get("w")
+        fit_settings.update({"ws_bkg_merged" : ws_bkg_merged})
 
-        global_idx, bin_pt, bin_eta = bins_dictionary[bin_key]
+    for bin_key in bins_dict:
+
+        global_idx, bin_pt, bin_eta = bins_dict[bin_key]
 
         existingRes = check_existing_fit(type_analysis, ws, bin_key)
 
         if type_analysis == 'indep':
 
             if existingRes == 0:
+
                 res_pass, res_fail, status = independent_efficiency(ws, bin_key, fit_settings, 
-                                                                    refit_numbkg=True, 
-                                                                    verb=fit_verbosity, figs=savefigs,
+                                                                    refit_numbkg=True, verb=fit_verb, 
+                                                                    import_pdfs=import_pdfs, figs=savefigs,
                                                                     figpath=figpath)
             else:
                 res_pass, res_fail = existingRes
@@ -222,21 +229,40 @@ if __name__ == '__main__':
     # workspace_name = f"root_files/ws/ws_bkg_studies.root"
     #  workspace_name = "root_files/ws_iso_indep_mcbkg_mergedbins.root"
 
-    workspace_name = "root_files/ws_iso_indep_mcbkg_2gev.root"
+    workspace_name = "root_files/ws_iso_indep_mcbkg_merged.root"
     
-    # ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_2GeV"))
-    #  ws.writeToFile(workspace_name)
+    ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
+    ws.writeToFile(workspace_name)
+
+
+    import_dict_bkg =  {
+        "bkg" : {
+            "filenames" : bkg_filenames,
+            "lumi_scales" : lumi_scales
+        } 
+    }
+    # file_bkg = ROOT.TFile(settings_dict["ws_bkg_merged"], "READ")
+    # ws_bkg = file_bkg.Get("w")
+
+    bin_dict_bkg = bin_dictionary("pt_10bins", "eta_16bins")
+    ws_bkg = ws_init(import_dict_bkg, type_analysis, bin_dict_bkg, binning("mass_60_120"))
+    
+    for merged_key in bin_dict_bkg.keys():
+         extend_merged_datasets(ws_bkg, merged_key, settings_dict["bkg_categories"])
+
+    ws_bkg.writeToFile(settings_dict["ws_bkg_merged"])
 
 
     # ------------------------------------------------------------------------
    
     # results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
    
-    figpath = {"good": "figs/fit_iso_indep_mcbkg_2gev", "check": "figs/check_fits"}
+    figpath = {"good": "figs/fit_iso_indep_mcbkg_merged", "check": "figs/check_fits/mcbkg_merged"} 
 
-    ws = make_fits(workspace_name, type_eff, type_analysis, bins, settings_dict, savefigs=True, figpath=figpath)
+    ws = make_fits(workspace_name, type_eff, type_analysis, bins, settings_dict, 
+                   import_pdfs=False, savefigs=True, figpath=figpath)
 
-    ws.writeToFile(workspace_name)
+    #ws.writeToFile(workspace_name)
  
 
     #print("RISULTATI SCRITTI SU PICKLE FILE")

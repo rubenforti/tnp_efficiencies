@@ -24,7 +24,7 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories,
     #  Initial parameters - MODIFY HERE
     # ----------------------------------
     NBINS = [5000, 5000]
-    bufFractions = [0.3, 0.3]
+    bufFractions = [0.2, 0.2]
 
     sumw2_error_option = False
 
@@ -33,11 +33,11 @@ def independent_efficiency(ws, bin_key, bkg_shape, bkg_categories,
     mean_p = ROOT.RooRealVar(
         f"mean_pass_{bin_key}", "mean pass", 0, -5.0, 5.0)
     sigma_p = ROOT.RooRealVar(
-        f"sigma_pass_{bin_key}", "sigma pass", 1, 0.01, 5.0)
+        f"sigma_pass_{bin_key}", "sigma pass", 1, 0.1, 5.0)
     mean_f = ROOT.RooRealVar(
         f"mean_fail_{bin_key}", "mean fail", 0, -5.0, 5.0)
     sigma_f = ROOT.RooRealVar(
-        f"sigma_fail_{bin_key}", "sigma fail", 0.5, 0.05, 5.0)
+        f"sigma_fail_{bin_key}", "sigma fail", 0.5, 0.1, 5.0)
 
     if bkg_shape == "expo":
         tau_p = ROOT.RooRealVar(

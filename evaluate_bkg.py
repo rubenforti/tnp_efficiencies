@@ -8,6 +8,7 @@ from utilities.base_library import eval_efficiency as eval_bkgfrac  #La formula 
 from utilities.results_utils import init_pass_fail_histos
 from utilities.plot_utils import plot_bkg_on_histo
 from utilities.fit_utils import check_existing_fit
+from utilities.dataset_utils import ws_init
 from array import array
 from indep_eff_pseudodata import independent_efficiency
 
@@ -158,7 +159,8 @@ def fit_bkg(type_eff, type_analysis, ws, flag, bin_key, fit_shape="expo"):
 ###############################################################################
 
 def bkg_mass_distribution(type_eff, bkg_categories, ws, binning_pt, binning_eta, 
-                           plot_on_data=False, plot_on_signal=False, figpath='figs/bkg_and_sig_mc'):
+                           plot_on_data=False, plot_on_signal=False, logscale=True,
+                           figpath='figs/bkg_and_sig_mc'):
     """
     Plots the M_inv distribution of the total bkg and the various background samples, for each (pt,eta) bin.
     These bkg distributions can be compared to the MC signal or the data distributions.
@@ -264,9 +266,16 @@ def bkg_mass_distribution(type_eff, bkg_categories, ws, binning_pt, binning_eta,
                 histos[f"h_bkgfrac_pull_{flag}"].Fill(bkg_frac_pull)
                 histos[f"h_bkgfrac_pull_{flag}_2d"].SetBinContent(bin_pt, bin_eta, bkg_frac_pull)
 
-                plot_bkg_on_histo(datasets, flag, bin_key, figpath=figpath) 
+                plot_bkg_on_histo(datasets, flag, bin_key, figpath=figpath)
 
-    
+            else:
+                datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories)
+                plot_bkg_on_histo(datasets, flag, bin_key, logscale=logscale, figpath=figpath)
+                
+
+
+
+    '''
     if plot_on_data:
         filename = f"bkg_results/nbkg_mc_vs_datafit.root"
     elif plot_on_signal:
@@ -278,7 +287,7 @@ def bkg_mass_distribution(type_eff, bkg_categories, ws, binning_pt, binning_eta,
     for histo in histos.values():
         histo.Write()
     file.Close()
-
+    '''
 
 
 ###############################################################################
@@ -369,37 +378,40 @@ def plot_backgrounds_2d(ws, binning_pt, binning_eta, bkg_categories,
         print("ERROR: can't normalize both on data and total bkg")
         sys.exit()
     elif norm_data:
-        add_title = "norm on data"
+        add_title = " norm on data"
     elif norm_tot_bkg:
-        add_title = "norm on total bkg"
+        add_title = " norm on total bkg"
     else:
         add_title = ""
 
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
     bin_dict = bin_dictionary(binning_pt, binning_eta)    
 
-    nbins_pt = len(binning_pt) - 1
-    nbins_eta = len(binning_eta) - 1
+    nbins_pt = len(bins_pt) - 1
+    nbins_eta = len(bins_eta) - 1
 
     rootfile_distrib = ROOT.TFile(filename, "RECREATE")
     histos = {}
 
     for cat in bkg_categories:
 
-        histos.update(init_pass_fail_histos(cat, cat+" add_title", 
-                                            binning_pt, binning_pt, binning_eta))
+        histos.update(init_pass_fail_histos(cat, cat, bins_pt, bins_pt, bins_eta))
+
+        cnt_mergedpt = 0
 
         for bin_key in bin_dict:
 
             _, bin_pt, bin_eta = bin_dict[bin_key]
 
             # Bin transformation needed in case the bins are merged
-            if type(bin_pt) is list:
-                bin_pt = int(1+(nbins_pt*(bin_pt[0]-1)/15.))
             if type(bin_eta) is list:
                 bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
+            if type(bin_pt) is list:
+                bin_pt_list = bin_pt
+                bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
+                cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
+                    
 
-            print(bin_pt, bin_eta)
 
             h_pass = ws.data(f"Minv_bkg_pass_{bin_key}_{cat}")
             h_fail = ws.data(f"Minv_bkg_fail_{bin_key}_{cat}")
@@ -413,8 +425,9 @@ def plot_backgrounds_2d(ws, binning_pt, binning_eta, bkg_categories,
                 print("ERROR: negative number of events")
                 sys.exit()
             if npass==0 or nfail==0:
-                print("**********\nWARNING: zero number of events\n**********\n")
-                
+                # print("**********\nWARNING: zero number of events\n**********\n")
+                pass
+
             if norm_data:
                 h_data_pass = ws.data(f"Minv_data_pass_{bin_key}")
                 h_data_fail = ws.data(f"Minv_data_fail_{bin_key}")
@@ -430,10 +443,10 @@ def plot_backgrounds_2d(ws, binning_pt, binning_eta, bkg_categories,
                 d_npass, d_nfail = d_npass/h_data_pass.sumEntries(), d_nfail/h_data_fail.sumEntries()
             
         
-            histos[f"{cat}_pass"].SetBinContent(bin_pt, bin_eta, npass)
-            histos[f"{cat}_pass"].SetBinError(bin_pt, bin_eta, d_npass)  
-            histos[f"{cat}_fail"].SetBinContent(bin_pt, bin_eta, nfail)
-            histos[f"{cat}_fail"].SetBinError(bin_pt, bin_eta, d_nfail)
+            histos[f"{cat}_pass_2d"].SetBinContent(bin_pt, bin_eta, npass)
+            #histos[f"{cat}_pass"].SetBinError(bin_pt, bin_eta, d_npass)  
+            histos[f"{cat}_fail_2d"].SetBinContent(bin_pt, bin_eta, nfail)
+            # histos[f"{cat}_fail"].SetBinError(bin_pt, bin_eta, d_nfail)
 
         '''
         c = ROOT.TCanvas("c", "c", 1200, 1200)
@@ -455,8 +468,8 @@ def plot_backgrounds_2d(ws, binning_pt, binning_eta, bkg_categories,
         '''
 
         rootfile_distrib.cd()
-        histos[f"{cat}_pass"].Write()
-        histos[f"{cat}_fail"].Write()
+        histos[f"{cat}_pass_2d"].Write()
+        histos[f"{cat}_fail_2d"].Write()
     
     rootfile_distrib.Close()
 
@@ -484,11 +497,14 @@ if __name__ == "__main__":
     sig_lumi_scale = lumi_scales.pop("Zmumu")
     # lumi_scales = {"WW":1, "WZ":1, "ZZ":1, "TTSemileptonic":1, "Ztautau":1}
 
-    filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
-    filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
-    filename_mc_weightsum = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS/tnp_iso_mc_vertexWeights1_oscharge1.root"
+    # filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
+    # filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
+    # filename_mc_weightsum = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS/tnp_iso_mc_vertexWeights1_oscharge1.root"
+    # dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
 
-    dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
+    filename_data = "root_files/datasets/tnp_iso_data_vertexWeights1_oscharge1.root"
+    filename_mc = "root_files/datasets/tnp_iso_mc_vertexWeights1_oscharge1.root"
+    dirname_bkg = "root_files/datasets"
 
     bkg_filenames = {}
     [bkg_filenames.update({cat : 
@@ -507,8 +523,8 @@ if __name__ == "__main__":
         }
     }
     
-    binning_pt_key = "pt"
-    binning_eta_key = "eta_8bins"
+    binning_pt_key = "pt_10bins"
+    binning_eta_key = "eta_16bins"
 
     binning_mass = binning("mass_60_120")
 
@@ -519,10 +535,10 @@ if __name__ == "__main__":
     # bin_set = bin_dict()
     bin_set = bin_dictionary(binning_pt_key, binning_eta_key)
 
-    ws_filename = "bkg_results/ws_bkg_pseudodata.root"
+    ws_filename = "root_files/ws_bkg_mergedbins_pt10_eta16.root"
 
-    #ws = ws_init(import_dictionary, an, bin_set, binning_mass)
-    # ws.writeToFile("root_files/ws_bkg_pseudodata.root")
+    ws = ws_init(import_dictionary, an, bin_set, binning_mass)
+    ws.writeToFile(ws_filename)
 
     # file = ROOT.TFile("root_files/ws_bkg_studies.root", "READ")
     # file = ROOT.TFile("root_files/ws_bkg_pseudodata.root", "READ")
@@ -530,12 +546,14 @@ if __name__ == "__main__":
     file = ROOT.TFile(ws_filename, "READ")
     ws = file.Get("w")
 
-    #plot_backgrounds_2d(ws, bkg_categories, lumi_scales, bin_set, new_binning_pt, new_binning_eta,
-    #                    norm_data=True, norm_tot_bkg=False, filename="root_files/backgrounds/bkg_2d_distr_norm_mc_signal.root")
+    # plot_backgrounds_2d(ws, binning_pt_key, binning_eta_key, bkg_categories,
+    #                     norm_data=False, norm_tot_bkg=False, 
+    #                     filename="bkg_2d_distr_12pt_24eta.root")
     
     
-    # bkg_mass_distribution("iso", bkg_categories, ws, binning_pt_key, binning_eta_key,
-    #                       plot_on_data=False, plot_on_signal=True)
+    bkg_mass_distribution("iso", bkg_categories, ws, binning_pt_key, binning_eta_key,
+                          plot_on_data=False, plot_on_signal=False, logscale=False,
+                          figpath="figs/bkg_pt10_eta16")
     
 
     # fit_on_pseudodata(ws, "pt", "eta_8bins", "expo", bkg_categories, refit_numbkg=True, verb=-1, figs=True)
@@ -543,7 +561,7 @@ if __name__ == "__main__":
 
     # ws.Print()
 
-    plot_pseudodata_eff_comparison(ws, "pt", "eta_8bins", "bkg_results/pseudodata_eff_comparison.root")
+    # plot_pseudodata_eff_comparison(ws, "pt", "eta_8bins", "bkg_results/pseudodata_eff_comparison.root")
 
 
     #ws.writeToFile("root_files/ws/ws_data_bkg.root")

@@ -6,10 +6,11 @@ from utilities.base_library import binning, bin_dictionary, eval_efficiency, sum
 from utilities.results_utils import results_manager, init_results_histos
 
 
-bins_delta_eff = array("d", [round(-1e-2 + (2e-2/75)*i, 5) for i in range(75+1)])
-bins_delta_deff = array("d", [round(-1e-3 + (2e-3/75)*i, 6) for i in range(75+1)])
-bins_pull = array("d", [round(-2 + (4./50)*i, 5) for i in range(50+1)])
+bins_delta_eff = array("d", [round(-8e-4 + (1.6e-3/75)*i, 5) for i in range(75+1)])
+bins_delta_deff = array("d", [round(-1e-4 + (2e-4/75)*i, 6) for i in range(75+1)])
+bins_pull = array("d", [round(-1 + (2/75)*i, 5) for i in range(75+1)])
 bins_ratio = array("d", [round(0.995 + (0.01/50)*i, 5) for i in range(50+1)])
+
 
 def compare_efficiency(ws_bmark, ws_new, binning_pt, binning_eta, file_output, auxiliary_res={}):
     """
@@ -51,15 +52,19 @@ def compare_efficiency(ws_bmark, ws_new, binning_pt, binning_eta, file_output, a
     histos.update(init_results_histos("pull_eff", "Pull efficiency", 
                                       bins_pull, bins_pt, bins_eta))
 
+    cnt_mergedpt = 0
+
     for bin_key in bmark_dict.keys():
 
         _, bin_pt, bin_eta = bin_dict[bin_key]
 
-        # Bin transformation needed in case the bins are merged
-        if type(bin_pt) is list:
-            bin_pt = int(1+(nbins_pt*(bin_pt[0]-1)/15.))
+       # Bin transformation needed in case the bins are merged
         if type(bin_eta) is list:
             bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
+        if type(bin_pt) is list:
+            bin_pt_list = bin_pt
+            bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
+            cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
 
         eff_1, deff_1 = res_benchmark.getEff(bin_key)
         eff_2, deff_2 = res_new.getEff(bin_key)
@@ -90,10 +95,6 @@ def compare_with_benchmark(ws, type_analysis, ref_txt, file_output):
     
     bins_pt, bins_eta = binning("pt"), binning("eta")
     bin_dict = bin_dictionary("pt","eta")
-    
-    bins_delta_eff = array("d", [round(-1e-3 + (2e-3/50)*i, 5) for i in range(50+1)])
-    bins_delta_deff = array("d", [round(-1e-4 + (2e-4/50)*i, 6) for i in range(50+1)])
-    bins_pull = array("d", [round(-2 + (4/50)*i, 5) for i in range(50+1)])
             
     histos = {}
     histos.update(init_results_histos("delta_eff", "Delta efficiency", 
@@ -189,15 +190,19 @@ def compare_eff_pseudodata(ws, binning_pt, binning_eta, file_output):
 
     results = results_manager("indep", binning_pt, binning_eta, import_ws=ws)
 
-    for bin_key in bin_dict:
+    cnt_mergedpt = 0
+    
+    for bin_key in bin_dict.keys():
 
         _, bin_pt, bin_eta = bin_dict[bin_key]
 
-        # Bin transformation needed in case the bins are merged
-        if type(bin_pt) is list:
-            bin_pt = int(1+(nbins_pt*(bin_pt[0]-1)/15.))
+       # Bin transformation needed in case the bins are merged
         if type(bin_eta) is list:
             bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
+        if type(bin_pt) is list:
+            bin_pt_list = bin_pt
+            bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
+            cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
         
         eff, d_eff = results.getEff(bin_key)
 
@@ -227,14 +232,14 @@ def compare_eff_pseudodata(ws, binning_pt, binning_eta, file_output):
 
 if __name__ == '__main__':
 
-    '''
-    file = ROOT.TFile.Open("results/bmark_iso_2gev/ws_iso_indep_bmark_2gev.root")
+    
+    file = ROOT.TFile.Open("results/benchmark_iso/ws_iso_indep_benchmark.root")
     ws = file.Get("w")
     compare_with_benchmark(ws, "indep", "results/benchmark_iso/old_results.txt", 
-                           "results/bmark_2gev/hres_compared_bmark.root")
-    '''
-
+                           "results/benchmark_iso/hres_cmp_iso_indep_benchmark.root")
     
+
+    '''
     file_bmark = ROOT.TFile.Open("results/bmark_iso_2gev/ws_iso_indep_bmark_2gev.root")
     ws_bmark = file_bmark.Get("w")
 
@@ -242,7 +247,7 @@ if __name__ == '__main__':
     ws_test = file_test.Get("w")
 
     compare_efficiency(ws_bmark, ws_test, "pt", "eta", "bkg_results/hres_mcbkg_2gev_cmp.root")
-    
+    '''
 
     '''
     file_pseudodata = ROOT.TFile.Open("bkg_results/ws_bkg_pseudodata.root")
