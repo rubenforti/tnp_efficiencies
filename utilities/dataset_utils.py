@@ -73,7 +73,8 @@ def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_sca
 
 ###############################################################################
 
-def ws_init(import_datasets, type_analysis, bins, bins_mass):
+def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mass, 
+            import_existing_ws=False, existing_ws_filename="", altBinning_bkg=False):
     """
     Initializes a RooWorkspace with the datasets corresponding to a given efficiency step. The objects 
     stored are RooDataHist of TP_invmass in every (pt,eta) bin. The datasets are of the type ("data, "mc",
@@ -81,15 +82,29 @@ def ws_init(import_datasets, type_analysis, bins, bins_mass):
     "data" and "mc types; two other dictionaries in the the "bkg" case, containing the paths of the files 
     and the dictionary of the luminosity scales.
     """
-    w = ROOT.RooWorkspace("w")
-    x = ROOT.RooRealVar("x", "TP M_inv", bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-    w.Import(x)
 
-    x_binning = ROOT.RooUniformBinning(bins_mass[0], bins_mass[-1], len(bins_mass)-1, "x_binning")
+    if altBinning_bkg is False:
+        bins = bin_dictionary(binning_pt, binning_eta)
+    else:
+        bin_idx_dict = make_bin_idx_dict(binning_pt, binning_eta)
+        bins = bin_dictionary()
+
+    bins_mass = binning(binning_mass)
+
+    if import_existing_ws is True:
+        ws_file = ROOT.TFile(existing_ws_filename)
+        w = ws_file.Get("w")
+    else:
+        w = ROOT.RooWorkspace("w")
+        x = ROOT.RooRealVar("x", "TP M_inv", bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+        x_binning = ROOT.RooUniformBinning(bins_mass[0], bins_mass[-1], len(bins_mass)-1, "x_binning")
+        w.Import(x)
+
 
     global_counter = 0
-    
-    for dataset_type in import_datasets:
+
+
+    for dataset_type in import_datasets:       
 
         if dataset_type=="data":
             file = ROOT.TFile(import_datasets[dataset_type], "READ")
@@ -106,50 +121,61 @@ def ws_init(import_datasets, type_analysis, bins, bins_mass):
             print("****\nINVALID DATASET TYPE\n****")
             sys.exit()
         
+
         for bin_key in bins:
 
-            _, bin_pt, bin_eta = bins[bin_key]
+            gl_idx, bin_pt, bin_eta = bins[bin_key]
 
-            if type_analysis == 'indep':
-                x_pass = ROOT.RooRealVar(f"x_pass_{bin_key}", "TP M_inv", 
-                                        bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-                x_pass.setBinning(x_binning)
-                x_fail = ROOT.RooRealVar(f"x_fail_{bin_key}", "TP M_inv",
-                                        bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-                x_fail.setBinning(x_binning)
-                axis = (x_fail, x_pass)
-                # w.Import(x_pass)
-                # w.Import(x_fail)
-            elif type_analysis == 'sim':
-                x_sim = ROOT.RooRealVar(f"x_sim_{bin_key}", "TP M_inv",
-                                        bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-                x_sim.setBinning(x_binning)
-                axis = (x_sim, x_sim)
+            if import_existing_ws is True:
+                if type_analysis == "indep":
+                    x_pass = w.var(f"x_pass_{bin_key}")
+                    x_fail = w.var(f"x_fail_{bin_key}")
+                    axis = (x_fail, x_pass)
+                elif type_analysis == "sim":
+                    x_sim = w.var(f"x_sim_{bin_key}")
+                    axis = (x_sim, x_sim)
             else:
-                print("****\nINVALID ANALYSIS TYPE\n****")
-                sys.exit()
-            
+                if type_analysis == 'indep':
+                    x_pass = ROOT.RooRealVar(f"x_pass_{bin_key}", "TP M_inv", 
+                                            bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+                    x_pass.setBinning(x_binning)
+                    x_fail = ROOT.RooRealVar(f"x_fail_{bin_key}", "TP M_inv",
+                                            bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+                    x_fail.setBinning(x_binning)
+                    axis = (x_fail, x_pass)
+                elif type_analysis == 'sim':
+                    x_sim = ROOT.RooRealVar(f"x_sim_{bin_key}", "TP M_inv",
+                                            bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+                    x_sim.setBinning(x_binning)
+                    axis = (x_sim, x_sim)
+
             if dataset_type == "data":
                 histo_pass = get_roohist(file, dataset_type, "pass", axis[1], bin_key, bin_pt, bin_eta)
                 histo_fail = get_roohist(file, dataset_type, "fail", axis[0], bin_key, bin_pt, bin_eta)
                 w.Import(histo_pass)
                 w.Import(histo_fail)
                 global_counter += 2
+
             if dataset_type == "mc":
                 histo_pass = get_roohist(file, dataset_type, "pass", axis[1], 
-                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
+                                        bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
                 histo_fail = get_roohist(file, dataset_type, "fail", axis[0], 
-                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
+                                        bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
                 w.Import(histo_pass)
                 w.Import(histo_fail)
                 global_counter += 2
+
             elif dataset_type == "bkg":
+                if altBinning_bkg is True:
+                    gl_idx_key = str(gl_idx)
+                    bin_pt, bin_eta = bin_idx_dict[gl_idx_key]
+                    print(bin_pt, bin_eta)
                 for cat in bkg_lumi_scales:
                     histo_pass = get_roohist(file_set[cat], dataset_type, "pass", axis[1], 
-                                             bin_key, bin_pt, bin_eta, global_scale=bkg_lumi_scales[cat])
+                                            bin_key, bin_pt, bin_eta, global_scale=bkg_lumi_scales[cat])
                     histo_pass.SetName(f"{histo_pass.GetName()}_{cat}")
                     histo_fail = get_roohist(file_set[cat], dataset_type, "fail", axis[0], 
-                                             bin_key, bin_pt, bin_eta, global_scale=bkg_lumi_scales[cat])
+                                            bin_key, bin_pt, bin_eta, global_scale=bkg_lumi_scales[cat])
                     histo_fail.SetName(f"{histo_fail.GetName()}_{cat}")
                     w.Import(histo_pass)
                     w.Import(histo_fail)
@@ -172,16 +198,22 @@ def show_negweighted_bins(ws, bkg_categories, binning_pt, binning_eta):
 
     bin_dict = bin_dictionary(binning_pt, binning_eta)
 
-    negweight_single_bkg = ROOT.TH2D("negweight_single_bkg", "negweight_single_bkg", 
+    neg_weight_single = ROOT.TH2D("neg_weight_single", "neg_weight_single", 
+                                  nbins_pt, bins_pt, nbins_eta, bins_eta)
+    neg_weight_total = ROOT.TH2D("neg_weight_total", "neg_weight_total", 
+                                 nbins_pt, bins_pt, nbins_eta, bins_eta)
+
+    neg_sumEntries_single = ROOT.TH2D("neg_sumEntries_single", "neg_sumEntries_single", 
+                                      nbins_pt, bins_pt, nbins_eta, bins_eta)
+    neg_sumEntries_total = ROOT.TH2D("neg_sumEntries_total", "neg_sumEntries_total", 
                                      nbins_pt, bins_pt, nbins_eta, bins_eta)
-    negweight_total_bkg = ROOT.TH2D("negweight_total_bkg", "negweight_total_bkg", 
-                                    nbins_pt, bins_pt, nbins_eta, bins_eta)
+    
+
 
     cnt_mergedpt=0
 
     for bin_key in bin_dict.keys():
 
-        cnt_negweight_single = 0
 
         _, bin_pt, bin_eta = bin_dict[bin_key]
 
@@ -193,30 +225,50 @@ def show_negweighted_bins(ws, bkg_categories, binning_pt, binning_eta):
             bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
             cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
 
-        n_ev_pass = 0
-        n_ev_fail = 0
-        for cat in bkg_categories:
-            histo_pass = ws.data(f"Minv_bkg_pass_{bin_key}_{cat}")
-            histo_fail = ws.data(f"Minv_bkg_fail_{bin_key}_{cat}")
-            n_ev_pass += histo_pass.sumEntries()
-            n_ev_fail += histo_fail.sumEntries()
+        cnt_sum_total = 0
+        cnt_sum_single = 0
+        cnt_weight_total = 0
+        cnt_weight_single = 0
 
-            if histo_pass.sumEntries()<0 or histo_fail.sumEntries()<0:
-                cnt_negweight_single += 1
-        
-        if cnt_negweight_single>0:
-            negweight_single_bkg.SetBinContent(bin_pt, bin_eta, cnt_negweight_single)
-                
-        if n_ev_pass<0 or n_ev_fail<0:
-            negweight_single_bkg.SetBinContent(bin_pt, bin_eta, 1)
-    
+        for flag in ["pass", "fail"]:
+            axis = ws.var(f"x_{flag}_{bin_key}")
+            tot_histo = ROOT.RooDataHist("tot_histo", "tot_histo", ROOT.RooArgList(axis), "")
+
+            for cat in bkg_categories:
+                bkg_data = ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")
+                tot_histo.add(bkg_data) 
+                cnt_sum_single = cnt_sum_single+1 if bkg_data.sumEntries() < 0 else cnt_sum_single
+                    
+            cnt_sum_total = cnt_sum_total+1 if tot_histo.sumEntries() < 0 else cnt_sum_total
+
+            for idx in range(tot_histo.numEntries()):
+                cnt_weight_total = cnt_weight_total+1 if tot_histo.weight(idx) < 0 else cnt_weight_total
+                for cat in bkg_categories:
+                    histo = ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")
+                    cnt_weight_single = cnt_weight_single+1 if histo.weight(idx) < 0 else cnt_weight_single
+
+
+        neg_weight_single.SetBinContent(bin_pt, bin_eta, cnt_weight_single)
+        neg_weight_total.SetBinContent(bin_pt, bin_eta, cnt_weight_total)
+        neg_sumEntries_single.SetBinContent(bin_pt, bin_eta, cnt_sum_single)
+        neg_sumEntries_total.SetBinContent(bin_pt, bin_eta, cnt_sum_total)    
+            
+                        
+
+    ROOT.gStyle.SetOptStat("i")
+    ROOT.gStyle.SetPalette(55)
+
     c = ROOT.TCanvas()
-    c.Divide(1,2)
+    c.Divide(2,2)
     c.cd(1)
-    negweight_single_bkg.Draw("colz")
+    neg_weight_single.Draw("colz")
     c.cd(2)
-    negweight_total_bkg.Draw("colz")
-    c.SaveAs(f"prob_bins_pt{nbins_pt}bins_eta{nbins_eta}bins.png")
+    neg_weight_total.Draw("colz")
+    c.cd(3)
+    neg_sumEntries_single.Draw("colz")
+    c.cd(4)
+    neg_sumEntries_total.Draw("colz")
+    c.SaveAs(f"figs/neg_bkg_histos_checks/prob_bins_pt{nbins_pt}_eta{nbins_eta}.pdf")
 
 ###############################################################################
 
@@ -254,6 +306,27 @@ def extend_merged_datasets(ws, merged_bin_key, bkg_categories):
                     ws.Import(new_data)
 
 
+
+def make_bin_idx_dict(binning_pt, binning_eta):
+    """
+    """
+
+    bin_dict = bin_dictionary(binning_pt, binning_eta)
+
+    bin_idx_dict = {}
+
+    for bin_key in bin_dict.keys():
+        gl_idx, pt, eta = bin_dict[bin_key]
+        if type(gl_idx) is list:
+            [bin_idx_dict.update({str(gl) : [pt, eta]})  for gl in gl_idx]
+        else:
+            bin_idx_dict.update({str(gl_idx) : [pt, eta]})
+            
+
+
+    return bin_idx_dict
+
+        
 
 
 
@@ -311,21 +384,7 @@ if __name__ == '__main__':
         } 
     }
 
-    binning_mass = binning("mass_60_120")
 
-    binnings_list = [# ["pt", "eta"], ["pt", "eta_24bins"], ["pt", "eta_16bins"], 
-                     # ["pt", "eta_8bins"], ["pt_12bins", "eta"], ["pt_10bins", "eta"],
-                     # ["pt_8bins", "eta"], ["pt_12bins", "eta_24bins"]]
-                     ["pt_10bins", "eta_16bins"]]
-    
-    # bin_dict = bin_dictionary("pt_12bins", "eta_24bins")
-
-    for binning_pt, binning_eta in binnings_list:
-        bin_set = bin_dictionary(binning_pt, binning_eta)
-
-        w = ws_init(import_dictionary, an, bin_set, binning_mass)
-        
-        show_negweighted_bins(w, bkg_categories, binning_pt, binning_eta)
 
 
 

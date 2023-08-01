@@ -6,9 +6,9 @@ from utilities.base_library import binning, bin_dictionary, eval_efficiency, sum
 from utilities.results_utils import results_manager, init_results_histos
 
 
-bins_delta_eff = array("d", [round(-8e-4 + (1.6e-3/75)*i, 5) for i in range(75+1)])
-bins_delta_deff = array("d", [round(-1e-4 + (2e-4/75)*i, 6) for i in range(75+1)])
-bins_pull = array("d", [round(-1 + (2/75)*i, 5) for i in range(75+1)])
+bins_delta_eff = array("d", [round(-2e-3 + (4e-3/75)*i, 6) for i in range(75+1)])
+bins_delta_deff = array("d", [round(-2e-3 + (4e-3/75)*i, 6) for i in range(75+1)])
+bins_pull = array("d", [round(-2 + (4/75)*i, 5) for i in range(75+1)])
 bins_ratio = array("d", [round(0.995 + (0.01/50)*i, 5) for i in range(50+1)])
 
 
@@ -233,18 +233,19 @@ def compare_eff_pseudodata(ws, binning_pt, binning_eta, file_output):
 if __name__ == '__main__':
 
     
-    file = ROOT.TFile.Open("results/benchmark_iso/ws_iso_indep_benchmark.root")
+    file = ROOT.TFile.Open("results/iso_indep_mcbkg_merged/ws_iso_indep_mcbkg_merged.root")
     ws = file.Get("w")
     compare_with_benchmark(ws, "indep", "results/benchmark_iso/old_results.txt", 
-                           "results/benchmark_iso/hres_cmp_iso_indep_benchmark.root")
+                           "results/iso_indep_mcbkg_merged/hres_cmp_mcbkg_merged.root")
     
 
     '''
-    file_bmark = ROOT.TFile.Open("results/bmark_iso_2gev/ws_iso_indep_bmark_2gev.root")
+    file_bmark = ROOT.TFile.Open("results/benchmark_iso/iso_indep_mcbkg_merged.root")
     ws_bmark = file_bmark.Get("w")
 
-    file_test = ROOT.TFile.Open("root_files/ws_iso_indep_mcbkg_2gev.root")
+    file_test = ROOT.TFile.Open("results/iso_indep_mcbkg_merged.root")
     ws_test = file_test.Get("w")
+    
 
     compare_efficiency(ws_bmark, ws_test, "pt", "eta", "bkg_results/hres_mcbkg_2gev_cmp.root")
     '''

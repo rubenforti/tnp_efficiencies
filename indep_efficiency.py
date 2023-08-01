@@ -8,7 +8,6 @@ import sys
 import copy
 from utilities.results_utils import results_manager, efficiency_from_res
 from utilities.plot_utils import plot_bkg_on_histo, plot_fitted_pass_fail
-from utilities.dataset_utils import import_pdf_library
 from utilities.base_library import eval_efficiency, sumw2_error
 from utilities.fit_utils import fit_quality, check_chi2
 
@@ -17,8 +16,8 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
                            figs=False, figpath={"good":"figs/stuff", "check":"figs/check/stuff"}):
     """
     """
-    path = os.path.dirname(__file__)
-    ROOT.gSystem.cd(path)
+    # path = os.path.dirname(__file__)
+    # ROOT.gSystem.cd(path)
     
     settings = copy.deepcopy(settings_dict)
 
@@ -30,11 +29,8 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
     bkg_tothist = {}
     bkg_pdf_ztautau, bkg_pdf_ttsemi = {}, {}
 
-    if "ws_bkg_merged" in settings.keys():
-        ws_bkg = settings["ws_bkg_merged"]
-
-    if bin_key!="[24.0to26.0][-2.4to-2.3]":
-        sys.exit()
+    # if bin_key!="[24.0to26.0][-2.4to-2.3]":
+    #     sys.exit()
 
 
     for flag in ["pass", "fail"]:
@@ -45,7 +41,7 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
                                                      axis[flag].getRange("fitRange")[1], 
                                                      settings[flag]["Nbins"]), "cache")
 
-        histo_data.update({flag : ws.data(f"Minv_data_{flag}_{bin_key}")})
+        histo_data.update({flag : ws.data(f"Minv_data_{flag}_{bin_key}")})            
 
         # ---------------------------------------------------------------------------------------------------
         # --------------------- Parameters definition -------------------------------------------------------
@@ -71,7 +67,7 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
         smearing.update({
             flag : ROOT.RooGaussian(f"smearing_{flag}_{bin_key}", "Gaussian smearing", 
                                     axis[flag], settings[flag]["pars"]["mu"], settings[flag]["pars"]["sigma"])})
-        print(type(smearing[flag])) 
+
         pdf_mc.update({
             flag : ROOT.RooHistPdf(f"pdf_mc_{flag}_{bin_key}", "pdf MC", 
                                    axis[flag], ws.data(f"Minv_mc_{flag}_{bin_key}"), 3)})
@@ -97,24 +93,13 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
             # histo_binning = axis.getBinning()
             bkg_tothist[flag] = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo",
                                                  ROOT.RooArgSet(axis[flag]), "")
-            for cat in settings["bkg_categories"]:
-                bkg_tothist[flag].add(ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}"))
+            
+            [bkg_tothist[flag].add(ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")) for cat in settings["bkg_categories"]]
+            
             bkg_pdf.update({
                 flag : ROOT.RooHistPdf(f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
                                        ROOT.RooArgSet(axis[flag]), bkg_tothist[flag])})
-            
-        elif settings[flag]["bkg_shape"] == "mc_merged":
-            bkg_tothist[flag] = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo",
-                                                 ROOT.RooArgSet(ws_bkg.var(f"x_{flag}_{bin_key}")), "")
-            for cat in settings["bkg_categories"]:
-                bkg_tothist[flag].add(ws_bkg.data(f"Minv_bkg_{flag}_{bin_key}_{cat}"))
-            bkg_pdf.update({
-                flag : ROOT.RooHistPdf(f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
-                                       ROOT.RooArgSet(axis[flag]), bkg_tothist[flag])}, 3)
-        else:
-            print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
-            sys.exit()
-        '''
+        
         elif settings[flag]["bkg_shape"] == "mc_double_pdf":
             n_ztautau = ws.data(f"Minv_bkg_{flag}_{bin_key}_Ztautau").sumEntries()
             n_ttsemileptonic = ws.data(f"Minv_bkg_{flag}_{bin_key}_TTSemileptonic").sumEntries()
@@ -141,8 +126,22 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
                     f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
                     ROOT.RooArgList(bkg_pdf_ztautau[flag], bkg_pdf_ttsemi[flag]), 
                     ROOT.RooArgList(settings[flag]["norm"]["ztautau"], settings[flag]["norm"]["ttsemi"]))})
-        '''
         
+        else:
+            print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
+            sys.exit()
+        
+
+        # ---------------------------------------------------------------------------------------------------
+        # -------------------- Pseudodata generation if requested -------------------------------------------
+
+        if "fit_on_pseudodata" in settings.keys() and settings["fit_on_pseudodata"] is True:
+            histo_data.update({
+                flag : ROOT.RooDataHist(f"Minv_pseudodata_{flag}_{bin_key}", "pseudodata_histo",
+                                                 ROOT.RooArgSet(axis[idx]), "")})
+            histo_data[flag].add(ws.data(f"Minv_mc_{flag}_{bin_key}"))
+            histo_data[flag].add(bkg_tothist[flag])
+
 
         # ---------------------------------------------------------------------------------------------------
         # -------------------- Final models and fits --------------------------------------------------------
@@ -251,61 +250,3 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
     return results["pass"], results["fail"], status
 
       
-
-if __name__ == '__main__':
-
-
-    dizionario = {
-        "strategy" : "indep",
-        "id_name" : "AAAAAAAAAAAAAAAAAA",
-        "fit_range" : [60.0, 120.0],
-        "run" : 1,
-        "pass" : {
-            "fit_strategy" : 2,
-            "Nbins" : 2000,
-            "bufFraction" : 0.5,
-            "bkg_shape" : "expo", 
-            "pars" : {
-                "mu" : [0.0, -5.0, 5.0],
-                "sigma" : [0.5, 0.1, 5.0],
-                "tau" : [0.0, -5.0, 5.0],
-            },
-            "norm" : {
-                "nsig" : ["0.9n", 0.5, "1.5n"],
-                "nbkg" : ["0.1n", 0.5, "1.5n"],
-            },
-        },
-        "fail" : {
-            "fit_strategy" : 2,
-            "Nbins" : 2000,
-            "bufFraction" : 0.5,
-            "bkg_shape" : "expo", 
-            "pars" : {
-                "mu" : [0.0, -5.0, 5.0],
-                "sigma" : [0.5, 0.1, 5.0],
-                "tau" : [0.0, -5.0, 5.0],
-            },
-            "norm" : {
-                "nsig" : ["0.9n", 0.5, "1.5n"],
-                "nbkg" : ["0.1n", 0.5, "1.5n"],
-            }
-        }
-    }
-
-
-    ROOT.gROOT.SetBatch(True)
-    ROOT.PyConfig.IgnoreCommandLineOptions = True
-
-    t0 = time.time()
-
-    type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
-    t = type_eff[3]
-
-    bin_key = "[24.0to26.0][-2.4to-2.3]"
-
-    file = ROOT.TFile("results/benchmark_iso/ws_iso_indep_benchmark.root")
-    ws = file.Get("w")
-
-    results_pass, results_fail, status = independent_efficiency(ws, bin_key, "expo", dizionario)
-
-    results_pass.Print("v")

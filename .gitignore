@@ -149,12 +149,10 @@ figs/
 results/benchmark_iso/fit_plots_old/
 results/*/fit_plots/
 
-bkg_results/fit_iso_indep_mcbkg_2gev/
-
+bkg_studies/*/plot_*/
 
 
 results/*/ws_*.root
-bkg_results/ws_*.root
 
 
 

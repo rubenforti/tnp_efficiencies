@@ -276,10 +276,6 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, logscale=True, figpath=''):
 
 
     total_bkg = plot_objects.pop("total_bkg")
-
-    for bin_idx in range(total_bkg["roohisto"].numEntries()):
-        if total_bkg["roohisto"].weight(bin_idx) > ctrl_plot_max:
-            ctrl_plot_max = total_bkg["roohisto"].weight(bin_idx)
     
     for nbins_total_bkg in [60, 30, 20]:
             
@@ -296,6 +292,10 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, logscale=True, figpath=''):
             if ctrl_plot_binning==0 or nbins_total_bkg==20:
                 total_bkg.update({"roohisto" : tmp_histo})
                 break
+    
+    for bin_idx in range(total_bkg["roohisto"].numEntries()):
+        if total_bkg["roohisto"].weight(bin_idx) > ctrl_plot_max:
+            ctrl_plot_max = total_bkg["roohisto"].weight(bin_idx)
 
     total_bkg["roohisto"].plotOn(frame,
                                  ROOT.RooFit.Name("Total bkg"),

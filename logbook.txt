@@ -567,9 +567,48 @@ l'errore che si ricava dal fit sia consistente con quello ricavato dal MC)Ratio_
 
 Risultati:
     - il pull ha una distribuzione circa gaussiana, da un rapido fit da TBrowser si stima mu=-0.12+-0.04 e
-      sigma=0.082+-0.005.
+      sigma=0.40+-0.03.
     - il rapporto fra gli errori tende ad avere valori maggiori di 1, come ci possiamo anche aspettare dato
       che il fit aggiunge delle correlazioni tra parametri che inevitabilmente fanno crescere l'incertezza.
+
+
+
+24-31/07/2023
+-------------
+Effettuati i fit su:
+  - pseudodata (eta_8bins)
+  - nominale in mass_bins da 2 GeV ["iso_indep_2gev"]
+  - mcbkg in mass_bins da 2 GeV ["mcbkg_2gev"]
+  - mcbkg con background merged in pt e eta (pt_12bins, eta_16bins) ["mcbkg_merged"]
+
+Il merging sia in pt sia in eta per il fit "mcbkg_merged" è stato scelto in modo da combinare le seguenti
+richieste:  1) aumentare il numero di eventi negli istogrammi da cui si estraggono le pdf di un fattore >~2 
+a occhio (da approfondire se necessario);  2) mantenere una buona granularità in pt e in eta;  3) non avere 
+singoli background con sumEntries()<0 e tenere basso (si è scelto < 50) il numero di weight<0 nell'istogramma
+di background totale.
+
+Per ogni fit (tranne quello su pseudodata) estratti i datacards contenenti delta_eff, delta_error_eff e pull
+sia in 1d che in 2d. DA AGGIUNGERE anche la quantità (new/default)-1 "rm1" che sarà utilizzata nei bias-tests
+nel fit a mW in futuro.
+
+Nel fit "mcbkg_2Gev", il plot 2d delle pulls (rispetto al fit "iso_indep_2gev") mostra 3/4 outliers
+importanti, che sono dovuti a fit balordi con l'ipotesi di bkg da MC. Probabilmente il controllo del chi2 non
+ha funzionato a dovere, varrebbe la pena quindi di sistemare lo stesso controllo con LLR e ripetere 
+il fit (che tutto sommato girava)
+
+Il fit sugli pseudodata è fatto su merged bins di eta. Ora, questa non è proprio una cosa ottimale perché
+vorremmo far sempre riferimento ai reco bins, quindi sarebbe da rifare il fit appunto sui reco bins. Non ci 
+dovrebbero essere problemi nel farlo poiché è raro che l'istogramma di bkg abbia weights negativi (al max,
+tra pass e fail in un dato bin di pt-eta ci sono tre weights<0) e sommando con l'istogramma di segnale
+dovrebbe sistemarsi tutto
+
+Provato a fare il fit con le impostazioni di "mcbkg_merged" ma con i bin di massa da 2 GeV e un doppio
+parametro di nuisance per il bkg (uno per Ztautau e uno per TT). Ci sono al momento 138 bin circa che non 
+convergono, per via dei pochi eventi nei fail. Secondo Bianchini si potrebbe porre una prior su tali 
+parametri, ma per il momento non merita sbatterci ulteriormente la testa -> teniamolo come possibilità futura
+
+
+
 
 
 
@@ -578,8 +617,13 @@ Risultati:
 
 
 To-do list:
- - fit con bin da 2 Gev, sia nominale che con ipotesi mcbkg (se va bene quello ) -> confronto eff 
- - 2 nuisance par. di background, uno per Ztautau uno per TT 
+ - Sistemare codice che gestisce i fit: fare un unico codice che prenda in input dei .json con i parametri
+   iniziali e costruisca le pdf a partire da quelli. In parallelo mantenere il codice "di controllo", che
+   coordina i .json e fa i fit se necessario
+
+ - Fit nominale con bin da 2 Gev di massa -> controllare che i risultati siano coerenti col benchmark 
+ - Se ok sopra, fit con ipotesi mcbkg (se va bene quello )
+ - 2 nuisance parameters (normalizzazioni) di background, uno per Ztautau uno per TT
  - background pdf data da roohistpdf da mc tot in macro bin (merge sia di pt sia in eta)
  - forme funzionali per i mc (se sopra non si hanno risultati buoni)
  - applichiamo ai trigger

@@ -20,13 +20,13 @@ settings_dict = {
     "id_name" : "AAAAAAAAAAAAAAAAAA",
     "fit_range" : [60.0, 120.0],
     "bkg_categories" : ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"],
-    "ws_bkg_merged" : "root_files/ws_bkg_mergedbins_pt10_eta16.root",
+    "fit_on_pseudodata" : False,
     "run" : 1,
     "pass" : {
         "fit_strategy" : 2,
         "Nbins" : 2000,
         "bufFraction" : 0.5, 
-        "bkg_shape": "mc_raw",
+        "bkg_shape": "mc_double_pdf",
         "pars" : {
             "mu" : [0.0, -5.0, 5.0],
             "sigma" : [0.5, 0.1, 5.0],
@@ -39,17 +39,17 @@ settings_dict = {
     },
     "fail" : {
         "fit_strategy" : 2,
-        "Nbins" : 2000,
-        "bufFraction" : 0.5,
-        "bkg_shape" : "mc_raw",
+        "Nbins" : 5000,
+        "bufFraction" : 0.3,
+        "bkg_shape" : "mc_double_pdf",
         "pars" : {
-            "mu" : [0.0, -5.0, 5.0],
-            "sigma" : [0.5, 0.1, 5.0],
+            "mu" : [0.5, -5.0, 5.0],
+            "sigma" : [3., 0.25, 5.0],
             "tau" : [0.0, -5.0, 5.0],
         },
         "norm" : {
-            "nsig" : ["0.9n", 0.5, "1.5n"],
-            "nbkg" : ["0.1n", 0.5, "1.5n"]
+            "nsig" : ["1n", 0.5, "5n"],
+            "nbkg" : ["0.01n", 0.05, "1.5n"]
         }
     }
 }
@@ -188,16 +188,15 @@ if __name__ == '__main__':
     # ------------------
 
 
-    '''
+    
     filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
     filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
     dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
     '''
-
     filename_data = "root_files/datasets/tnp_iso_data_vertexWeights1_oscharge1.root"
     filename_mc = "root_files/datasets/tnp_iso_mc_vertexWeights1_oscharge1.root"
     dirname_bkg = "root_files/datasets"
-    
+    '''
     
     bkg_filenames = {}
     [bkg_filenames.update({cat : 
@@ -220,49 +219,52 @@ if __name__ == '__main__':
             "filename": filename_mc,
             "lumi_scale" : lumi_scale_signal
         },
-        "bkg" : {
-            "filenames" : bkg_filenames,
-            "lumi_scales" : lumi_scales
-        } 
+        # "bkg" : {
+        #     "filenames" : bkg_filenames,
+        #     "lumi_scales" : lumi_scales
+        # } 
     }
 
     # workspace_name = f"root_files/ws/ws_bkg_studies.root"
     #  workspace_name = "root_files/ws_iso_indep_mcbkg_mergedbins.root"
 
-    workspace_name = "root_files/ws_iso_indep_mcbkg_merged.root"
+    binning_mass = "mass_2GeV"
+
+    workspace_name = "root_files/ws_iso_indep_double_mcbkg_merged_2gev.root"
     
-    ws = ws_init(import_dictionary, type_analysis, bins, binning("mass_60_120"))
-    ws.writeToFile(workspace_name)
+    # ws = ws_init(import_dictionary, type_analysis, "pt", "eta", binning_mass)
+    # ws.writeToFile(workspace_name)
 
+    # file = ROOT.TFile(workspace_name, "READ")
+    # ws = file.Get("w")
 
+    
     import_dict_bkg =  {
         "bkg" : {
             "filenames" : bkg_filenames,
             "lumi_scales" : lumi_scales
         } 
     }
-    # file_bkg = ROOT.TFile(settings_dict["ws_bkg_merged"], "READ")
-    # ws_bkg = file_bkg.Get("w")
 
-    bin_dict_bkg = bin_dictionary("pt_10bins", "eta_16bins")
-    ws_bkg = ws_init(import_dict_bkg, type_analysis, bin_dict_bkg, binning("mass_60_120"))
-    
-    for merged_key in bin_dict_bkg.keys():
-         extend_merged_datasets(ws_bkg, merged_key, settings_dict["bkg_categories"])
 
-    ws_bkg.writeToFile(settings_dict["ws_bkg_merged"])
+
+
+    # ws_bkg = ws_init(import_dict_bkg, type_analysis, "pt_12bins", "eta_16bins", binning_mass, 
+    #                  import_existing_ws=True, existing_ws_filename=workspace_name, altBinning_bkg=True)
+    # ws_bkg.writeToFile(workspace_name)
+
 
 
     # ------------------------------------------------------------------------
    
     # results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
    
-    figpath = {"good": "figs/fit_iso_indep_mcbkg_merged", "check": "figs/check_fits/mcbkg_merged"} 
+    figpath = {"good": "figs/fit_iso_indep_double_mcbkg_merged", "check": "figs/check_fits/mcbkg_merged"} 
 
     ws = make_fits(workspace_name, type_eff, type_analysis, bins, settings_dict, 
-                   import_pdfs=False, savefigs=True, figpath=figpath)
+                  import_pdfs=True, savefigs=True, figpath=figpath)
 
-    #ws.writeToFile(workspace_name)
+    ws.writeToFile(workspace_name)
  
 
     #print("RISULTATI SCRITTI SU PICKLE FILE")
