@@ -51,11 +51,11 @@ def llr_eval(histo, res):
     for idx in range(histo.numEntries()):
         k = histo.weight(idx)
         if k == 0:
-            max_ll_data += 2
+            max_ll_data += 0
         elif k>0:
-            max_ll_data += 2*(k*ROOT.TMath.Log(k) - k)
+            max_ll_data += 2*(k*ROOT.TMath.Log(k))
 
-    llr_val = max_ll_data + 2*res.minNll()
+    llr_val = max_ll_data #  + 2*res.minNll()
 
     pars = res.floatParsFinal()
     ndof = histo.numEntries() - pars.getSize()

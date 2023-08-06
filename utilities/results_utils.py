@@ -30,11 +30,14 @@ class results_manager:
     """
     """
 
-    def __init__(self, type_analysis, binning_pt, binning_eta, import_ws = ""):
+    def __init__(self, type_analysis, binning_pt, binning_eta, import_ws="", import_txt=""):
         """
         """
         self._dict_results = {}
         self._analysis = type_analysis if type_analysis in ["indep", "sim"] else ""
+        if self._analysis == "":
+            print("ERROR: analysis type not recognized")
+            return None
         
         if type(import_ws) is ROOT.RooWorkspace:
             bin_dict = bin_dictionary(binning_pt, binning_eta)
@@ -48,7 +51,18 @@ class results_manager:
                     self.add_result({"sim":import_ws.obj(f"results_{bin_key}")}, bin_key)
                 else:
                     print("ERROR: analysis type not recognized")
-                
+        
+        elif type(import_txt) is list:
+            idx_list = 3
+            print(import_txt[0])
+            print(import_txt[1])
+            print(import_txt[2])
+            print(import_txt[3])
+            bin_dict = bin_dictionary(binning_pt, binning_eta)
+            for bin_key in bin_dict.keys():
+                self.add_result_from_txt(import_txt, idx_list, bin_key)
+                idx_list += 1
+
 
     def add_result(self, res, bin_key):
         """
@@ -97,6 +111,11 @@ class results_manager:
             self._dict_results.update(new_res)
         else:
             pass
+    
+    def add_result_from_txt(self, row_list, idx_list, bin_key):
+        elements = row_list[idx_list].split('\t')
+        eff, deff = float(elements[4]), float(elements[5])
+        self._dict_results.update({bin_key : {"efficiency" : (eff, deff)}})
 
     def Open(self, filename):
         with open(filename, "rb") as file:
@@ -210,47 +229,43 @@ def init_results_histos(histo_name, histo_title, bins_var, bins_pt, bins_eta):
 
 ###############################################################################
 
-def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
+def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict, nbins_eta):
     """
     """
 
-    file_in = ROOT.TFile.Open(ws_name, "UPDATE")
-    ws = file_in.Get("w")
+    # Counter used in case pt bins are merged
+    cnt_mergedpt = 0
 
-    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
-
-    bin_dict = bin_dictionary(binning_pt, binning_eta)
-    
-    
-    results = results_manager(type_analysis, binning_pt, binning_eta, import_ws=ws)
-
-    bins_eff = array("d", [round(0.85 + 0.003*i, 3) for i in range(51)])
-    bins_rel_err = array("d", [round(0 + 0.0002*i, 4) for i in range(51)])
-
-    histos ={}
-    histos.update(init_results_histos("efficiency", "Efficiency", 
-                                      bins_eff, bins_pt, bins_eta))
-    histos.update(init_results_histos("eff_rel_error", "Relative error on efficiency",
-                                      bins_rel_err, bins_pt, bins_eta))
-    
     for bin_key in bin_dict.keys():
-        
+
         _, bin_pt, bin_eta = bin_dict[bin_key]
 
-        eff, d_eff = results.getEff(bin_key)
-        # print(eff[0], eff[1])
-        histos["efficiency"].Fill(eff)
-        histos["efficiency_2d"].SetBinContent(bin_pt, bin_eta, eff)
-        histos["eff_rel_error"].Fill(d_eff/eff)
-        histos["eff_rel_error_2d"].SetBinContent(bin_pt, bin_eta, d_eff/eff)
-    
+        # Bin transformation needed in case the bins are merged
+        if type(bin_eta) is list:
+                bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
+        if type(bin_pt) is list:
+            bin_pt_list = bin_pt
+            bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
+            cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
 
-    file_out = ROOT.TFile.Open(ws_name.replace("ws", "hres"), "RECREATE")
+        eff_1, deff_1 = res_bmark.getEff(bin_key)
+        eff_2, deff_2 = res_new.getEff(bin_key)
 
-    [histo.Write() for histo in histos.values()]
-
-    file_out.Close()
-
+        if "delta" in hist_dict.keys():
+            hist_dict["delta"].Fill(eff_2-eff_1)
+            hist_dict["delta_2d"].SetBinContent(bin_pt, bin_eta, eff_2-eff_1)
+        if "delta_error" in hist_dict.keys():
+            hist_dict["delta_error"].Fill(deff_2-deff_1)
+            hist_dict["delta_error_2d"].SetBinContent(bin_pt, bin_eta, deff_2-deff_1)
+        if "pull" in hist_dict.keys():
+            hist_dict["pull"].Fill((eff_2-eff_1)/deff_2)
+            hist_dict["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff_2-eff_1)/deff_2)
+        if "rm1" in hist_dict.keys():
+            hist_dict["rm1"].Fill((eff_2/eff_1)-1)
+            hist_dict["rm1_2d"].SetBinContent(bin_pt, bin_eta, (eff_2/eff_1)-1)
+        if "ratio_error" in hist_dict.keys():
+            hist_dict["ratio_error"].Fill(deff_2/deff_1)
+            hist_dict["ratio_error_2d"].SetBinContent(bin_pt, bin_eta, deff_2/deff_1)
     
         
 ###############################################################################

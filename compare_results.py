@@ -3,28 +3,113 @@
 import ROOT
 from array import array
 from utilities.base_library import binning, bin_dictionary, eval_efficiency, sumw2_error
-from utilities.results_utils import results_manager, init_results_histos
+from utilities.results_utils import results_manager, init_results_histos, fill_res_histograms
+
+NBINS = 75
+
+eff_min = 0.85
+rel_err_eff_min = 1e-4
+rel_err_eff_max = 0.01
+sf_min = 0.99
+sf_max = 1.01
 
 
-bins_delta_eff = array("d", [round(-2e-3 + (4e-3/75)*i, 6) for i in range(75+1)])
-bins_delta_deff = array("d", [round(-2e-3 + (4e-3/75)*i, 6) for i in range(75+1)])
-bins_pull = array("d", [round(-2 + (4/75)*i, 5) for i in range(75+1)])
-bins_ratio = array("d", [round(0.995 + (0.01/50)*i, 5) for i in range(50+1)])
+delta_min = -2e-3
+delta_error_min = -2e-3
+pull_min = -2
+rm1_min = -0.005
+ratio_error_min = -0.01
+
+res_array_dict = {
+    "eff" : array("d", [round(eff_min + (1-eff_min)*(i/NBINS), 4) for i in range(NBINS+1)]),
+    "rel_err_eff" : array("d", [round(rel_err_eff_min + (rel_err_eff_max-rel_err_eff_min)*(i/NBINS), 6) 
+                                for i in range(NBINS+1)]),
+    "sf" : array("d", [round(sf_min + (sf_max-sf_min)*(i/NBINS), 5) for i in range(NBINS+1)]),
+
+}
+
+cmpres_array_dict = {
+    "delta" : array("d", [round(delta_min + (-2*delta_min/NBINS)*i, 6) for i in range(NBINS+1)]),
+    "delta_error" : array("d", [round(delta_error_min + (-2*delta_error_min/NBINS)*i, 6) for i in range(NBINS+1)]),
+    "pull" : array("d", [round(pull_min + (-2*pull_min/NBINS)*i, 6) for i in range(NBINS+1)]),
+    "rm1" : array("d", [round(rm1_min + (-2*rm1_min/NBINS)*i, 6) for i in range(NBINS+1)]),
+    "ratio_error" : array("d", [round(ratio_error_min + (-2*ratio_error_min/NBINS)*i, 6) for i in range(NBINS+1)])
+}
+
+###############################################################################
+
+def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
+    """
+    """
+    file_in = ROOT.TFile.Open(ws_name, "UPDATE")
+    ws = file_in.Get("w")
+
+    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+
+    bin_dict = bin_dictionary(binning_pt, binning_eta)
+    
+    results = results_manager(type_analysis, binning_pt, binning_eta, import_ws=ws)
 
 
-def compare_efficiency(ws_bmark, ws_new, binning_pt, binning_eta, file_output, auxiliary_res={}):
+    histos ={}
+    
+    [histos.update(init_results_histos(res, res, res_array_dict[res], bins_pt, bins_eta)) 
+     for res in ["efficiency", "eff_rel_error", "sf"]]
+
+    
+    for bin_key in bin_dict.keys():
+        
+        _, bin_pt, bin_eta = bin_dict[bin_key]
+
+        eff, d_eff = results.getEff(bin_key)
+        eff_mc, d_eff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
+                                           ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
+                                           sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
+                                           sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
+
+        histos["efficiency"].Fill(eff)
+        histos["efficiency_2d"].SetBinContent(bin_pt, bin_eta, eff)
+        histos["eff_rel_error"].Fill(d_eff/eff)
+        histos["eff_rel_error_2d"].SetBinContent(bin_pt, bin_eta, d_eff/eff)
+        histos["sf"].Fill(eff/eff_mc)
+        histos["sf_2d"].SetBinContent(bin_pt, bin_eta, eff/eff_mc)
+    
+
+    file_out = ROOT.TFile(ws_name.replace("ws", "hres"), "RECREATE")
+    file_out.cd()
+    [histo.Write() for histo in histos.values()]
+    file_out.Close()
+
+###############################################################################
+
+def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binning_eta, res_list, auxiliary_res={}):
     """
     Compare the efficiencies and their error between two results files. The first file is 
     considered as benchmark
     """
-    
-    for t_an in ["indep", "sim"]:
-        an_bmark = t_an if t_an in ws_bmark.GetName() else ""
-        an_new = t_an if t_an in ws_new.GetName() else ""
 
+    if ".root" in ws_txt_bmark_filename:
+        file_bmark = ROOT.TFile(ws_txt_bmark_filename, "READ")
+        ws_bmark = file_bmark.Get("w")
+        print(type(ws_bmark))
+        for t_an in ["indep", "sim"]: 
+            if t_an in ws_txt_bmark_filename:
+                res_benchmark = results_manager(t_an, binning_pt, binning_eta, import_ws=ws_bmark)
+                break
+    else:
+        with open(ws_txt_bmark_filename, "r") as file_bmark:
+            row_list = file_bmark.readlines()
+        print(type(row_list))
+        res_benchmark = results_manager("indep", "pt", "eta", import_txt=row_list)
     
-    res_benchmark = results_manager("indep", binning_pt, binning_eta, import_ws=ws_bmark)
-    res_new = results_manager("indep", binning_pt, binning_eta, import_ws=ws_new)
+    file_new = ROOT.TFile(ws_new_filename, "READ")
+    ws_new = file_new.Get("w")
+
+    print("indep" in ws_new_filename)
+    for t_an in ["indep", "sim"]:
+        if t_an in ws_new_filename:
+            res_new = results_manager(t_an, binning_pt, binning_eta, import_ws=ws_new)
+            break
 
     '''
     if auxiliary_res["filename"]!="":
@@ -37,141 +122,33 @@ def compare_efficiency(ws_bmark, ws_new, binning_pt, binning_eta, file_output, a
     '''
 
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
-    nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
-
     bin_dict = bin_dictionary(binning_pt, binning_eta)
-    
-    bmark_dict = res_benchmark.dictionary()
-            
  
     histos = {}
-    histos.update(init_results_histos("delta_eff", "Delta efficiency", 
-                                      bins_delta_eff, bins_pt, bins_eta))
-    histos.update(init_results_histos("delta_error_eff", "Delta error on efficiency",
-                                      bins_delta_deff, bins_pt, bins_eta))
-    histos.update(init_results_histos("pull_eff", "Pull efficiency", 
-                                      bins_pull, bins_pt, bins_eta))
+    [histos.update(init_results_histos(res_key, res_key, cmpres_array_dict[res_key], bins_pt, bins_eta)) 
+     for res_key in res_list]
 
-    cnt_mergedpt = 0
+    fill_res_histograms(res_benchmark, res_new, histos, bin_dict, len(bins_eta)-1) 
 
-    for bin_key in bmark_dict.keys():
+    histos_copy = histos.copy()
+    for hist_key in histos_copy.keys():
+        if "2d" in hist_key:
+            histos[hist_key].Sumw2()
+            histo_pt = histos[hist_key].ProjectionX(hist_key.replace("2d", "pt"), 1, len(bins_eta)-1)
+            histo_pt.Scale(1/(len(bins_eta)-1))
+            histo_eta = histos[hist_key].ProjectionY(hist_key.replace("2d", "eta"), 1, len(bins_pt)-1)
+            histo_eta.Scale(1/(len(bins_pt)-1))
+            histos.update({histo_pt.GetName() : histo_pt, histo_eta.GetName() : histo_eta})
+       
 
-        _, bin_pt, bin_eta = bin_dict[bin_key]
-
-       # Bin transformation needed in case the bins are merged
-        if type(bin_eta) is list:
-            bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
-        if type(bin_pt) is list:
-            bin_pt_list = bin_pt
-            bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
-            cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
-
-        eff_1, deff_1 = res_benchmark.getEff(bin_key)
-        eff_2, deff_2 = res_new.getEff(bin_key)
-
-        delta_eff = eff_2-eff_1
-        delta_deff = deff_2-deff_1
-
-        histos["delta_eff"].Fill(delta_eff)
-        histos["delta_eff_2d"].SetBinContent(bin_pt, bin_eta, delta_eff)
-
-        histos["delta_error_eff"].Fill(delta_deff)
-        histos["delta_error_eff_2d"].SetBinContent(bin_pt, bin_eta, delta_deff)
-
-        histos["pull_eff"].Fill(delta_eff/deff_2)
-        histos["pull_eff_2d"].SetBinContent(bin_pt, bin_eta, delta_eff/deff_1)
-
-    file_out = ROOT.TFile(file_output, "RECREATE")
+    file_out = ROOT.TFile(ws_new_filename.replace("ws", "hres_cmp"), "RECREATE")
     file_out.cd()
     [histo.Write() for histo in histos.values()]
     file_out.Close()
 
 ###############################################################################
 
-def compare_with_benchmark(ws, type_analysis, ref_txt, file_output):
-
-    with open(ref_txt, "r") as file:
-        row_list = file.readlines()
-    
-    bins_pt, bins_eta = binning("pt"), binning("eta")
-    bin_dict = bin_dictionary("pt","eta")
-            
-    histos = {}
-    histos.update(init_results_histos("delta_eff", "Delta efficiency", 
-                                      bins_delta_eff, bins_pt, bins_eta))
-    histos.update(init_results_histos("delta_error_eff", "Delta error on efficiency",
-                                      bins_delta_deff, bins_pt, bins_eta))
-    histos.update(init_results_histos("pull_eff", "Pull efficiency", 
-                                      bins_pull, bins_pt, bins_eta))
-
-    idx_list = 3
-
-    print(row_list[0])
-    print(row_list[1])
-    print(row_list[2])
-    print(row_list[3])
-
-    results = results_manager(type_analysis, "pt", "eta", import_ws=ws)
-
-    for bin_key in bin_dict.keys():
-        
-        _, bin_pt, bin_eta = bin_dict[bin_key]
-
-        eff, deff = results.getEff(bin_key)
-        elements = row_list[idx_list].split('\t')
-
-        histos["delta_eff"].Fill(eff-float(elements[4]))
-        histos["delta_eff_2d"].SetBinContent(bin_pt, bin_eta, eff-float(elements[4]))
-
-        histos["delta_error_eff"].Fill(deff-float(elements[5]))
-        histos["delta_error_eff_2d"].SetBinContent(bin_pt, bin_eta, deff-float(elements[5]))
-
-        histos["pull_eff"].Fill((eff-float(elements[4]))/float(elements[5]))
-        histos["pull_eff_2d"].SetBinContent(bin_pt, bin_eta, (eff-float(elements[4]))/float(elements[5]))
-
-        idx_list += 1
-
-    file_out = ROOT.TFile(file_output, "RECREATE")
-    file_out.cd()
-    [histo.Write() for histo in histos.values()]
-    file_out.Close()
-    '''
-    c0 = ROOT.TCanvas("", "", 1200, 900)
-    c0.Divide(2)
-    c0.cd(1)
-    ROOT.gStyle.SetOptStat("menr")
-    ROOT.gPad.SetLogy()
-    h_delta_eff.Draw()
-    c0.cd(2)
-    ROOT.gPad.SetLogy()
-    h_delta_deff.Draw()
-    c0.SaveAs("figs/delta_eff.pdf")
-
-    c1 = ROOT.TCanvas("delta_eff", "delta_eff", 1200, 900)
-    c1.cd()
-    ROOT.gStyle.SetOptStat("en")
-    ROOT.gPad.SetRightMargin(0.15)
-    ROOT.gStyle.SetPalette(57)
-    h2d_delta_eff.Draw("COLZ")
-    h2d_delta_eff.SetContour(25)
-    c1.SaveAs("figs/delta_eff_2d.pdf")
-
-    c2 = ROOT.TCanvas("pull_delta_eff", "pull_delta_eff", 1200, 900)
-    c2.cd()
-    ROOT.gStyle.SetOptStat("en")
-    ROOT.gPad.SetRightMargin(0.15)
-    ROOT.gStyle.SetPalette(57)
-    h2d_pull.Draw("COLZ")
-    h2d_pull.SetContour(25)
-    c2.SaveAs("figs/pull_delta_eff_2d.pdf")
-    '''
-
-
-   
-
-###############################################################################
-
-def compare_eff_pseudodata(ws, binning_pt, binning_eta, file_output):
+def compare_eff_pseudodata(ws, binning_pt, binning_eta, res_list, file_output):
     """
     """
 
@@ -180,13 +157,9 @@ def compare_eff_pseudodata(ws, binning_pt, binning_eta, file_output):
 
     nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
 
-    #serializzare
     histos = {}
-
-    histos.update(init_results_histos("pull", "Pull efficiency", bins_pull, bins_pt, bins_eta))
-    histos.update(init_results_histos("ratio", "Ratio efficiency", bins_ratio, bins_pt, bins_eta))
-    histos.update(init_results_histos("ratio_errors", "Ratio errors on efficiency", 
-                                      bins_ratio, bins_pt, bins_eta))
+    [histos.update(init_results_histos(res_key, res_key, cmpres_array_dict[res_key], bins_pt, bins_eta)) 
+     for res_key in res_list]
 
     results = results_manager("indep", binning_pt, binning_eta, import_ws=ws)
 
@@ -211,16 +184,21 @@ def compare_eff_pseudodata(ws, binning_pt, binning_eta, file_output):
                                            sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
                                            sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
 
-        pull = (eff-eff_mc)/d_eff_mc
-        ratio = eff / eff_mc
-        ratio_errors  = d_eff/d_eff_mc
-
-        histos["ratio"].Fill(ratio)
-        histos["ratio_2d"].SetBinContent(bin_pt, bin_eta, ratio)
-        histos["pull"].Fill(pull)
-        histos["pull_2d"].SetBinContent(bin_pt, bin_eta, pull)
-        histos["ratio_errors"].Fill(ratio_errors)
-        histos["ratio_errors_2d"].SetBinContent(bin_pt, bin_eta, ratio_errors)
+        if "delta" in histos.keys():
+            histos["delta"].Fill(eff-eff_mc)
+            histos["delta2d"].SetBinContent(bin_pt, bin_eta, eff-eff_mc)
+        if "delta_error" in histos.keys():
+            histos["delta_error"].Fill(d_eff-d_eff_mc)
+            histos["delta_error_2d"].SetBinContent(bin_pt, bin_eta, d_eff-d_eff_mc)
+        if "pull_eff" in histos.keys():
+            histos["pull"].Fill((eff-eff_mc)/d_eff_mc)
+            histos["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff-eff_mc)/d_eff_mc)
+        if "rm1" in histos.keys():
+            histos["rm1"].Fill((eff/eff_mc)-1)
+            histos["rm1_2d"].SetBinContent(bin_pt, bin_eta, (eff/eff_mc)-1)
+        if "ratio_error" in histos.keys():
+            histos["ratio_error"].Fill(d_eff/d_eff_mc)
+            histos["ratio_error_2d"].SetBinContent(bin_pt, bin_eta, d_eff/d_eff_mc)
 
     resfile = ROOT.TFile(file_output, "RECREATE")
     resfile.cd()
@@ -232,11 +210,14 @@ def compare_eff_pseudodata(ws, binning_pt, binning_eta, file_output):
 
 if __name__ == '__main__':
 
-    
-    file = ROOT.TFile.Open("results/iso_indep_mcbkg_merged/ws_iso_indep_mcbkg_merged.root")
-    ws = file.Get("w")
-    compare_with_benchmark(ws, "indep", "results/benchmark_iso/old_results.txt", 
-                           "results/iso_indep_mcbkg_merged/hres_cmp_mcbkg_merged.root")
+    res_list = cmpres_array_dict.keys()
+
+    ws_results = [["results/iso_indep_2gev/ws_iso_indep_2gev.root", "results/benchmark_iso/old_results.txt"],
+                  ["results/iso_indep_2gev_mcbkg/ws_iso_indep_2gev_mcbkg.root", "results/iso_indep_2gev/ws_iso_indep_2gev.root"],
+                  ["results/iso_indep_mcbkg_merged/ws_iso_indep_mcbkg_merged.root", "results/benchmark_iso/old_results.txt"]]
+
+    for ws_new, ws_benchmark in ws_results:
+        compare_efficiency(ws_benchmark, ws_new, "pt", "eta", res_list)
     
 
     '''
