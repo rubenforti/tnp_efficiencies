@@ -146,6 +146,7 @@ root_files/
 
 # Temporary fig repository
 figs/fit_*/
+figs/bkg_*/
 figs/check_fits/
 results/benchmark_iso/fit_plots_old/
 results/*/fit_plots/

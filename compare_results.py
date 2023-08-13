@@ -14,11 +14,11 @@ sf_min = 0.99
 sf_max = 1.01
 
 
-delta_min = -2e-3
-delta_error_min = -2e-3
-pull_min = -2
-rm1_min = -0.005
-ratio_error_min = -0.01
+delta_min = -8e-3
+delta_error_min = -1e-3
+pull_min = -3
+rm1_min = -0.01
+ratio_error_min = 0.5
 
 res_array_dict = {
     "eff" : array("d", [round(eff_min + (1-eff_min)*(i/NBINS), 4) for i in range(NBINS+1)]),
@@ -33,7 +33,7 @@ cmpres_array_dict = {
     "delta_error" : array("d", [round(delta_error_min + (-2*delta_error_min/NBINS)*i, 6) for i in range(NBINS+1)]),
     "pull" : array("d", [round(pull_min + (-2*pull_min/NBINS)*i, 6) for i in range(NBINS+1)]),
     "rm1" : array("d", [round(rm1_min + (-2*rm1_min/NBINS)*i, 6) for i in range(NBINS+1)]),
-    "ratio_error" : array("d", [round(ratio_error_min + (-2*ratio_error_min/NBINS)*i, 6) for i in range(NBINS+1)])
+    "ratio_error" : array("d", [round(ratio_error_min + (2*(1-ratio_error_min)/NBINS)*i, 6) for i in range(NBINS+1)])
 }
 
 ###############################################################################
@@ -164,6 +164,8 @@ def compare_eff_pseudodata(ws, binning_pt, binning_eta, res_list, file_output):
     results = results_manager("indep", binning_pt, binning_eta, import_ws=ws)
 
     cnt_mergedpt = 0
+
+    print(histos.keys())
     
     for bin_key in bin_dict.keys():
 
@@ -186,11 +188,11 @@ def compare_eff_pseudodata(ws, binning_pt, binning_eta, res_list, file_output):
 
         if "delta" in histos.keys():
             histos["delta"].Fill(eff-eff_mc)
-            histos["delta2d"].SetBinContent(bin_pt, bin_eta, eff-eff_mc)
+            histos["delta_2d"].SetBinContent(bin_pt, bin_eta, eff-eff_mc)
         if "delta_error" in histos.keys():
             histos["delta_error"].Fill(d_eff-d_eff_mc)
             histos["delta_error_2d"].SetBinContent(bin_pt, bin_eta, d_eff-d_eff_mc)
-        if "pull_eff" in histos.keys():
+        if "pull" in histos.keys():
             histos["pull"].Fill((eff-eff_mc)/d_eff_mc)
             histos["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff-eff_mc)/d_eff_mc)
         if "rm1" in histos.keys():
@@ -212,13 +214,14 @@ if __name__ == '__main__':
 
     res_list = cmpres_array_dict.keys()
 
+    '''
     ws_results = [["results/iso_indep_2gev/ws_iso_indep_2gev.root", "results/benchmark_iso/old_results.txt"],
                   ["results/iso_indep_2gev_mcbkg/ws_iso_indep_2gev_mcbkg.root", "results/iso_indep_2gev/ws_iso_indep_2gev.root"],
                   ["results/iso_indep_mcbkg_merged/ws_iso_indep_mcbkg_merged.root", "results/benchmark_iso/old_results.txt"]]
 
     for ws_new, ws_benchmark in ws_results:
         compare_efficiency(ws_benchmark, ws_new, "pt", "eta", res_list)
-    
+    '''
 
     '''
     file_bmark = ROOT.TFile.Open("results/benchmark_iso/iso_indep_mcbkg_merged.root")
@@ -231,11 +234,11 @@ if __name__ == '__main__':
     compare_efficiency(ws_bmark, ws_test, "pt", "eta", "bkg_results/hres_mcbkg_2gev_cmp.root")
     '''
 
-    '''
-    file_pseudodata = ROOT.TFile.Open("bkg_results/ws_bkg_pseudodata.root")
+    
+    file_pseudodata = ROOT.TFile.Open("results/pseudodata_eta8bins/ws_iso_pseudodata_eta8bins.root")
     ws_pseudodata = file_pseudodata.Get("w")
-    compare_eff_pseudodata(ws_pseudodata, "pt", "eta_8bins", "bkg_results/hres_pseudodata_cmp.root")
-    '''
+    compare_eff_pseudodata(ws_pseudodata, "pt", "eta_8bins", res_list, "results/pseudodata_eta8bins/hres_cmp_pseudodata.root")
+
 
     
 

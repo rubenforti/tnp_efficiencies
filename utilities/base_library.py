@@ -123,6 +123,25 @@ def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
 
 ###############################################################################
 
+def bin_global_idx_dict(binning_pt, binning_eta):
+    """
+    """
+
+    bin_dict = bin_dictionary(binning_pt, binning_eta)
+
+    bin_idx_dict = {}
+
+    for bin_key in bin_dict.keys():
+        gl_idx, pt, eta = bin_dict[bin_key]
+        if type(gl_idx) is list:
+            [bin_idx_dict.update({str(gl) : [pt, eta]}) for gl in gl_idx]
+        else:
+            bin_idx_dict.update({str(gl_idx) : [pt, eta]})
+            
+    return bin_idx_dict
+
+###############################################################################
+
 def cross_section_bkg(bkg_process):
     """
     Returns the cross section of the given background process in pb

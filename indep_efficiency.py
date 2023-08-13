@@ -7,7 +7,7 @@ import os
 import sys
 import copy
 from utilities.results_utils import results_manager, efficiency_from_res
-from utilities.plot_utils import plot_bkg_on_histo, plot_fitted_pass_fail
+from utilities.plot_utils import plot_fitted_pass_fail
 from utilities.base_library import eval_efficiency, sumw2_error
 from utilities.fit_utils import fit_quality, check_chi2
 
@@ -25,12 +25,15 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
     smearing, pdf_mc, conv_pdf, bkg_pdf, sum_pdf, model_pdf = {}, {}, {}, {}, {}, {}
     results, fit_status = {}, {}
 
-
     bkg_tothist = {}
     bkg_pdf_ztautau, bkg_pdf_ttsemi = {}, {}
+    h_pseudodata = {}
 
     # if bin_key!="[24.0to26.0][-2.4to-2.3]":
     #     sys.exit()
+
+    fit_pseudodata = True if ("fit_on_pseudodata" in settings.keys() and 
+                              settings["fit_on_pseudodata"] is True) else False
 
 
     for flag in ["pass", "fail"]:
@@ -45,25 +48,29 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
 
         # ---------------------------------------------------------------------------------------------------
         # --------------------- Parameters definition -------------------------------------------------------
+
         for obj_key in settings[flag]["pars"].keys():
             pars_obj = settings[flag]["pars"]
             settings[flag]["pars"].update({
                 obj_key : ROOT.RooRealVar(f"{obj_key}_{flag}_{bin_key}", f"{obj_key} {flag}", 
                                           pars_obj[obj_key][0], pars_obj[obj_key][1], pars_obj[obj_key][2])})
         
-        for obj_key in settings[flag]["norm"].keys():
-            norm_obj = settings[flag]["norm"][obj_key]
-            for idx in range(3):
-                if (type(norm_obj[idx]) is str) and ("n" in norm_obj[idx]):
-                    norm_obj[idx] = float(norm_obj[idx].replace("n",""))*histo_data[flag].sumEntries()
-                else:
-                    norm_obj[idx] = float(norm_obj[idx])
-            settings[flag]["norm"].update({
-                obj_key : ROOT.RooRealVar(f"{obj_key}_{flag}_{bin_key}", f"{obj_key} {flag}",
-                                          norm_obj[0], norm_obj[1], norm_obj[2])})
-        
+        if fit_pseudodata is False:
+            for obj_key in settings[flag]["norm"].keys():
+                norm_obj = settings[flag]["norm"][obj_key]
+                for idx in range(3):
+                    if (type(norm_obj[idx]) is str) and ("n" in norm_obj[idx]):
+                        norm_obj[idx] = float(norm_obj[idx].replace("n",""))*histo_data[flag].sumEntries()
+                    else:
+                        norm_obj[idx] = float(norm_obj[idx])
+                settings[flag]["norm"].update({
+                    obj_key : ROOT.RooRealVar(f"{obj_key}_{flag}_{bin_key}", f"{obj_key} {flag}",
+                                            norm_obj[0], norm_obj[1], norm_obj[2])})
+
+
         # ---------------------------------------------------------------------------------------------------
         # -------------------- Signal PDF -------------------------------------------------------------------
+
         smearing.update({
             flag : ROOT.RooGaussian(f"smearing_{flag}_{bin_key}", "Gaussian smearing", 
                                     axis[flag], settings[flag]["pars"]["mu"], settings[flag]["pars"]["sigma"])})
@@ -77,8 +84,10 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
                                       axis[flag], pdf_mc[flag], smearing[flag])})
         conv_pdf[flag].setBufferFraction(settings[flag]["bufFraction"])
 
+
         # ---------------------------------------------------------------------------------------------------
         # -------------------- Background PDF ---------------------------------------------------------------
+
         if settings[flag]["bkg_shape"] == "expo":
             bkg_pdf.update({
                 flag : ROOT.RooExponential(f"expo_bkg_{flag}_{bin_key}", "Exponential background",
@@ -93,13 +102,15 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
             # histo_binning = axis.getBinning()
             bkg_tothist[flag] = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo",
                                                  ROOT.RooArgSet(axis[flag]), "")
+            for cat in settings["bkg_categories"]:
+                bkg_tothist[flag].add(ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")) 
             
-            [bkg_tothist[flag].add(ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")) for cat in settings["bkg_categories"]]
-            
+            print("AAAAAAAAAAAA")
+            print(bkg_tothist[flag])
             bkg_pdf.update({
                 flag : ROOT.RooHistPdf(f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
-                                       ROOT.RooArgSet(axis[flag]), bkg_tothist[flag])})
-        
+                                    ROOT.RooArgSet(axis[flag]), bkg_tothist[flag])})
+            
         elif settings[flag]["bkg_shape"] == "mc_double_pdf":
             n_ztautau = ws.data(f"Minv_bkg_{flag}_{bin_key}_Ztautau").sumEntries()
             n_ttsemileptonic = ws.data(f"Minv_bkg_{flag}_{bin_key}_TTSemileptonic").sumEntries()
@@ -130,21 +141,39 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
         else:
             print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
             sys.exit()
-        
+
 
         # ---------------------------------------------------------------------------------------------------
         # -------------------- Pseudodata generation if requested -------------------------------------------
 
-        if "fit_on_pseudodata" in settings.keys() and settings["fit_on_pseudodata"] is True:
-            histo_data.update({
-                flag : ROOT.RooDataHist(f"Minv_pseudodata_{flag}_{bin_key}", "pseudodata_histo",
-                                                 ROOT.RooArgSet(axis[idx]), "")})
-            histo_data[flag].add(ws.data(f"Minv_mc_{flag}_{bin_key}"))
-            histo_data[flag].add(bkg_tothist[flag])
+        if fit_pseudodata is True:
+            del histo_data[flag]
+
+
+            h_pseudodata[flag] = ROOT.RooDataHist(f"Minv_pseudodata_{flag}_{bin_key}", "pseudodata_histo",
+                                                  ROOT.RooArgSet(axis[flag]), "")
+            h_pseudodata[flag].add(ws.data(f"Minv_mc_{flag}_{bin_key}"))
+            for cat in settings["bkg_categories"]:
+                h_pseudodata[flag].add(ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")) 
+            histo_data.update({flag : h_pseudodata[flag]})
+            
+            
+            for obj_key in settings[flag]["norm"].keys():
+                norm_obj = settings[flag]["norm"][obj_key]
+                for idx in range(3):
+                    if (type(norm_obj[idx]) is str) and ("n" in norm_obj[idx]):
+                        norm_obj[idx] = float(norm_obj[idx].replace("n",""))*histo_data[flag].sumEntries()
+                    else:
+                        norm_obj[idx] = float(norm_obj[idx])
+                settings[flag]["norm"].update({
+                    obj_key : ROOT.RooRealVar(f"{obj_key}_{flag}_{bin_key}", f"{obj_key} {flag}",
+                                            norm_obj[0], norm_obj[1], norm_obj[2])})
+
 
 
         # ---------------------------------------------------------------------------------------------------
         # -------------------- Final models and fits --------------------------------------------------------
+
         sum_pdf.update({
             flag : ROOT.RooAddPdf(f"sum_{flag}_{bin_key}", "Signal+Bkg", 
                                   ROOT.RooArgList(conv_pdf[flag], bkg_pdf[flag]), 
@@ -160,13 +189,18 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
                                     ROOT.RooFit.Range("fitRange"),
                                     ROOT.RooFit.Minimizer("Minuit2"),
                                     ROOT.RooFit.Strategy(settings[flag]["fit_strategy"]),
+                                    ROOT.RooFit.SumW2Error(False),
                                     # ROOT.RooFit.MaxCalls(100000),
                                     ROOT.RooFit.Save(1),
                                     ROOT.RooFit.PrintLevel(verb)
                                     )
         results.update({flag : res})
 
-        status_chi2 = check_chi2(histo_data[flag], model_pdf[flag], results[flag], type="pearson")
+        if fit_pseudodata is False:
+            status_chi2 = check_chi2(histo_data[flag], model_pdf[flag], results[flag], type="pearson")
+        else:
+            status_chi2 = True
+
         status = bool(status_chi2*fit_quality(results[flag], type_checks="benchmark"))
 
         print(status_chi2)
@@ -175,7 +209,6 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
         nsig_fitted = settings[flag]["norm"]["nsig"]
         nbkg_fitted = settings[flag]["norm"]["nbkg"]
        
-
         low_nbkg = (nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal())
         print(settings[flag]["norm"]["nbkg"].getVal())
         print(settings[flag]["norm"]["nsig"].getVal())
@@ -198,16 +231,17 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
                                        ROOT.RooFit.Range("fitRange"),
                                        ROOT.RooFit.Minimizer("Minuit2"),
                                        ROOT.RooFit.Strategy(settings[flag]["fit_strategy"]),
+                                       ROOT.RooFit.SumW2Error(False),
                                        # ROOT.RooFit.MaxCalls(100000),
                                        ROOT.RooFit.Save(1),
                                        ROOT.RooFit.PrintLevel(verb)
                                        )
             results.update({flag : res})
     
-        if check_chi2(histo_data[flag], model_pdf[flag], results[flag]) is False:
-            results[flag].SetTitle("Chi2_not_passed")
-
         fit_status[flag] = fit_quality(results[flag], type_checks="benchmark")
+
+        if fit_pseudodata is False:
+            fit_status[flag] = fit_status[flag]*check_chi2(histo_data[flag], model_pdf[flag], results[flag])
 
         results[flag].SetName(f"results_{flag}_{bin_key}")
 

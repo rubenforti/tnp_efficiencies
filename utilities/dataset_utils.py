@@ -4,8 +4,7 @@
 import sys
 import os
 import ROOT
-from utilities.base_library import binning, bin_dictionary, lumi_factors, get_idx_from_bounds
-
+from utilities.base_library import binning, bin_dictionary, lumi_factors, get_idx_from_bounds, bin_global_idx_dict
 
 def import_pdf_library(*functions):
     """
@@ -86,7 +85,7 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
     if altBinning_bkg is False:
         bins = bin_dictionary(binning_pt, binning_eta)
     else:
-        bin_idx_dict = make_bin_idx_dict(binning_pt, binning_eta)
+        bin_idx_dict = bin_global_idx_dict(binning_pt, binning_eta)
         bins = bin_dictionary()
 
     bins_mass = binning(binning_mass)
@@ -306,37 +305,7 @@ def extend_merged_datasets(ws, merged_bin_key, bkg_categories):
                     ws.Import(new_data)
 
 
-
-def make_bin_idx_dict(binning_pt, binning_eta):
-    """
-    """
-
-    bin_dict = bin_dictionary(binning_pt, binning_eta)
-
-    bin_idx_dict = {}
-
-    for bin_key in bin_dict.keys():
-        gl_idx, pt, eta = bin_dict[bin_key]
-        if type(gl_idx) is list:
-            [bin_idx_dict.update({str(gl) : [pt, eta]})  for gl in gl_idx]
-        else:
-            bin_idx_dict.update({str(gl_idx) : [pt, eta]})
-            
-
-
-    return bin_idx_dict
-
-        
-
-
-
-    
-
-
-
-
-
-        
+      
 ###############################################################################     
 ###############################################################################
 
