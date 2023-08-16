@@ -1,42 +1,50 @@
 {
+    "settings_iso" : {
 
-    "settings_dict" : {
-        "strategy" : "indep",
-        "id_name" : "AAAAAAAAAAAAAAAAAA",
+        "type_analysis" : "indep",
         "fit_range" : [60.0, 120.0],
         "fit_on_pseudodata" : false,
-        "run" : 1,
-        "pass" : {
-            "fit_strategy" : 2,
-            "Nbins" : 2000,
-            "bufFraction" : 0.5, 
-            "bkg_shape": "expo",
-            "pars" : {
-                "mu" : [0.0, -5.0, 5.0],
-                "sigma" : [0.5, 0.1, 5.0],
-                "tau" : [0.0, -5.0, 5.0]
+        "fit_strategy" : {
+            "pass" : 2,
+            "fail" : 2
+        },
+        "Nbins" : {
+            "pass" : 2000,
+            "fail" : 2000
+        },
+        "bufFraction" : {
+            "pass" : 0.5,
+            "fail" : 0.5
+        },
+        "bkg_shape" : {
+            "pass" : "expo",
+            "fail" : "expo"
+        },
+        "pars" : {
+            "mu" : {
+                "pass" :[0.0, -5.0, 5.0],
+                "fail" :[0.0, -5.0, 5.0]
             },
-            "norm" : {
-                "nsig" : ["0.9n", 0.5, "1.5n"],
-                "nbkg" : ["0.1n", 0.5, "1.5n"]
+            "sigma" : {
+                "pass" :[0.5, 0.1, 5.0],
+                "fail" :[0.5, 0.1, 5.0]
+            },
+            "tau" : {
+                "pass" :[0.0, -5.0, 5.0],
+                "fail" :[0.0, -5.0, 5.0]
             }
         },
-        "fail" : {
-            "fit_strategy" : 2,
-            "Nbins" : 2000,
-            "bufFraction" : 0.5,
-            "bkg_shape" : "expo",
-            "pars" : {
-                "mu" : [0.5, -5.0, 5.0],
-                "sigma" : [0.5, 0.1, 5.0],
-                "tau" : [0.0, -5.0, 5.0]
+        "norm" : {
+            "nsig" : {
+                "pass" : ["0.9n", 0.5, "1.5n"],
+                "fail" : ["0.9n", 0.5, "1.5n"]
             },
-            "norm" : {
-                "nsig" : ["0.9n", 0.5, "1.5n"],
-                "nbkg" : ["0.1n", 0.5, "1.5n"]
+            "nbkg" : {
+                "pass" : ["0.1n", 0.5, "1.5n"],
+                "fail" : ["0.1n", 0.5, "1.5n"]
             }
         }
-    }
 
+    }
 }
 

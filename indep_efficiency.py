@@ -28,9 +28,9 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
     bkg_tothist = {}
     bkg_pdf_ztautau, bkg_pdf_ttsemi = {}, {}
     h_pseudodata = {}
-
-    # if bin_key!="[24.0to26.0][-2.4to-2.3]":
-    #     sys.exit()
+    
+    if bin_key!="[24.0to26.0][-2.4to-2.3]":
+        sys.exit()
 
     fit_pseudodata = True if ("fit_on_pseudodata" in settings.keys() and 
                               settings["fit_on_pseudodata"] is True) else False
@@ -42,29 +42,29 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
         axis[flag].setRange("fitRange", settings["fit_range"][0], settings["fit_range"][1])
         axis[flag].setBinning(ROOT.RooUniformBinning(axis[flag].getRange("fitRange")[0], 
                                                      axis[flag].getRange("fitRange")[1], 
-                                                     settings[flag]["Nbins"]), "cache")
+                                                     settings["Nbins"][flag]), "cache")
 
         histo_data.update({flag : ws.data(f"Minv_data_{flag}_{bin_key}")})            
 
         # ---------------------------------------------------------------------------------------------------
         # --------------------- Parameters definition -------------------------------------------------------
 
-        for obj_key in settings[flag]["pars"].keys():
-            pars_obj = settings[flag]["pars"]
-            settings[flag]["pars"].update({
-                obj_key : ROOT.RooRealVar(f"{obj_key}_{flag}_{bin_key}", f"{obj_key} {flag}", 
-                                          pars_obj[obj_key][0], pars_obj[obj_key][1], pars_obj[obj_key][2])})
+        for pars_key in settings["pars"].keys():
+            pars_obj = settings["pars"][pars_key][flag]
+            settings["pars"][pars_key].update({
+                flag : ROOT.RooRealVar(f"{pars_key}_{flag}_{bin_key}", f"{pars_key} {flag}", 
+                                          pars_obj[0], pars_obj[1], pars_obj[2])})
         
         if fit_pseudodata is False:
-            for obj_key in settings[flag]["norm"].keys():
-                norm_obj = settings[flag]["norm"][obj_key]
+            for norm_key in ["nsig", "nbkg"]:
+                norm_obj = settings["norm"][norm_key][flag]
                 for idx in range(3):
                     if (type(norm_obj[idx]) is str) and ("n" in norm_obj[idx]):
                         norm_obj[idx] = float(norm_obj[idx].replace("n",""))*histo_data[flag].sumEntries()
                     else:
                         norm_obj[idx] = float(norm_obj[idx])
-                settings[flag]["norm"].update({
-                    obj_key : ROOT.RooRealVar(f"{obj_key}_{flag}_{bin_key}", f"{obj_key} {flag}",
+                settings["norm"][norm_key].update({
+                    flag : ROOT.RooRealVar(f"{norm_key}_{flag}_{bin_key}", f"{norm_key} {flag}",
                                             norm_obj[0], norm_obj[1], norm_obj[2])})
 
 
@@ -73,7 +73,7 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
 
         smearing.update({
             flag : ROOT.RooGaussian(f"smearing_{flag}_{bin_key}", "Gaussian smearing", 
-                                    axis[flag], settings[flag]["pars"]["mu"], settings[flag]["pars"]["sigma"])})
+                                    axis[flag], settings["pars"]["mu"][flag], settings["pars"]["sigma"][flag])})
 
         pdf_mc.update({
             flag : ROOT.RooHistPdf(f"pdf_mc_{flag}_{bin_key}", "pdf MC", 
@@ -82,48 +82,45 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
         conv_pdf.update({
             flag : ROOT.RooFFTConvPdf(f"conv_{flag}_{bin_key}", f"Convolution pdf", 
                                       axis[flag], pdf_mc[flag], smearing[flag])})
-        conv_pdf[flag].setBufferFraction(settings[flag]["bufFraction"])
+        conv_pdf[flag].setBufferFraction(settings["bufFraction"][flag])
 
 
         # ---------------------------------------------------------------------------------------------------
         # -------------------- Background PDF ---------------------------------------------------------------
 
-        if settings[flag]["bkg_shape"] == "expo":
+        if settings["bkg_shape"][flag] == "expo":
             bkg_pdf.update({
                 flag : ROOT.RooExponential(f"expo_bkg_{flag}_{bin_key}", "Exponential background",
-                                           axis[flag], settings[flag]["pars"]["tau"])})
+                                           axis[flag], settings["pars"]["tau"][flag])})
             
-        elif settings[flag]["bkg_shape"] == "mixed":
+        elif settings["bkg_shape"][flag] == "mixed":
             pass
-        elif settings[flag]["bkg_shape"] == "cmsshape":
+        elif settings["bkg_shape"][flag] == "cmsshape":
             pass
 
-        elif settings[flag]["bkg_shape"] == "mc_raw":
+        elif settings["bkg_shape"][flag] == "mc_raw":
             # histo_binning = axis.getBinning()
             bkg_tothist[flag] = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo",
                                                  ROOT.RooArgSet(axis[flag]), "")
             for cat in settings["bkg_categories"]:
                 bkg_tothist[flag].add(ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")) 
-            
-            print("AAAAAAAAAAAA")
-            print(bkg_tothist[flag])
             bkg_pdf.update({
                 flag : ROOT.RooHistPdf(f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
                                     ROOT.RooArgSet(axis[flag]), bkg_tothist[flag])})
             
-        elif settings[flag]["bkg_shape"] == "mc_double_pdf":
+        elif settings["bkg_shape"][flag] == "mc_double_pdf":
             n_ztautau = ws.data(f"Minv_bkg_{flag}_{bin_key}_Ztautau").sumEntries()
             n_ttsemileptonic = ws.data(f"Minv_bkg_{flag}_{bin_key}_TTSemileptonic").sumEntries()
-            settings[flag]["norm"].update({
+            settings["norm"][flag].update({
                 "ztautau": ROOT.RooRealVar(f"nbkg_ztautau_{flag}_{bin_key}", f"Nbkg {flag} Ztautau", 
                                            n_ztautau, 0.5, 1.5*n_ztautau)})
-            settings[flag]["norm"].update({
+            settings["norm"][flag].update({
                 "ttsemi": ROOT.RooRealVar(f"nbkg_ttsemileptonic_{flag}_{bin_key}", f"Nbkg {flag} TTSemi", 
                                           n_ttsemileptonic, 0.5, 1.5*n_ttsemileptonic)})
-            settings[flag]["norm"].update({
+            settings["norm"][flag].update({
                 "nbkg" : ROOT.RooAddition(f"nbkg_{flag}_{bin_key}", f"Nbkg {flag}", 
-                                          ROOT.RooArgList(settings[flag]["norm"]["ztautau"], 
-                                                          settings[flag]["norm"]["ttsemi"]))})
+                                          ROOT.RooArgList(settings["norm"][flag]["ztautau"], 
+                                                          settings["norm"][flag]["ttsemi"]))})
             bkg_pdf_ztautau.update({
                 flag: ROOT.RooHistPdf(f"mcbkg_ztautau_{flag}_{bin_key}",
                                       "MC-driven bkg Ztautau", ROOT.RooArgSet(axis[flag]), 
@@ -136,7 +133,7 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
                 flag : ROOT.RooAddPdf(
                     f"mcbkg_{flag}_{bin_key}", "MC-driven background", 
                     ROOT.RooArgList(bkg_pdf_ztautau[flag], bkg_pdf_ttsemi[flag]), 
-                    ROOT.RooArgList(settings[flag]["norm"]["ztautau"], settings[flag]["norm"]["ttsemi"]))})
+                    ROOT.RooArgList(settings["norm"]["ztautau"][flag], settings["norm"]["ttsemi"][flag]))})
         
         else:
             print("REQUESTED BACKGROUND SHAPE IS NOT SUPPORTED")
@@ -158,17 +155,17 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
             histo_data.update({flag : h_pseudodata[flag]})
             
             
-            for obj_key in settings[flag]["norm"].keys():
-                norm_obj = settings[flag]["norm"][obj_key]
-                for idx in range(3):
-                    if (type(norm_obj[idx]) is str) and ("n" in norm_obj[idx]):
-                        norm_obj[idx] = float(norm_obj[idx].replace("n",""))*histo_data[flag].sumEntries()
-                    else:
-                        norm_obj[idx] = float(norm_obj[idx])
-                settings[flag]["norm"].update({
-                    obj_key : ROOT.RooRealVar(f"{obj_key}_{flag}_{bin_key}", f"{obj_key} {flag}",
-                                            norm_obj[0], norm_obj[1], norm_obj[2])})
-
+            if fit_pseudodata is False:
+                for norm_key in ["nsig", "nbkg"]:
+                    norm_obj = settings["norm"][norm_key][flag]
+                    for idx in range(3):
+                        if (type(norm_obj[idx]) is str) and ("n" in norm_obj[idx]):
+                            norm_obj[idx] = float(norm_obj[idx].replace("n",""))*histo_data[flag].sumEntries()
+                        else:
+                            norm_obj[idx] = float(norm_obj[idx])
+                    settings["norm"][norm_key].update({
+                        flag : ROOT.RooRealVar(f"{norm_key}_{flag}_{bin_key}", f"{norm_key} {flag}",
+                                                norm_obj[0], norm_obj[1], norm_obj[2])})
 
 
         # ---------------------------------------------------------------------------------------------------
@@ -177,8 +174,8 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
         sum_pdf.update({
             flag : ROOT.RooAddPdf(f"sum_{flag}_{bin_key}", "Signal+Bkg", 
                                   ROOT.RooArgList(conv_pdf[flag], bkg_pdf[flag]), 
-                                  ROOT.RooArgList(settings[flag]["norm"]["nsig"], 
-                                                  settings[flag]["norm"]["nbkg"]))})
+                                  ROOT.RooArgList(settings["norm"]["nsig"][flag], 
+                                                  settings["norm"]["nbkg"][flag]))})
         sum_pdf[flag].setNormRange("fitRange")
 
         model_pdf.update({flag : ROOT.RooAddPdf(sum_pdf[flag], f'PDF_{flag}_{bin_key}')})
@@ -188,7 +185,7 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
                                     # ROOT.RooFit.Extended(1),
                                     ROOT.RooFit.Range("fitRange"),
                                     ROOT.RooFit.Minimizer("Minuit2"),
-                                    ROOT.RooFit.Strategy(settings[flag]["fit_strategy"]),
+                                    ROOT.RooFit.Strategy(settings["fit_strategy"][flag]),
                                     ROOT.RooFit.SumW2Error(False),
                                     # ROOT.RooFit.MaxCalls(100000),
                                     ROOT.RooFit.Save(1),
@@ -206,31 +203,31 @@ def independent_efficiency(ws, bin_key, settings_dict, refit_numbkg=True, verb=-
         print(status_chi2)
         print(status)
         
-        nsig_fitted = settings[flag]["norm"]["nsig"]
-        nbkg_fitted = settings[flag]["norm"]["nbkg"]
+        nsig_fitted = settings["norm"]["nsig"][flag]
+        nbkg_fitted = settings["norm"]["nbkg"][flag]
        
         low_nbkg = (nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal())
-        print(settings[flag]["norm"]["nbkg"].getVal())
-        print(settings[flag]["norm"]["nsig"].getVal())
+        print(settings["norm"]["nbkg"][flag].getVal())
+        print(settings["norm"]["nsig"][flag].getVal())
         print(low_nbkg)
 
         if (status is False) and refit_numbkg and low_nbkg:
             results[flag].Print()
-            settings[flag]["pars"]["tau"].setVal(1)
-            settings[flag]["pars"]["tau"].setConstant()
+            settings["pars"]["tau"][flag].setVal(1)
+            settings["pars"]["tau"][flag].setConstant()
 
-            for norm_key in settings[flag]["norm"].keys():
-                if "bkg" in norm_key and type(settings[flag]["norm"][norm_key]) is ROOT.RooRealVar:
-                    settings[flag]["norm"][norm_key].setVal(0)
-                    settings[flag]["norm"][norm_key].setConstant()
 
-            print("REFITTING WITHOUT BACKGROUND")
-            print("\n\n\n\n")
+            if type(settings["norm"]["nbkg"][flag]) is ROOT.RooRealVar:
+                    settings["norm"]["nbkg"][flag].setVal(0)
+                    settings["norm"]["nbkg"][flag].setConstant()
+
+            print("\n\nREFITTING WITHOUT BACKGROUND\n\n\n\n")
+
             res = model_pdf[flag].fitTo(histo_data[flag],
                                        # ROOT.RooFit.Extended(1),
                                        ROOT.RooFit.Range("fitRange"),
-                                       ROOT.RooFit.Minimizer("Minuit2"),
-                                       ROOT.RooFit.Strategy(settings[flag]["fit_strategy"]),
+                                       ROOT.RooFit.Minimizer("Minuit2", "Migrad"),
+                                       ROOT.RooFit.Strategy(settings["fit_strategy"][flag]),
                                        ROOT.RooFit.SumW2Error(False),
                                        # ROOT.RooFit.MaxCalls(100000),
                                        ROOT.RooFit.Save(1),

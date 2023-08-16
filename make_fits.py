@@ -15,41 +15,49 @@ from utilities.dataset_utils import ws_init, extend_merged_datasets
 
 
 
-settings_dict = {
-    "strategy" : "indep",
-    "id_name" : "AAAAAAAAAAAAAAAAAA",
+fit_settings_iso = {
+
+    "type_analysis" : "indep",
     "fit_range" : [60.0, 120.0],
-    "bkg_categories" : ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"],
-    "fit_on_pseudodata" : True,
-    "run" : 1,
-    "pass" : {
-        "fit_strategy" : 2,
-        "Nbins" : 5000,
-        "bufFraction" : 0.1, 
-        "bkg_shape": "expo",
-        "pars" : {
-            "mu" : [0.0, -5.0, 5.0],
-            "sigma" : [0.5, 0.01, 5.0],
-            "tau" : [0.0, -5.0, 5.0],
-        },
-        "norm" : {
-            "nsig" : ["1n", 0.5, "3n"],
-            "nbkg" : ["0.05n", 0.5, "1.5n"],
-        },
+    "fit_on_pseudodata" : False,
+    "fit_strategy" : {
+        "pass" : 2,
+        "fail" : 2
     },
-    "fail" : {
-        "fit_strategy" : 2,
-        "Nbins" : 8000,
-        "bufFraction" : 0.5,
-        "bkg_shape" : "expo",
-        "pars" : {
-            "mu" : [0.2, -5.0, 5.0],
-            "sigma" : [1.5, 0.2, 5.0],
-            "tau" : [-0.5, -2.0, 2.0],
+    "Nbins" : {
+        "pass" : 2000,
+        "fail" : 2000
+    },
+    "bufFraction" : {
+        "pass" : 0.5,
+        "fail" : 0.5
+    },
+    "bkg_shape" : {
+        "pass" : "expo",
+        "fail" : "expo"
+    },
+    "pars" : {
+        "mu" : {
+            "pass" :[0.0, -5.0, 5.0],
+            "fail" :[0.0, -5.0, 5.0]
         },
-        "norm" : {
-            "nsig" : ["1n", 0.5, "3n"],
-            "nbkg" : ["0.1n", 0.5, "1.5n"],
+        "sigma" : {
+            "pass" :[0.5, 0.1, 5.0],
+            "fail" :[0.5, 0.1, 5.0]
+        },
+        "tau" : {
+            "pass" :[0.0, -5.0, 5.0],
+            "fail" :[0.0, -5.0, 5.0]
+        }
+    },
+    "norm" : {
+        "nsig" : {
+            "pass" : ["0.9n", 0.5, "1.5n"],
+            "fail" : ["0.9n", 0.5, "1.5n"]
+        },
+        "nbkg" : {
+            "pass" : ["0.1n", 0.5, "1.5n"],
+            "fail" : ["0.1n", 0.5, "1.5n"]
         }
     }
 }
@@ -94,7 +102,7 @@ def make_fits(ws_name, type_eff, type_analysis, bins_dict, fit_settings, fit_ver
                 status = True
     
 
-            if status is False:
+            if status is False or 1!=0:
                 print(f"\nBin {bin_key} ({bin_pt}|{bin_eta}) has problems!\n")
                 prob_bins.append(bin_key)
                 print("****")
@@ -172,13 +180,9 @@ if __name__ == '__main__':
     # GENERAL SETTINGS
     # ----------------
 
-    types_efficiencies = ("sa", "global", "ID", "iso", "trigger", "veto")
-    type_eff = types_efficiencies[3]
+    type_eff = "iso"
 
-    type_analysis = 'indep'
-
-    bkg_pdf = 'expo'
-
+    type_analysis = "indep"
         
     bins = bin_dictionary("pt", "eta")
 
@@ -189,26 +193,24 @@ if __name__ == '__main__':
 
 
     '''
-    filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
-    filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
+    filename_data = f"/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
+    filename_mc = f"/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
     dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
     '''
-    filename_data = "root_files/datasets/tnp_iso_data_vertexWeights1_oscharge1.root"
-    filename_mc = "root_files/datasets/tnp_iso_mc_vertexWeights1_oscharge1.root"
+
+    
+    filename_data = f"root_files/datasets/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
+    filename_mc = f"root_files/datasets/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
     dirname_bkg = "root_files/datasets"
     
-    
+    bkg_types = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
+
     bkg_filenames = {}
     [bkg_filenames.update({cat : 
-        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in settings_dict["bkg_categories"]]
-    
-    print(bkg_filenames)
+        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_types]
     
 
-    lumi_scales = lumi_factors(type_eff, settings_dict["bkg_categories"])
-
-    print(lumi_scales)
-
+    lumi_scales = lumi_factors(type_eff, bkg_types)
 
     lumi_scale_signal = lumi_scales.pop("Zmumu")
     
@@ -219,18 +221,18 @@ if __name__ == '__main__':
             "filename": filename_mc,
             "lumi_scale" : lumi_scale_signal
         },
-        "bkg" : {
-           "filenames" : bkg_filenames,
-           "lumi_scales" : lumi_scales
-        } 
+        # "bkg" : {
+        #    "filenames" : bkg_filenames,
+        #   "lumi_scales" : lumi_scales
+        # } 
     }
 
     # workspace_name = f"root_files/ws/ws_bkg_studies.root"
-    #  workspace_name = "root_files/ws_iso_indep_mcbkg_mergedbins.root"
+    # workspace_name = "root_files/ws_{type_eff}_indep_mcbkg_mergedbins.root"
 
     binning_mass = "mass_60_120"
 
-    workspace_name = "root_files/ws_iso_pseudodata.root"
+    workspace_name = f"root_files/iso_workspace.root"
     
     # ws = ws_init(import_dictionary, type_analysis, "pt", "eta", binning_mass)
     # ws.writeToFile(workspace_name)
@@ -257,10 +259,10 @@ if __name__ == '__main__':
    
     figpath = {"good": "figs/pseudodata", "check": "figs/check_fits/pseudodata"} 
 
-    ws = make_fits(workspace_name, type_eff, type_analysis, bins, settings_dict, 
-                  import_pdfs=True, savefigs=True, figpath=figpath)
+    ws = make_fits(workspace_name, type_eff, type_analysis, bins, fit_settings_iso, 
+                  import_pdfs=False, savefigs=False, figpath=figpath)
 
-    ws.writeToFile(workspace_name)
+    # ws.writeToFile(workspace_name)
  
 
     #print("RISULTATI SCRITTI SU PICKLE FILE")
