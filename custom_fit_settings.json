@@ -10,7 +10,7 @@
             "fail" : 2
         },
         "Nbins" : {
-            "pass" : 2000,
+            "pass" : 10000,
             "fail" : 2000
         },
         "bufFraction" : {
@@ -48,4 +48,3 @@
 
     }
 }
-

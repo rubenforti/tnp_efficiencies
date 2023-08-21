@@ -15,8 +15,8 @@ def check_existing_fit(type_analysis, ws, bin_key):
         isFittedFail = type(ws.obj(f'PDF_fail_{bin_key}')) is ROOT.RooAddPdf
         if isFittedPass and isFittedFail:
             print("Not possible to refit an existing PDF! \nReturning the results obtained previously")
-            res_pass = ROOT.RooFitResult(ws.obj(f'results_pass_{bin_key}'))
-            res_fail = ROOT.RooFitResult(ws.obj(f'results_fail_{bin_key}'))
+            res_pass = ws.obj(f'results_pass_{bin_key}')
+            res_fail = ws.obj(f'results_fail_{bin_key}')
             return (res_pass, res_fail)
         else:
             return 0
@@ -24,7 +24,7 @@ def check_existing_fit(type_analysis, ws, bin_key):
     if type_analysis == 'sim':
         if type(ws.obj(f'PDF_{bin_key}')) is ROOT.RooSimultaneous:
             print("Not possible to refit an existing PDF! \nReturning the results obtained previously")
-            res = ROOT.RooFitResult(ws.obj(f'results_{bin_key}'))
+            res = ws.obj(f'results_{bin_key}')
             return res
         else:
             return 0
@@ -66,40 +66,47 @@ def llr_eval(histo, res):
 
 ###############################################################################
 
-def check_chi2(histo, pdf, res, type="pearson", nsigma=15):
+def status_chi2(histo, pdf, res, type="pearson", nsigma=15):
     """
     """
-    if type == "pearson":
-        chi2val, ndof = pearson_chi2_eval(histo, pdf, histo.numEntries(), res)
-        print(chi2val, ndof)
-    elif type == "llr":
-        chi2val, ndof = llr_eval(histo, res)
-    
-    status_chi2 = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
 
-    return status_chi2
+    if "pseudodata" in histo.GetName():
+        return True
+
+    else:
+        if type == "pearson":
+            chi2val, ndof = pearson_chi2_eval(histo, pdf, histo.numEntries(), res)
+            print(chi2val, ndof)
+        elif type == "llr":
+            chi2val, ndof = llr_eval(histo, res)
+        
+        chi2_status = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
+
+        return chi2_status
 
 ###############################################################################
 
-def fit_quality(res, type_checks="benchmark"):
+def fit_quality(fit_obj, type_checks="benchmark"):
     """
     """
-    check_covm = (res.covQual() == 3)
+    check_covm = (fit_obj["res"].covQual() == 3)
 
     if type_checks == "benchmark":
-        check_migrad = (res.status() == 0 or res.status() == 1)
-        #check_chi2 = (res.GetTitle() != "Chi2_not_passed")
-        check_chi2 = True
-        return bool(check_migrad*check_covm*check_chi2)
+        check_migrad = (fit_obj["res"].status() == 0 or fit_obj["res"].status() == 1)
+        check_chi2 = status_chi2(fit_obj["histo"], fit_obj["pdf"], fit_obj["res"], type="pearson")
+        return bool(check_covm*check_migrad*check_chi2)
+    
     elif type_checks == "new_checks":
-        check_migrad = res.status() == 0
-        check_edm = (res.edm() < 1e-3)
-        return bool(check_migrad*check_covm*check_edm)
+        check_migrad = fit_obj["res"].status() == 0
+        check_edm = (fit_obj["res"].edm() < 1e-3)
+        check_chi2 = status_chi2(fit_obj["histo"], fit_obj["pdf"], fit_obj["res"], 
+                                 type="llr", nsigma=5)
+        return bool(check_covm*check_migrad*check_edm*check_chi2)
     '''
     # Not used anymore, could be useful if Sumw2Error turns out to be needed
     elif type_checks == "pseudodata":
-        check_migrad = res.status()==0
-        check_covm = (res.covQual()==2 or res.covQual()==3)
+        check_migrad = fit_obj["res"].status()==0
+        check_covm = (fit_obj["res"].covQual()==2 or fit_obj["res"].covQual()==3)
         return bool(check_migrad*check_covm)
     '''
 

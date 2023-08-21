@@ -7,63 +7,12 @@ import sys
 import time
 import argparse
 from utilities.base_library import bin_dictionary, binning, lumi_factors
-from indep_efficiency import independent_efficiency
-# from indep_eff_mcbkg import independent_efficiency
-# from sim_efficiency import simultaneous_efficiency
+from indep_efficiency import EfficiencyFitter
 from utilities.fit_utils import check_existing_fit, fit_quality
-from utilities.dataset_utils import ws_init, extend_merged_datasets
+from utilities.dataset_utils import ws_init
 
 
-
-fit_settings_iso = {
-
-    "type_analysis" : "indep",
-    "fit_range" : [60.0, 120.0],
-    "fit_on_pseudodata" : False,
-    "fit_strategy" : {
-        "pass" : 2,
-        "fail" : 2
-    },
-    "Nbins" : {
-        "pass" : 2000,
-        "fail" : 2000
-    },
-    "bufFraction" : {
-        "pass" : 0.5,
-        "fail" : 0.5
-    },
-    "bkg_shape" : {
-        "pass" : "expo",
-        "fail" : "expo"
-    },
-    "pars" : {
-        "mu" : {
-            "pass" :[0.0, -5.0, 5.0],
-            "fail" :[0.0, -5.0, 5.0]
-        },
-        "sigma" : {
-            "pass" :[0.5, 0.1, 5.0],
-            "fail" :[0.5, 0.1, 5.0]
-        },
-        "tau" : {
-            "pass" :[0.0, -5.0, 5.0],
-            "fail" :[0.0, -5.0, 5.0]
-        }
-    },
-    "norm" : {
-        "nsig" : {
-            "pass" : ["0.9n", 0.5, "1.5n"],
-            "fail" : ["0.9n", 0.5, "1.5n"]
-        },
-        "nbkg" : {
-            "pass" : ["0.1n", 0.5, "1.5n"],
-            "fail" : ["0.1n", 0.5, "1.5n"]
-        }
-    }
-}
-
-
-def make_fits(ws_name, type_eff, type_analysis, bins_dict, fit_settings, fit_verb=-1, import_pdfs=False, 
+def runFits(ws_name, type_eff, bins_dict, fit_settings, fit_verb=-1, import_pdfs=False, refit_numbkg=True, 
               savefigs=False, figpath={"good":"figs/stuff", "check":"figs/check/stuff"}):
     """
     """
@@ -75,53 +24,62 @@ def make_fits(ws_name, type_eff, type_analysis, bins_dict, fit_settings, fit_ver
 
     prob_bins = []
 
-    # key_prova = "[24.0to26.0][-2.4to-2.3]"
-    # bins_dictionary = {key_prova : bins_dictionary[key_prova]}
 
-    if "ws_bkg_merged" in fit_settings.keys():
-        file_bkg_merged = ROOT.TFile(fit_settings["ws_bkg_merged"], "READ")
-        ws_bkg_merged = file_bkg_merged.Get("w")
-        fit_settings.update({"ws_bkg_merged" : ws_bkg_merged})
+    for bin_key in bins_dict.keys():
 
-    for bin_key in bins_dict:
+        # if bin_key!="[24.0to26.0][-2.4to-2.3]":
+        #    sys.exit()
 
-        global_idx, bin_pt, bin_eta = bins_dict[bin_key]
+        existingRes = check_existing_fit(fit_settings["type_analysis"], ws, bin_key)
 
-        existingRes = check_existing_fit(type_analysis, ws, bin_key)
+        if fit_settings["type_analysis"] == "indep" and existingRes == 0:
+                
+            fitter = EfficiencyFitter("indep", bin_key, fit_settings)
+            res, status_dict = {}, {}   
 
-        if type_analysis == 'indep':
+            for flag in ["pass", "fail"]:
+                result, status = fitter.doFit(flag, ws)
+                
+                pars_fitted = result.floatParsFinal()
+                nsig_fitted = pars_fitted.find(f"nsig_{flag}_{bin_key}")
+                nbkg_fitted = pars_fitted.find(f"nbkg_{flag}_{bin_key}")
+            
+                low_nbkg = (nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal())
 
-            if existingRes == 0:
+                if (status is False) and refit_numbkg and low_nbkg:
+                    result, status = fitter.refit_noBkg(flag, ws)
 
-                res_pass, res_fail, status = independent_efficiency(ws, bin_key, fit_settings, 
-                                                                    refit_numbkg=True, verb=fit_verb, 
-                                                                    import_pdfs=import_pdfs, figs=savefigs,
-                                                                    figpath=figpath)
-            else:
-                res_pass, res_fail = existingRes
-                status = True
-    
+                res.update({flag : result})
+                status_dict.update({flag : status})
 
-            if status is False or 1!=0:
-                print(f"\nBin {bin_key} ({bin_pt}|{bin_eta}) has problems!\n")
+            status = bool(status_dict["pass"]*status_dict["fail"])
+
+            if status and import_pdfs:
+                ws.Import(fitter.getFinalPdf("pass")), ws.Import(fitter.getFinalPdf("fail"))
+                ws.Import(res["pass"]), ws.Import(res["fail"])
+            
+            if savefigs:
+                fitter.saveFig(ws, res, status, figpath)
+
+            if status is False:
+                print(f"\n\nBin {bin_key} has problems!\n")
                 prob_bins.append(bin_key)
                 print("****")
-                res_pass.Print()
-                res_pass.correlationMatrix().Print()
+                res["pass"].Print()
+                res["pass"].correlationMatrix().Print()
                 print("****")
-                res_fail.Print()
-                res_fail.correlationMatrix().Print()
+                res["fail"].Print()
+                res["fail"].correlationMatrix().Print()
                 print("****")
-                print(res_pass.status(), res_fail.status())
-                print(res_pass.covQual(), res_fail.covQual())
-                print(res_pass.edm(), res_fail.edm())
+                print(res["pass"].status(), res["fail"].status())
+                print(res["pass"].covQual(), res["fail"].covQual())
+                print(res["pass"].edm(), res["fail"].edm())
                 print('\n')
-            else:
-                pass
-                #res_object.add_result(ws, bin_pt, bin_eta)
             
-        elif type_analysis == 'sim':
-
+        elif fit_settings["type_analysis"] == "sim" and existingRes == 0:
+            pass
+            
+            '''
             if existingRes == 0:
                 results = simultaneous_efficiency(ws, bin_key, bkg_pdf, 
                                                   refit_numbkg=True, test_bkg=False, same_smearing=False, 
@@ -145,20 +103,11 @@ def make_fits(ws_name, type_eff, type_analysis, bins_dict, fit_settings, fit_ver
             else:
                 pass
                 #res_object.add_result(ws, bin_pt, bin_eta)
-                
-        else:
-            print("Wrong fit strategy! Closing the program")
-            sys.exit()
-    
-        
+            ''' 
+
+
     print(f"NUM of problematic bins = {len(prob_bins)}")
     print(prob_bins)
-
-    '''
-    print("List of non fitted bins:")
-    for probl_bin_key in problematic_bins:
-        print(problematic_bins[probl_bin_key][1], problematic_bins[probl_bin_key][2])
-    '''
 
     return ws
 
@@ -257,10 +206,10 @@ if __name__ == '__main__':
    
     # results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
    
-    figpath = {"good": "figs/pseudodata", "check": "figs/check_fits/pseudodata"} 
+    figpath = {"good": "figs/", "check": "figs/"} 
 
     ws = make_fits(workspace_name, type_eff, type_analysis, bins, fit_settings_iso, 
-                  import_pdfs=False, savefigs=False, figpath=figpath)
+                  import_pdfs=False, savefigs=True, figpath=figpath)
 
     # ws.writeToFile(workspace_name)
  

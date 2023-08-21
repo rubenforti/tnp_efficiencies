@@ -92,13 +92,12 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
 
     if import_existing_ws is True:
         ws_file = ROOT.TFile(existing_ws_filename)
-        w = ws_file.Get("w")
+        ws = ws_file.Get("w")
     else:
-        w = ROOT.RooWorkspace("w")
+        ws = ROOT.RooWorkspace("w")
         x = ROOT.RooRealVar("x", "TP M_inv", bins_mass[0], bins_mass[-1], unit="GeV/c^2")
         x_binning = ROOT.RooUniformBinning(bins_mass[0], bins_mass[-1], len(bins_mass)-1, "x_binning")
-        w.Import(x)
-
+        ws.Import(x)
 
     global_counter = 0
 
@@ -127,11 +126,11 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
 
             if import_existing_ws is True:
                 if type_analysis == "indep":
-                    x_pass = w.var(f"x_pass_{bin_key}")
-                    x_fail = w.var(f"x_fail_{bin_key}")
+                    x_pass = ws.var(f"x_pass_{bin_key}")
+                    x_fail = ws.var(f"x_fail_{bin_key}")
                     axis = (x_fail, x_pass)
                 elif type_analysis == "sim":
-                    x_sim = w.var(f"x_sim_{bin_key}")
+                    x_sim = ws.var(f"x_sim_{bin_key}")
                     axis = (x_sim, x_sim)
             else:
                 if type_analysis == 'indep':
@@ -151,8 +150,8 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
             if dataset_type == "data":
                 histo_pass = get_roohist(file, dataset_type, "pass", axis[1], bin_key, bin_pt, bin_eta)
                 histo_fail = get_roohist(file, dataset_type, "fail", axis[0], bin_key, bin_pt, bin_eta)
-                w.Import(histo_pass)
-                w.Import(histo_fail)
+                ws.Import(histo_pass)
+                ws.Import(histo_fail)
                 global_counter += 2
 
             if dataset_type == "mc":
@@ -160,8 +159,8 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
                 histo_fail = get_roohist(file, dataset_type, "fail", axis[0], 
                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
-                w.Import(histo_pass)
-                w.Import(histo_fail)
+                ws.Import(histo_pass)
+                ws.Import(histo_fail)
                 global_counter += 2
 
             elif dataset_type == "bkg":
@@ -176,15 +175,15 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                     histo_fail = get_roohist(file_set[cat], dataset_type, "fail", axis[0], 
                                             bin_key, bin_pt, bin_eta, global_scale=bkg_lumi_scales[cat])
                     histo_fail.SetName(f"{histo_fail.GetName()}_{cat}")
-                    w.Import(histo_pass)
-                    w.Import(histo_fail)
+                    ws.Import(histo_pass)
+                    ws.Import(histo_fail)
                     global_counter += 2
             else:
                 pass
 
     print(global_counter)
             
-    return w
+    return ws
 
 ###############################################################################
 
@@ -272,6 +271,11 @@ def show_negweighted_bins(ws, bkg_categories, binning_pt, binning_eta):
 ###############################################################################
 
 
+'''
+# NOT USED ANYWHERE. Probably created to add the bkg datasets in merged bins to a workspace with data in
+# reco ones, but evidently it couldn't perform well. This feature is now implemented as an accessory path
+# in ws_init.
+
 def extend_merged_datasets(ws, merged_bin_key, bkg_categories):
     """
     """
@@ -303,7 +307,7 @@ def extend_merged_datasets(ws, merged_bin_key, bkg_categories):
                 for cat in bkg_categories:
                     new_data = bkg_datasets[f"{cat}_{flag}"].Clone(f"Minv_bkg_{flag}_{bin_key}_{cat}")
                     ws.Import(new_data)
-
+'''
 
       
 ###############################################################################     
@@ -352,18 +356,3 @@ if __name__ == '__main__':
             "lumi_scales" : lumi_scales
         } 
     }
-
-
-
-
-
-
-    # w = ws_init_backgrounds(dirname_bkg, bkg_categories, t, lumi_scales, bin_set, binning_mass)
-    # w.Print()
-
-   
-
-
-
-
-   #w.writeToFile(f"root_files/ws/ws_data_mc_bkg.root")

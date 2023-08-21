@@ -82,7 +82,7 @@ def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
 
 ###############################################################################
 
-def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binning_eta, res_list, auxiliary_res={}):
+def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binning_eta, res_list):
     """
     Compare the efficiencies and their error between two results files. The first file is 
     considered as benchmark
@@ -95,7 +95,6 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
         for t_an in ["indep", "sim"]: 
             if t_an in ws_txt_bmark_filename:
                 res_benchmark = results_manager(t_an, binning_pt, binning_eta, import_ws=ws_bmark)
-                break
     else:
         with open(ws_txt_bmark_filename, "r") as file_bmark:
             row_list = file_bmark.readlines()
@@ -109,20 +108,13 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
     for t_an in ["indep", "sim"]:
         if t_an in ws_new_filename:
             res_new = results_manager(t_an, binning_pt, binning_eta, import_ws=ws_new)
-            break
-
-    '''
-    if auxiliary_res["filename"]!="":
-        aux_file = ROOT.TFile(auxiliary_res.pop("filename"), "READ")
-        aux_ws = aux_file.Get("w")
-        for key_missing in auxiliary_res.keys():
-            res_pass = aux_ws.obj(f"results_pass_{auxiliary_res[key_missing]}")
-            res_fail = aux_ws.obj(f"results_fail_{auxiliary_res[key_missing]}")
-            res_new.add_result({"pass":res_pass, "fail":res_fail}, key_missing)
-    '''
 
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
     bin_dict = bin_dictionary(binning_pt, binning_eta)
+
+    dict_new = res_new._dict_results
+    print(type(dict_new))
+    print("N keys", len(dict_new.keys()))
  
     histos = {}
     [histos.update(init_results_histos(res_key, res_key, cmpres_array_dict[res_key], bins_pt, bins_eta)) 
@@ -223,22 +215,19 @@ if __name__ == '__main__':
         compare_efficiency(ws_benchmark, ws_new, "pt", "eta", res_list)
     '''
 
-    '''
-    file_bmark = ROOT.TFile.Open("results/benchmark_iso/iso_indep_mcbkg_merged.root")
-    ws_bmark = file_bmark.Get("w")
+    
+    filename_bmark = "results/benchmark_iso/ws_iso_indep_benchmark.root"
 
-    file_test = ROOT.TFile.Open("results/iso_indep_mcbkg_merged.root")
-    ws_test = file_test.Get("w")
+    filename_test = "root_files/iso_workspace_indep.root"
+    
+    compare_efficiency(filename_bmark, filename_test, "pt", "eta", res_list)
     
 
-    compare_efficiency(ws_bmark, ws_test, "pt", "eta", "bkg_results/hres_mcbkg_2gev_cmp.root")
     '''
-
-    
     file_pseudodata = ROOT.TFile.Open("results/pseudodata_eta8bins/ws_iso_pseudodata_eta8bins.root")
     ws_pseudodata = file_pseudodata.Get("w")
     compare_eff_pseudodata(ws_pseudodata, "pt", "eta_8bins", res_list, "results/pseudodata_eta8bins/hres_cmp_pseudodata.root")
-
+    '''
 
     
 

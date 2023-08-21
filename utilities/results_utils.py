@@ -2,6 +2,7 @@
 """
 import ROOT
 import os
+import sys
 import pickle
 from array import array
 from utilities.fit_utils import fit_quality, pearson_chi2_eval
@@ -71,13 +72,8 @@ class results_manager:
         Nfail, sigma_Nfail = 0, 0
 
         if self._analysis == 'indep':
-            # res_pass = ws.obj(f"results_pass_({bin_pt}|{bin_eta})")
-            # res_fail = ws.obj(f"results_fail_({bin_pt}|{bin_eta})")
-
+        
             res_pass, res_fail = res["pass"], res["fail"]
-            
-            # histo_pass = self._ws.data(f"Minv_data_pass_({bin_pt}|{bin_eta})")
-            # histo_fail = self._ws.data(f"Minv_data_fail_({bin_pt}|{bin_eta})")
 
             if type(res_pass) is ROOT.RooFitResult and type(res_fail) is ROOT.RooFitResult:
 
@@ -129,16 +125,17 @@ class results_manager:
     def dictionary(self):
         return self._dict_results
 
-    def getEff(self, bin_key='', bin_pt=0, bin_eta=0):
+    def getEff(self, bin_key=''):
         """
         """
         if bin_key == "all":
             eff = [] 
             [eff.append(self._dict_results[key]["efficiency"]) for key in self._dict_results.keys()]
-        elif bin_key=='' and bin_pt!=0 and bin_eta != 0:
-            pass
-        else:
+        elif bin_key in self._dict_results.keys():
             eff = self._dict_results[bin_key]["efficiency"]
+        else:
+            print("Bin key not present in the results object dictionary")
+            sys.exit()
 
         return eff
     
