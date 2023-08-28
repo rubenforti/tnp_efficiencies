@@ -6,10 +6,41 @@ import os
 import sys
 import time
 import argparse
-from utilities.base_library import bin_dictionary, binning, lumi_factors
-from indep_efficiency import EfficiencyFitter
-from utilities.fit_utils import check_existing_fit, fit_quality
-from utilities.dataset_utils import ws_init
+from utilities.base_library import bin_dictionary, lumi_factors
+from independent_fitter import EfficiencyFitter as indep_eff
+from simultaneous_fitter import EfficiencyFitter as sim_eff
+from utilities.fit_utils import check_existing_fit
+
+
+def printFitStatus(type_analysis, bin_key, status, res, prob_bins):
+
+    if status is True:
+        print(f"\n\nBin {bin_key} is OK!\n")
+    else:
+        print(f"\n\nBin {bin_key} has problems!\n")
+        prob_bins.append(bin_key)
+        if type_analysis == "indep":
+            print("****")
+            res["pass"].Print()
+            res["pass"].correlationMatrix().Print()
+            print("****")
+            res["fail"].Print()
+            res["fail"].correlationMatrix().Print()
+            print("****")
+            print(res["pass"].status(), res["fail"].status())
+            print(res["pass"].covQual(), res["fail"].covQual())
+            print(res["pass"].edm(), res["fail"].edm())
+            print('\n')
+        elif type_analysis == "sim":
+            print("****")
+            res.Print()
+            res.correlationMatrix().Print()
+            print("****")
+            print(res.status())
+            print(res.covQual())
+            print(res.edm())
+            print('\n')
+
 
 
 def runFits(ws_name, type_eff, bins_dict, fit_settings, fit_verb=-1, import_pdfs=False, refit_numbkg=True, 
@@ -24,87 +55,75 @@ def runFits(ws_name, type_eff, bins_dict, fit_settings, fit_verb=-1, import_pdfs
 
     prob_bins = []
 
-
     for bin_key in bins_dict.keys():
-
+        
         # if bin_key!="[24.0to26.0][-2.4to-2.3]":
         #    sys.exit()
 
-        existingRes = check_existing_fit(fit_settings["type_analysis"], ws, bin_key)
+        if check_existing_fit(fit_settings["type_analysis"], ws, bin_key) == 0:
 
-        if fit_settings["type_analysis"] == "indep" and existingRes == 0:
+            if fit_settings["type_analysis"] == "indep":
+                    
+                fitter = indep_eff(bin_key, fit_settings)
+                res, status_dict = {}, {}   
+
+                for flag in ["pass", "fail"]:
+                    result, status = fitter.doFit(flag, ws)
+                    
+                    pars_fitted = result.floatParsFinal()
+                    nsig_fitted = pars_fitted.find(f"nsig_{flag}_{bin_key}")
+                    nbkg_fitted = pars_fitted.find(f"nbkg_{flag}_{bin_key}")
                 
-            fitter = EfficiencyFitter("indep", bin_key, fit_settings)
-            res, status_dict = {}, {}   
+                    low_nbkg = (nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal())
 
-            for flag in ["pass", "fail"]:
-                result, status = fitter.doFit(flag, ws)
+                    if (status is False) and refit_numbkg and low_nbkg:
+                        result, status = fitter.refit_noBkg(flag, ws)
+
+                    res.update({flag : result})
+                    status_dict.update({flag : status})
+
+                status = bool(status_dict["pass"]*status_dict["fail"])
+
+                if status and import_pdfs:
+                    ws.Import(fitter.getFinalPdf("pass")), ws.Import(fitter.getFinalPdf("fail"))
+                    ws.Import(res["pass"]), ws.Import(res["fail"])
+                
+                if savefigs:
+                    fitter.saveFig(ws, res, status, figpath)
+
+
+            elif fit_settings["type_analysis"] == "sim" or fit_settings["type_analysis"] == "sim_sf":
+
+                fitter = sim_eff(bin_key, fit_settings)
+
+                result, status = fitter.doFit(ws)
                 
                 pars_fitted = result.floatParsFinal()
-                nsig_fitted = pars_fitted.find(f"nsig_{flag}_{bin_key}")
-                nbkg_fitted = pars_fitted.find(f"nbkg_{flag}_{bin_key}")
+
+                refit_flags = []
+                if (status is False) and refit_numbkg:
+                    for flag in ["pass", "fail"]:
+                        nsig_fitted = pars_fitted.find(f"nsig_{flag}_{bin_key}")
+                        nbkg_fitted = pars_fitted.find(f"nbkg_{flag}_{bin_key}")
             
-                low_nbkg = (nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal())
+                        if (nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal()):
+                            refit_flags.append(flag)
 
-                if (status is False) and refit_numbkg and low_nbkg:
-                    result, status = fitter.refit_noBkg(flag, ws)
+                    if len(refit_flags) != 0:
+                        res, status = fitter.refit_noBkg(refit_flags, ws)
 
-                res.update({flag : result})
-                status_dict.update({flag : status})
+                if status and import_pdfs:
+                    ws.Import(fitter.getFinalPdf("sim")), ws.Import(res)
 
-            status = bool(status_dict["pass"]*status_dict["fail"])
-
-            if status and import_pdfs:
-                ws.Import(fitter.getFinalPdf("pass")), ws.Import(fitter.getFinalPdf("fail"))
-                ws.Import(res["pass"]), ws.Import(res["fail"])
+                if savefigs:
+                    fitter.saveFig(ws, res, status, figpath)
             
-            if savefigs:
-                fitter.saveFig(ws, res, status, figpath)
-
-            if status is False:
-                print(f"\n\nBin {bin_key} has problems!\n")
-                prob_bins.append(bin_key)
-                print("****")
-                res["pass"].Print()
-                res["pass"].correlationMatrix().Print()
-                print("****")
-                res["fail"].Print()
-                res["fail"].correlationMatrix().Print()
-                print("****")
-                print(res["pass"].status(), res["fail"].status())
-                print(res["pass"].covQual(), res["fail"].covQual())
-                print(res["pass"].edm(), res["fail"].edm())
-                print('\n')
-            
-        elif fit_settings["type_analysis"] == "sim" and existingRes == 0:
-            pass
-            
-            '''
-            if existingRes == 0:
-                results = simultaneous_efficiency(ws, bin_key, bkg_pdf, 
-                                                  refit_numbkg=True, test_bkg=False, same_smearing=False, 
-                                                  enable_mcfit=False, verb=fit_verbosity, figs=savefigs)
-            else: 
-                results = existingRes
-
-            status = fit_quality(results, old_checks=True)
-
-            if status is False or 1!=0:
-                print(f"\nBin {bin_pt},{bin_eta} has problems!\n")
-                Nproblems += 1
-                problematic_bins.update({bin_key: bin_dictionary[bin_key]})
-                results.Print()
-                #results.correlationMatrix().Print()
-                print("****")
-                print(results.status())
-                print(results.covQual())
-                print(results.edm())
-                print(' ')
             else:
-                pass
-                #res_object.add_result(ws, bin_pt, bin_eta)
-            ''' 
-
+                print("ERROR: wrong analysis type indicated")
+                sys.exit()
+        
+        printFitStatus(type_analysis, bin_key, status, res, prob_bins)
+                
 
     print(f"NUM of problematic bins = {len(prob_bins)}")
     print(prob_bins)

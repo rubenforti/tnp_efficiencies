@@ -187,7 +187,7 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
 
 ###############################################################################
 
-def show_negweighted_bins(ws, bkg_categories, binning_pt, binning_eta):
+def show_negweighted_bins(type_eff, ws, bkg_categories, binning_pt, binning_eta):
     """
     """
 
@@ -212,6 +212,7 @@ def show_negweighted_bins(ws, bkg_categories, binning_pt, binning_eta):
 
     for bin_key in bin_dict.keys():
 
+        print(bin_key)
 
         _, bin_pt, bin_eta = bin_dict[bin_key]
 
@@ -266,7 +267,8 @@ def show_negweighted_bins(ws, bkg_categories, binning_pt, binning_eta):
     neg_sumEntries_single.Draw("colz")
     c.cd(4)
     neg_sumEntries_total.Draw("colz")
-    c.SaveAs(f"figs/neg_bkg_histos_checks/prob_bins_pt{nbins_pt}_eta{nbins_eta}.pdf")
+    c.SaveAs(f"figs/{type_eff}_neg_bkg_histos_checks/prob_bins_pt{nbins_pt}_eta{nbins_eta}.pdf")
+
 
 ###############################################################################
 

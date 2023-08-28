@@ -16,14 +16,14 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 # -----------------------------------------------------------------------------
 #  GENERAL SETTINGS
 # ------------------
-type_eff = "iso"
+type_eff = "triggerminus"
 type_analysis = "indep"
 
 localDatasets = True
-load_McBkg = False
+load_McBkg = True
 
-generateDatasets = True
-default_fit_settings = True
+generateDatasets = False
+default_fit_settings = False
 
 binning_pt, binning_eta, binning_mass = "pt", "eta", "mass_60_120"
 mergedbins_bkg = False
@@ -31,11 +31,11 @@ binning_pt_bkg, binning_eta_bkg = "pt_12bins", "eta_16bins"
 
 bkg_types = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
 
-workspace_name = f"root_files/ws_triggerplus_indep_bmark.root"
+workspace_name = f"root_files/ws_{type_eff}_pseudodata.root"
 import_pdfs = True
 
 savefigs = True
-figpath = {"good": "figs/triggerplus_bmark", "check": "figs/triggerplus_bmark/check"} 
+figpath = {"good": "figs/pseudodata_trigminus", "check": "figs/pseudodata_trigminus/check"} 
 
 
 if mergedbins_bkg and (binning_pt != "pt" or binning_eta != "eta"):
@@ -47,8 +47,11 @@ if mergedbins_bkg and (binning_pt != "pt" or binning_eta != "eta"):
 # --------------------
 if generateDatasets:
 
-    lumi_scales = lumi_factors(type_eff, bkg_types)
-    lumi_scale_signal = lumi_scales.pop("Zmumu")
+    if load_McBkg:
+        lumi_scales = lumi_factors(type_eff, bkg_types)
+        lumi_scale_signal = lumi_scales.pop("Zmumu")
+    else: 
+        lumi_scale_signal = 1
 
     if localDatasets:
         filename_data = f"root_files/datasets/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
@@ -65,19 +68,19 @@ if generateDatasets:
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass)
     ws.writeToFile(workspace_name)
 
-    if load_McBkg:
+    if load_McBkg is True:
         bkg_filenames = {}
         [bkg_filenames.update({cat : 
             f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_types]
 
-        import_dictionary.update({"bkg" : {"filenames" : bkg_filenames, "lumi_scales" : lumi_scales}})
+        import_dict_bkg = {"bkg" : {"filenames" : bkg_filenames, "lumi_scales" : lumi_scales}}
 
         if mergedbins_bkg:
-            ws_bkg = ws_init(import_dictionary["bkg"], type_analysis, binning_pt_bkg, binning_eta_bkg, 
+            ws_bkg = ws_init(import_dict_bkg, type_analysis, binning_pt_bkg, binning_eta_bkg, 
                              binning_mass, import_existing_ws=True, existing_ws_filename=workspace_name, 
                              altBinning_bkg=True)
         else:
-            ws_bkg = ws_init(import_dictionary["bkg"], type_analysis, binning_pt, binning_eta, 
+            ws_bkg = ws_init(import_dict_bkg, type_analysis, binning_pt, binning_eta, 
                              binning_mass, import_existing_ws=True, existing_ws_filename=workspace_name, 
                              altBinning_bkg=False)
     
@@ -96,6 +99,9 @@ if ("idip" in type_eff) or ("trigger" in type_eff) or ("iso" in type_eff):
     fit_settings = fit_settings["idip_trig_iso"]
 else:
     fit_settings = fit_settings[type_eff]
+
+if load_McBkg:
+    fit_settings.update({"bkg_categories" : bkg_types})
 
 # -----------------------------------------------------------------------------------------------------------
 #  RUNNING FITS

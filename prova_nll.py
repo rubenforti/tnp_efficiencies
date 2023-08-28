@@ -91,8 +91,9 @@ def compare_nll(NBINS):
     offset = minimizer_func.getOffset()
     print(offset)
     
-    '''
+
     print(max_ll, sum_ll)
+    '''
     print((max_ll-sum_ll)/(2*(NBINS-3)))
     print(chi2_roostat)
     '''
@@ -101,7 +102,7 @@ def compare_nll(NBINS):
 
 if __name__=="__main__":
 
-    bins = [30 + 5*i for i in range(1)]
+    bins = [20 + 5*i for i in range(10)]
     nlls = [compare_nll(b) for b in bins]
 
     bins = np.array(bins)
@@ -110,10 +111,6 @@ if __name__=="__main__":
     ang_coeff = (np.max(nlls)-np.min(nlls))/(np.max(bins)-np.min(bins))
     # print(ang_coeff)
 
-
-    dev = []
-    for i in range(len(nlls)):
-        dev.append(nlls[i] - ang_coeff*bins[i])
 
     exp_nlls = [ang_coeff*b for b in bins]
 
@@ -125,5 +122,5 @@ if __name__=="__main__":
     print(nlls)
     
     plt.figure(2)
-    plt.hist(dev, bins=10)
+    plt.hist((nlls-exp_nlls)/nlls, bins=10)
     plt.show()

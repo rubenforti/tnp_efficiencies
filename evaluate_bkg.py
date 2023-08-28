@@ -8,9 +8,9 @@ from utilities.base_library import eval_efficiency as eval_bkgfrac  #La formula 
 from utilities.results_utils import init_pass_fail_histos
 from utilities.plot_utils import plot_bkg_on_histo
 from utilities.fit_utils import check_existing_fit
-from utilities.dataset_utils import ws_init, show_negweighted_bins
+from utilities.dataset_utils import show_negweighted_bins
 from array import array
-from indep_eff_pseudodata import independent_efficiency
+# from indep_eff_pseudodata import independent_efficiency
 
 
 # bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
@@ -476,29 +476,29 @@ if __name__ == "__main__":
     bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
     # bkg_categories = ["Ztautau"]
 
-    type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
-    t = type_eff[3]
+    type_eff = "triggerminus"
 
-    types_analysis = ["indep", "sim"]
-    an = types_analysis[0]
+    type_analysis = "indep"
 
-    lumi_scales = lumi_factors(t, bkg_categories)
+    lumi_scales = lumi_factors(type_eff, bkg_categories)
 
     sig_lumi_scale = lumi_scales.pop("Zmumu")
     # lumi_scales = {"WW":1, "WZ":1, "ZZ":1, "TTSemileptonic":1, "Ztautau":1}
 
+    '''
     filename_data = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_data_vertexWeights1_oscharge1.root"
     filename_mc = "/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_iso_mc_vertexWeights1_oscharge1.root"
     filename_mc_weightsum = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS/tnp_iso_mc_vertexWeights1_oscharge1.root"
     dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
+    '''
 
-    # filename_data = "root_files/datasets/tnp_iso_data_vertexWeights1_oscharge1.root"
-    # filename_mc = "root_files/datasets/tnp_iso_mc_vertexWeights1_oscharge1.root"
-    # dirname_bkg = "root_files/datasets"
+    filename_data = "root_files/datasets/tnp_triggerminus_data_vertexWeights1_oscharge1.root"
+    filename_mc = "root_files/datasets/tnp_triggerminus_mc_vertexWeights1_oscharge1.root"
+    dirname_bkg = "root_files/datasets"
 
     bkg_filenames = {}
     [bkg_filenames.update({cat : 
-        f"{dirname_bkg}/tnp_{t}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_categories]
+        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_categories]
 
 
     import_dictionary = {
@@ -522,10 +522,10 @@ if __name__ == "__main__":
     # bin_set = bin_dict()
     bin_set = bin_dictionary(binning_pt_key, binning_eta_key)
 
-    ws_filename = "root_files/ws_bkg_mergedbins_pt12_eta16.root"
+    ws_filename = "root_files/ws_triggerminus_pseudodata.root"
 
-    ws = ws_init(import_dictionary, an, binning_pt_key, binning_eta_key, binning_mass)
-    ws.writeToFile(ws_filename)
+    # ws = ws_init(import_dictionary, an, binning_pt_key, binning_eta_key, binning_mass)
+    # ws.writeToFile(ws_filename)
 
     # file = ROOT.TFile("root_files/ws_bkg_studies.root", "READ")
     # file = ROOT.TFile("root_files/ws_bkg_pseudodata.root", "READ")
@@ -546,14 +546,15 @@ if __name__ == "__main__":
         w = ws_init(import_dictionary, an, bin_set, binning_mass)
         show_negweighted_bins(w, bkg_categories, binning_pt, binning_eta)
     '''
+    show_negweighted_bins(type_eff, ws, bkg_categories, "pt", "eta")
 
-    
+
+    '''
     plot_backgrounds_2d(ws, binning_pt_key, binning_eta_key, bkg_categories,
                         norm_data=False, norm_tot_bkg=False, 
                         filename="bkg_2d_distr_pt12_eta16.root")
-    
-
-
+    '''
+                        
     '''
     bkg_mass_distribution("iso", bkg_categories, ws, binning_pt_key, binning_eta_key,
                           plot_on_data=False, plot_on_signal=False, logscale=False,

@@ -140,9 +140,12 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
 
 ###############################################################################
 
-def compare_eff_pseudodata(ws, binning_pt, binning_eta, res_list, file_output):
+def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list, file_output):
     """
     """
+
+    file_pseudodata = ROOT.TFile.Open(ws_filename)
+    ws = file_pseudodata.Get("w")
 
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
     bin_dict = bin_dictionary(binning_pt, binning_eta)
@@ -207,27 +210,16 @@ if __name__ == '__main__':
     res_list = cmpres_array_dict.keys()
 
     '''
-    ws_results = [["results/iso_indep_2gev/ws_iso_indep_2gev.root", "results/benchmark_iso/old_results.txt"],
-                  ["results/iso_indep_2gev_mcbkg/ws_iso_indep_2gev_mcbkg.root", "results/iso_indep_2gev/ws_iso_indep_2gev.root"],
-                  ["results/iso_indep_mcbkg_merged/ws_iso_indep_mcbkg_merged.root", "results/benchmark_iso/old_results.txt"]]
+    ws_results = [["results/benchmark_trig_plus/ws_triggerplus_indep_bmark.root", "results/benchmark_trig_plus/old_results.txt"],
+                  ["results/benchmark_trig_minus/ws_triggerminus_indep_bmark.root", "results/benchmark_trig_minus/old_results.txt"],]
 
     for ws_new, ws_benchmark in ws_results:
         compare_efficiency(ws_benchmark, ws_new, "pt", "eta", res_list)
     '''
-
     
-    filename_bmark = "results/benchmark_iso/ws_iso_indep_benchmark.root"
-
-    filename_test = "root_files/iso_workspace_indep.root"
+    ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
     
-    compare_efficiency(filename_bmark, filename_test, "pt", "eta", res_list)
-    
-
-    '''
-    file_pseudodata = ROOT.TFile.Open("results/pseudodata_eta8bins/ws_iso_pseudodata_eta8bins.root")
-    ws_pseudodata = file_pseudodata.Get("w")
-    compare_eff_pseudodata(ws_pseudodata, "pt", "eta_8bins", res_list, "results/pseudodata_eta8bins/hres_cmp_pseudodata.root")
-    '''
+    compare_eff_pseudodata(ws_filename, "pt", "eta", res_list, "results/pseudodata_trig_minus/hres_cmp_pseudodata.root")
 
     
 
