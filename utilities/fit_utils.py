@@ -43,25 +43,66 @@ def pearson_chi2_eval(histo, pdf, nbins, res):
 
 ###############################################################################
 
-def llr_eval(histo, res):
+def llr_eval(histo, pdf):
     """
     """
-    max_ll_data = 0
 
-    for idx in range(histo.numEntries()):
-        k = histo.weight(idx)
-        if k == 0:
-            max_ll_data += 0
-        elif k>0:
-            max_ll_data += 2*(k*ROOT.TMath.Log(k))
+    observables = pdf.getObservables(histo)
+    for obs in observables:
+        obs.Print()
+        if "x_pass" in obs.GetName() or "x_fail" in obs.GetName() or "x_sim" in obs.GetName():
+            axis = obs
 
-    llr_val = max_ll_data #  + 2*res.minNll()
+    binning = axis.getBinning()
+    NBINS = binning.numBins()
+    
+    EVTS = histo.sumEntries()
 
-    pars = res.floatParsFinal()
-    ndof = histo.numEntries() - pars.getSize()
+    binning.Print()
 
-    return llr_val, ndof
+    print(NBINS, EVTS)
 
+    sum_ll = 0
+    max_ll = 0
+
+    for i in range(NBINS):
+    
+        axis.setVal(binning.binCenter(i))
+        weight = histo.weight(i)
+
+        pdf_val = pdf.getVal(ROOT.RooArgSet(axis))
+
+        mu = EVTS*(axis.getMax()-axis.getMin())*pdf_val/NBINS
+        mu = round(mu, 5)
+
+        new_sumll = weight*ROOT.TMath.Log(mu) - mu if mu>0 else 0.0
+        sum_ll += 2*new_sumll
+
+        if weight > 0:
+            max_ll += 2*weight*ROOT.TMath.Log(weight) - 2*weight
+
+
+    n_fitted_events=0
+    for server in pdf.servers():
+        if "nsig" in server.GetName() or "nbkg" in server.GetName():
+            n_fitted_events += server.getVal()
+
+    print(n_fitted_events)
+
+
+    sum_ll += 2*EVTS*ROOT.TMath.Log(n_fitted_events) - 2*n_fitted_events
+    max_ll += 2*EVTS*ROOT.TMath.Log(EVTS) - 2*EVTS
+
+    print(sum_ll, max_ll)
+
+
+    llr = max_ll - sum_ll
+
+    floatpars = pdf.getParameters(histo)
+
+    ndof = NBINS - floatpars.size()
+
+    return llr, ndof
 
 
 ###############################################################################
@@ -138,3 +179,38 @@ def llr_test_bkg(histo, pdf, alpha=0.05):
     null = True if pval > 0.05 else False
 
     return null
+
+
+
+if __name__ == "__main__":
+
+
+    NBINS = 60
+
+    axis = ROOT.RooRealVar("x_pass", "x", 60, 120)
+    axis.setBins(NBINS)
+
+    mu = ROOT.RooRealVar("mu", "mu", 91, 85, 95)
+    sigma = ROOT.RooRealVar("sigma", "sigma", 2.5, 0.5, 5)
+
+    gaus = ROOT.RooGaussian("gaus", "gaus", axis, mu, sigma)
+
+    EVTS = int(NBINS*100)
+
+    nevents = ROOT.RooRealVar("nsig", "numev", EVTS, 0, 5*EVTS)
+
+    gaus_extended = ROOT.RooExtendPdf("gaus_extended", "gaus_extended", gaus, nevents)
+
+    data = gaus_extended.generateBinned(ROOT.RooArgSet(axis), EVTS)
+
+    res = gaus_extended.fitTo(data, 
+                    ROOT.RooFit.Save(1), 
+                    ROOT.RooFit.Minimizer("Minuit2", "Migrad"),
+                    ROOT.RooFit.PrintLevel(-1))
+    
+
+    print(-2*res.minNll())
+    
+    llr, ndof = llr_eval(data, gaus_extended)
+
+    print(llr, ndof)

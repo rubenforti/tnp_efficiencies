@@ -563,7 +563,7 @@ Quindi adesso ripetiamo la run di fit sugli pseudodati con sumW2=False, covQual=
 risultati il bias sull'efficienza dovuto alla procedura di fit. Fit completato in 4/5 run.
 Essendo l'obbiettivo di questa analisi valutare il bias dovuto alla procedura di fit (con ipotesi expo),
 si calcola il PULL (dove l'ipotesi expo ha il ruolo di test), il RATIO e il RATIO_ERROR (per verificare che
-l'errore che si ricava dal fit sia consistente con quello ricavato dal MC)Ratio_error
+l'errore che si ricava dal fit sia consistente con quello ricavato dal MC)
 
 Risultati:
     - il pull ha una distribuzione circa gaussiana, da un rapido fit da TBrowser si stima mu=-0.12+-0.04 e
