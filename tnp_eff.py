@@ -16,11 +16,11 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 # -----------------------------------------------------------------------------
 #  GENERAL SETTINGS
 # ------------------
-type_eff = "triggerminus"
-type_analysis = "indep"
+type_eff = "iso"
+type_analysis = "sim"
 
 localDatasets = True
-load_McBkg = True
+load_McBkg = False
 
 generateDatasets = False
 default_fit_settings = False
@@ -31,10 +31,10 @@ binning_pt_bkg, binning_eta_bkg = "pt_12bins", "eta_16bins"
 
 bkg_types = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
 
-workspace_name = f"root_files/ws_{type_eff}_pseudodata.root"
-import_pdfs = True
+workspace_name = f"root_files/ws_{type_eff}_{type_analysis}_prova.root"
+import_pdfs = False
 
-savefigs = True
+savefigs = False
 figpath = {"good": "figs/pseudodata_trigminus", "check": "figs/pseudodata_trigminus/check"} 
 
 

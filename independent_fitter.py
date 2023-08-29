@@ -16,10 +16,9 @@ class EfficiencyFitter():
     """
     """
 
-    def __init__(self, type_analysis, bin_key, settings):
+    def __init__(self, bin_key, settings):
         """
         """
-        self.__type_analysis = type_analysis
         self.__settings = copy.deepcopy(settings)
         self.__bin_key = bin_key
         
@@ -158,7 +157,8 @@ class EfficiencyFitter():
                                            )
         res.SetName(f"results_{flag}_{self.__bin_key}")
         
-        fit_obj = {"histo" : self.__histo_data[flag], "pdf" : self.__model_pdf[flag], "res" : res}
+        fit_obj = {"axis" : self.__axis[flag], "histo" : self.__histo_data[flag], 
+                   "pdf" : self.__model_pdf[flag], "res" : res}
         status = fit_quality(fit_obj, type_checks=self.__settings["fit_checks"])
 
         return res, status

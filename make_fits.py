@@ -57,13 +57,14 @@ def runFits(ws_name, type_eff, bins_dict, fit_settings, fit_verb=-1, import_pdfs
 
     for bin_key in bins_dict.keys():
         
-        # if bin_key!="[24.0to26.0][-2.4to-2.3]":
-        #    sys.exit()
+        if bin_key!="[24.0to26.0][-2.4to-2.3]":
+            sys.exit()
 
         if check_existing_fit(fit_settings["type_analysis"], ws, bin_key) == 0:
 
             if fit_settings["type_analysis"] == "indep":
-                    
+                
+                print("AAA")
                 fitter = indep_eff(bin_key, fit_settings)
                 res, status_dict = {}, {}   
 
@@ -96,9 +97,9 @@ def runFits(ws_name, type_eff, bins_dict, fit_settings, fit_verb=-1, import_pdfs
 
                 fitter = sim_eff(bin_key, fit_settings)
 
-                result, status = fitter.doFit(ws)
+                res, status = fitter.doFit(ws)
                 
-                pars_fitted = result.floatParsFinal()
+                pars_fitted = res.floatParsFinal()
 
                 refit_flags = []
                 if (status is False) and refit_numbkg:
@@ -122,7 +123,7 @@ def runFits(ws_name, type_eff, bins_dict, fit_settings, fit_verb=-1, import_pdfs
                 print("ERROR: wrong analysis type indicated")
                 sys.exit()
         
-        printFitStatus(type_analysis, bin_key, status, res, prob_bins)
+        printFitStatus(fit_settings["type_analysis"], bin_key, status, res, prob_bins)
                 
 
     print(f"NUM of problematic bins = {len(prob_bins)}")

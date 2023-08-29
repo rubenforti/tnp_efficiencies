@@ -1,16 +1,16 @@
 {
     "idip_trig_iso" : {
 
-        "type_analysis" : "indep",
-        "fit_checks" : "benchmark",
+        "type_analysis" : "sim",
+        "fit_checks" : "new_checks",
         "fit_range" : [60.0, 120.0],
-        "fit_on_pseudodata" : true,
+        "fit_on_pseudodata" : false,
         "fit_strategy" : {
             "pass" : 2,
             "fail" : 2
         },
         "Nbins" : {
-            "pass" : 10000,
+            "pass" : 5000,
             "fail" : 5000
         },
         "bufFraction" : {
@@ -28,7 +28,7 @@
             },
             "sigma" : {
                 "pass" :[0.5, 0.1, 5.0],
-                "fail" :[1.0, 0.01, 5.0]
+                "fail" :[0.5, 0.1, 5.0]
             },
             "tau" : {
                 "pass" :[0.0, -5.0, 5.0],
@@ -37,12 +37,12 @@
         },
         "norm" : {
             "nsig" : {
-                "pass" : ["1n", 0.5, "5n"],
-                "fail" : ["1n", 0.5, "5n"]
+                "pass" : ["0.9n", 0.5, "5n"],
+                "fail" : ["0.9n", 0.5, "5n"]
             },
             "nbkg" : {
-                "pass" : ["0.05n", 0.1, "0.5n"],
-                "fail" : ["0.01n", 0.01, "0.5n"]
+                "pass" : ["0.1n", 0.5, "0.5n"],
+                "fail" : ["0.1n", 0.5, "0.5n"]
             }
         }
 

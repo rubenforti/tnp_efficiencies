@@ -31,36 +31,23 @@ def check_existing_fit(type_analysis, ws, bin_key):
 
 ###############################################################################
 
-def pearson_chi2_eval(histo, pdf, nbins, res):
+def pearson_chi2_eval(histo, pdf):
     """
     """
-    ndof = nbins - res.floatParsFinal().getSize()
-    # print(ndof)
     chi2_obj = ROOT.RooChi2Var("chi2", "chi2", pdf, histo)
     chi2_val = chi2_obj.getVal() 
 
-    return chi2_val, ndof
+    return chi2_val
 
 ###############################################################################
 
-def llr_eval(histo, pdf):
+def llr_eval(histo, pdf, axis):
     """
     """
-
-    observables = pdf.getObservables(histo)
-    for obs in observables:
-        obs.Print()
-        if "x_pass" in obs.GetName() or "x_fail" in obs.GetName() or "x_sim" in obs.GetName():
-            axis = obs
 
     binning = axis.getBinning()
-    NBINS = binning.numBins()
-    
+    NBINS = binning.numBins()   
     EVTS = histo.sumEntries()
-
-    binning.Print()
-
-    print(NBINS, EVTS)
 
     sum_ll = 0
     max_ll = 0
@@ -71,7 +58,6 @@ def llr_eval(histo, pdf):
         weight = histo.weight(i)
 
         pdf_val = pdf.getVal(ROOT.RooArgSet(axis))
-
         mu = EVTS*(axis.getMax()-axis.getMin())*pdf_val/NBINS
         mu = round(mu, 5)
 
@@ -81,76 +67,86 @@ def llr_eval(histo, pdf):
         if weight > 0:
             max_ll += 2*weight*ROOT.TMath.Log(weight) - 2*weight
 
-
     n_fitted_events=0
     for server in pdf.servers():
         if "nsig" in server.GetName() or "nbkg" in server.GetName():
             n_fitted_events += server.getVal()
 
-    print(n_fitted_events)
-
-
     sum_ll += 2*EVTS*ROOT.TMath.Log(n_fitted_events) - 2*n_fitted_events
     max_ll += 2*EVTS*ROOT.TMath.Log(EVTS) - 2*EVTS
 
-    print(sum_ll, max_ll)
-
-
     llr = max_ll - sum_ll
 
-    floatpars = pdf.getParameters(histo)
+    print("***")
+    print("Nbins, Nevents, NfittedEvents:", NBINS, EVTS, n_fitted_events)
+    print("SumLL, MaxLL", sum_ll, max_ll)
+    print("***")
 
-    ndof = NBINS - floatpars.size()
-
-    return llr, ndof
+    return llr
 
 
 ###############################################################################
 
-def status_chi2(histo, pdf, res, type="pearson", nsigma=15):
+def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
     """
     """
 
-    if "pseudodata" in histo.GetName():
-        return True
+    if "pass" in res.GetName() or "fail" in res.GetName():
+        chi2val = llr_eval(histo, pdf, axis) if type_chi2=="llr" else pearson_chi2_eval(histo, pdf)
+        ndof = histo.numEntries() - res.floatParsFinal().getSize()
 
+    elif "sim" in res.GetName():
+        chi2val = 0
+        for flag in ["pass", "fail"]:
+            chi2val = chi2val + llr_eval(histo[flag], pdf[flag], axis) if \
+                type_chi2=="llr" else pearson_chi2_eval(histo[flag], pdf[flag])
+        ndof = histo["pass"].numEntries() + histo["fail"].numEntries() - res.floatParsFinal().getSize()
     else:
-        if type == "pearson":
-            chi2val, ndof = pearson_chi2_eval(histo, pdf, histo.numEntries(), res)
-            print(chi2val, ndof)
-        elif type == "llr":
-            chi2val, ndof = llr_eval(histo, res)
-        
-        chi2_status = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
-
-        return chi2_status
+        print("ERROR: status_chi2() function is not implemented for this type of fit")
+        sys.exit()
+     
+    chi2_status = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
+    print(chi2val, ndof, chi2_status) 
+    return chi2_status
+    
 
 ###############################################################################
 
 def fit_quality(fit_obj, type_checks="benchmark"):
     """
     """
-    check_covm = (fit_obj["res"].covQual() == 3)
+    check_edm = True
+    check_migrad = True
+    check_chi2 = True
+    check_covm = True
 
     if type_checks == "benchmark":
         check_migrad = (fit_obj["res"].status() == 0 or fit_obj["res"].status() == 1)
-        check_chi2 = status_chi2(fit_obj["histo"], fit_obj["pdf"], fit_obj["res"], type="pearson")
-        return bool(check_covm*check_migrad*check_chi2)
-    
+        check_covm = (fit_obj["res"].covQual() == 3)
+        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
+                                 fit_obj["res"], type_chi2="pearson", nsigma=15)
     elif type_checks == "new_checks":
         check_migrad = fit_obj["res"].status() == 0
+        check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 1e-3)
-        check_chi2 = status_chi2(fit_obj["histo"], fit_obj["pdf"], fit_obj["res"], 
-                                 type="llr", nsigma=5)
-        return bool(check_covm*check_migrad*check_edm*check_chi2)
-    '''
-    # Not used anymore, could be useful if Sumw2Error turns out to be needed
+        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
+                                 fit_obj["res"], type_chi2="llr", nsigma=5)
     elif type_checks == "pseudodata":
+        check_migrad = (fit_obj["res"].status() == 0 or fit_obj["res"].status() == 1)
+        check_covm = (fit_obj["res"].covQual() == 3)
+    '''
+    # Not used, could be useful if Sumw2Error turns out to be needed
+    elif type_checks == "pseudodata_sumw2":
         check_migrad = fit_obj["res"].status()==0
         check_covm = (fit_obj["res"].covQual()==2 or fit_obj["res"].covQual()==3)
         return bool(check_migrad*check_covm)
     '''
 
+    
+    return bool(check_migrad*check_covm*check_edm*check_chi2)
+
+
+    
 ###############################################################################
 
 def llr_test_bkg(histo, pdf, alpha=0.05):
