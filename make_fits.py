@@ -57,14 +57,13 @@ def runFits(ws_name, type_eff, bins_dict, fit_settings, fit_verb=-1, import_pdfs
 
     for bin_key in bins_dict.keys():
         
-        if bin_key!="[24.0to26.0][-2.4to-2.3]":
-            sys.exit()
+        # if bin_key!="[24.0to26.0][-2.4to-2.3]":
+        #    sys.exit()
 
         if check_existing_fit(fit_settings["type_analysis"], ws, bin_key) == 0:
 
             if fit_settings["type_analysis"] == "indep":
                 
-                print("AAA")
                 fitter = indep_eff(bin_key, fit_settings)
                 res, status_dict = {}, {}   
 
@@ -103,12 +102,21 @@ def runFits(ws_name, type_eff, bins_dict, fit_settings, fit_verb=-1, import_pdfs
 
                 refit_flags = []
                 if (status is False) and refit_numbkg:
-                    for flag in ["pass", "fail"]:
-                        nsig_fitted = pars_fitted.find(f"nsig_{flag}_{bin_key}")
-                        nbkg_fitted = pars_fitted.find(f"nbkg_{flag}_{bin_key}")
-            
-                        if (nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal()):
-                            refit_flags.append(flag)
+                    
+                    eff_fitted = pars_fitted.find(f"efficiency_{bin_key}")
+                    nsig_tot_fitted = pars_fitted.find(f"ntot_{bin_key}")
+
+                    nsig_fitted_pass = eff_fitted.getVal()*nsig_tot_fitted.getVal()
+                    nsig_fitted_fail = (1-eff_fitted.getVal())*nsig_tot_fitted.getVal()
+
+                    nbkg_fitted_pass = pars_fitted.find(f"nbkg_pass_{bin_key}")
+                    nbkg_fitted_fail = pars_fitted.find(f"nbkg_fail_{bin_key}")
+
+                    if (nbkg_fitted_pass.getVal() < 0.005*nsig_fitted_pass):
+                        refit_flags.append("pass")
+                    
+                    if (nbkg_fitted_fail.getVal() < 0.005*nsig_fitted_fail):
+                        refit_flags.append("fail")
 
                     if len(refit_flags) != 0:
                         res, status = fitter.refit_noBkg(refit_flags, ws)

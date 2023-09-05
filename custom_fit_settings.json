@@ -1,7 +1,6 @@
 {
     "idip_trig_iso" : {
 
-        "type_analysis" : "sim",
         "fit_checks" : "new_checks",
         "fit_range" : [60.0, 120.0],
         "fit_on_pseudodata" : false,

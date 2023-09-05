@@ -1,7 +1,6 @@
 {
     "idip_trig_iso" : {
 
-        "type_analysis" : "indep",
         "fit_checks" : "benchmark",
         "fit_range" : [60.0, 120.0],
         "fit_on_pseudodata" : false,

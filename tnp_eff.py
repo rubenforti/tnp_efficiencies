@@ -17,13 +17,13 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 #  GENERAL SETTINGS
 # ------------------
 type_eff = "iso"
-type_analysis = "sim"
+type_analysis = "indep"
 
-localDatasets = True
+localDatasets = False
 load_McBkg = False
 
-generateDatasets = False
-default_fit_settings = False
+generateDatasets = True
+default_fit_settings = True
 
 binning_pt, binning_eta, binning_mass = "pt", "eta", "mass_60_120"
 mergedbins_bkg = False
@@ -32,7 +32,7 @@ binning_pt_bkg, binning_eta_bkg = "pt_12bins", "eta_16bins"
 bkg_types = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
 
 workspace_name = f"root_files/ws_{type_eff}_{type_analysis}_prova.root"
-import_pdfs = False
+import_pdfs = True
 
 savefigs = False
 figpath = {"good": "figs/pseudodata_trigminus", "check": "figs/pseudodata_trigminus/check"} 
@@ -99,6 +99,8 @@ if ("idip" in type_eff) or ("trigger" in type_eff) or ("iso" in type_eff):
     fit_settings = fit_settings["idip_trig_iso"]
 else:
     fit_settings = fit_settings[type_eff]
+
+fit_settings.update({"type_analysis" : type_analysis})
 
 if load_McBkg:
     fit_settings.update({"bkg_categories" : bkg_types})

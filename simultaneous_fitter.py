@@ -43,6 +43,8 @@ class EfficiencyFitter():
         if self.__settings["bkg_model"] == "mc_raw":
             self.__bkg_categories = self.__settings["bkg_categories"]
             self.__bkg_tothist = {}
+        
+        self.__settings.update({"init_pdfs" : True})
 
 
     def importAxis(self, ws):
@@ -67,7 +69,7 @@ class EfficiencyFitter():
         self.__total_events = self.__histo_data["pass"].sumEntries() + self.__histo_data["fail"].sumEntries()
         
         self.__settings["norm"].update({ "ntot" : ROOT.RooRealVar(
-            f"ntot_{self.__bin_key}", "N total events", self.__total_events, 0, 5*self.__total_events)})
+            f"ntot_{self.__bin_key}", "nsig total", self.__total_events, 0, 5*self.__total_events)})
 
         self.__settings["norm"]["nsig"].update({
             "pass" : ROOT.RooProduct(f"nsig_pass_{self.__bin_key}", "nsig pass", 
@@ -183,10 +185,10 @@ class EfficiencyFitter():
                 self.__model_pdf["sim"].addPdf(self.__pdf_mc[flag], f"mc_{flag}")                
         
 
-    def doFit(self, ws, init_pdfs=True):
+    def doFit(self, ws):
         """
         """
-        if init_pdfs:
+        if self.__settings["init_pdfs"] is True:
             self.importAxis(ws)
             for flag in ["pass", "fail"]:
                 self.initParams(flag)
@@ -223,11 +225,11 @@ class EfficiencyFitter():
                                             ROOT.RooFit.SumW2Error(False),
                                             # ROOT.RooFit.MaxCalls(100000),
                                             ROOT.RooFit.Save(1),
-                                            ROOT.RooFit.PrintLevel(1))
+                                            ROOT.RooFit.PrintLevel(-1))
 
         res.SetName(f"results_sim_{self.__bin_key}")
         
-        res.Print("v")
+        # res.Print("v")
         fit_obj = {"axis" : self.__axis, "histo" : self.__histo_data, "pdf" : self.__model_pdf, "res" : res}
         status = fit_quality(fit_obj, type_checks=self.__settings["fit_checks"])
 
@@ -243,7 +245,9 @@ class EfficiencyFitter():
             self.__settings["norm"]["nbkg"][flag].setVal(0)
             self.__settings["norm"]["nbkg"][flag].setConstant()
         
-        return self.doFit(flag, ws, init_pdfs=False)
+        self.__settings["init_pdfs"] = False
+        
+        return self.doFit(ws)
     
 
     def getFinalPdf(self, flag):
