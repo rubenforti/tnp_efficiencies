@@ -3,7 +3,6 @@
 
         "fit_checks" : "benchmark",
         "fit_range" : [60.0, 120.0],
-        "fit_on_pseudodata" : false,
         "fit_strategy" : {
             "pass" : 2,
             "fail" : 2

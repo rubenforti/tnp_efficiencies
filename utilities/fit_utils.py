@@ -91,16 +91,21 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
     """
     """
 
-    if "pass" in res.GetName() or "fail" in res.GetName():
-        chi2val = llr_eval(histo, pdf, axis) if type_chi2=="llr" else pearson_chi2_eval(histo, pdf)
-        ndof = histo.numEntries() - res.floatParsFinal().getSize()
+    type_an = "indep" if "pass" in res.GetName() or "fail" in res.GetName() else None
+    type_an = "sim" if "sim" in res.GetName() else None
 
-    elif "sim" in res.GetName():
+    if type_an == "indep":
+        flag = "pass" if "pass" in res.GetName() else "fail"
+        chi2val = llr_eval(histo[flag], pdf[flag], axis[flag]) \
+            if type_chi2=="llr" else pearson_chi2_eval(histo[flag], pdf[flag])
+        ndof = histo[flag].numEntries() - res.floatParsFinal().getSize()
+    elif type_an == "sim":
         chi2val = 0
         for flag in ["pass", "fail"]:
-            chi2val = chi2val + llr_eval(histo[flag], pdf[flag], axis) if \
-                type_chi2=="llr" else pearson_chi2_eval(histo[flag], pdf[flag])
+            if type_chi2=="llr": chi2val = chi2val + llr_eval(histo[flag], pdf[flag], axis[flag]) 
+            else: chi2val = chi2val + pearson_chi2_eval(histo[flag], pdf[flag])
         ndof = histo["pass"].numEntries() + histo["fail"].numEntries() - res.floatParsFinal().getSize()
+
     else:
         print("ERROR: status_chi2() function is not implemented for this type of fit")
         sys.exit()
@@ -126,7 +131,7 @@ def fit_quality(fit_obj, type_checks="benchmark"):
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
                                  fit_obj["res"], type_chi2="pearson", nsigma=15)
     elif type_checks == "new_checks":
-        check_migrad = fit_obj["res"].status() == 0
+        check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 1e-3)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 

@@ -4,20 +4,17 @@
 import ROOT
 import os
 import sys
-import time
-import argparse
-from utilities.base_library import bin_dictionary, lumi_factors
-from independent_fitter import EfficiencyFitter as indep_eff
-from simultaneous_fitter import EfficiencyFitter as sim_eff
-from utilities.fit_utils import check_existing_fit
+from multiprocessing import Pool
+from itertools import repeat
+from fitter import IndepFitter, SimFitter
 
 
 def printFitStatus(type_analysis, bin_key, status, res, prob_bins):
 
     if status is True:
-        print(f"\n\nBin {bin_key} is OK!\n")
+        print(f"Bin {bin_key} is OK!\n\n")
     else:
-        print(f"\n\nBin {bin_key} has problems!\n")
+        print(f"Bin {bin_key} has problems!\n")
         prob_bins.append(bin_key)
         if type_analysis == "indep":
             print("****")
@@ -33,18 +30,17 @@ def printFitStatus(type_analysis, bin_key, status, res, prob_bins):
             print('\n')
         elif type_analysis == "sim":
             print("****")
-            res.Print()
-            res.correlationMatrix().Print()
+            res["sim"].Print()
+            res["sim"].correlationMatrix().Print()
             print("****")
-            print(res.status())
-            print(res.covQual())
-            print(res.edm())
-            print('\n')
+            print(res["sim"].status())
+            print(res["sim"].covQual())
+            print(res["sim"].edm())
+            print('\n\n')
 
 
-
-def runFits(ws_name, type_eff, bins_dict, fit_settings, fit_verb=-1, import_pdfs=False, refit_numbkg=True, 
-              savefigs=False, figpath={"good":"figs/stuff", "check":"figs/check/stuff"}):
+def runFits(ws_name, bins_dict, fit_settings, parallelize=True, import_pdfs=False,  
+            savefigs=False, figpath={"good":"figs/stuff", "check":"figs/check/stuff"}):
     """
     """
     path = os.path.dirname(__file__)
@@ -57,193 +53,98 @@ def runFits(ws_name, type_eff, bins_dict, fit_settings, fit_verb=-1, import_pdfs
 
     for bin_key in bins_dict.keys():
         
-        # if bin_key!="[24.0to26.0][-2.4to-2.3]":
-        #    sys.exit()
+        # if bin_key != "[60.0to65.0][-1.3to-1.2]": continue
 
-        if check_existing_fit(fit_settings["type_analysis"], ws, bin_key) == 0:
+        if fit_settings["type_analysis"] == "indep":
+            fitter = IndepFitter(bin_key, fit_settings)            
+            fitter.manageFit(ws)
+            status = bool(fitter.results["pass"]["status"]*fitter.results["fail"]["status"])
+            res = {"pass" : fitter.results["pass"]["res_obj"], "fail" : fitter.results["fail"]["res_obj"]}
 
-            if fit_settings["type_analysis"] == "indep":
-                
-                fitter = indep_eff(bin_key, fit_settings)
-                res, status_dict = {}, {}   
-
-                for flag in ["pass", "fail"]:
-                    result, status = fitter.doFit(flag, ws)
-                    
-                    pars_fitted = result.floatParsFinal()
-                    nsig_fitted = pars_fitted.find(f"nsig_{flag}_{bin_key}")
-                    nbkg_fitted = pars_fitted.find(f"nbkg_{flag}_{bin_key}")
-                
-                    low_nbkg = (nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal())
-
-                    if (status is False) and refit_numbkg and low_nbkg:
-                        result, status = fitter.refit_noBkg(flag, ws)
-
-                    res.update({flag : result})
-                    status_dict.update({flag : status})
-
-                status = bool(status_dict["pass"]*status_dict["fail"])
-
-                if status and import_pdfs:
-                    ws.Import(fitter.getFinalPdf("pass")), ws.Import(fitter.getFinalPdf("fail"))
-                    ws.Import(res["pass"]), ws.Import(res["fail"])
-                
-                if savefigs:
-                    fitter.saveFig(ws, res, status, figpath)
-
-
-            elif fit_settings["type_analysis"] == "sim" or fit_settings["type_analysis"] == "sim_sf":
-
-                fitter = sim_eff(bin_key, fit_settings)
-
-                res, status = fitter.doFit(ws)
-                
-                pars_fitted = res.floatParsFinal()
-
-                refit_flags = []
-                if (status is False) and refit_numbkg:
-                    
-                    eff_fitted = pars_fitted.find(f"efficiency_{bin_key}")
-                    nsig_tot_fitted = pars_fitted.find(f"ntot_{bin_key}")
-
-                    nsig_fitted_pass = eff_fitted.getVal()*nsig_tot_fitted.getVal()
-                    nsig_fitted_fail = (1-eff_fitted.getVal())*nsig_tot_fitted.getVal()
-
-                    nbkg_fitted_pass = pars_fitted.find(f"nbkg_pass_{bin_key}")
-                    nbkg_fitted_fail = pars_fitted.find(f"nbkg_fail_{bin_key}")
-
-                    if (nbkg_fitted_pass.getVal() < 0.005*nsig_fitted_pass):
-                        refit_flags.append("pass")
-                    
-                    if (nbkg_fitted_fail.getVal() < 0.005*nsig_fitted_fail):
-                        refit_flags.append("fail")
-
-                    if len(refit_flags) != 0:
-                        res, status = fitter.refit_noBkg(refit_flags, ws)
-
-                if status and import_pdfs:
-                    ws.Import(fitter.getFinalPdf("sim")), ws.Import(res)
-
-                if savefigs:
-                    fitter.saveFig(ws, res, status, figpath)
-            
-            else:
-                print("ERROR: wrong analysis type indicated")
-                sys.exit()
+    
+        elif fit_settings["type_analysis"] == "sim" or fit_settings["type_analysis"] == "sim_sf":
+            fitter = SimFitter(bin_key, fit_settings)
+            fitter.manageFit(ws)
+            res = {"sim" : fitter.results["sim"]["res_obj"]}
+            status = bool(fitter.results["sim"]["status"])
         
+        else:
+            print("ERROR: wrong analysis type indicated")
+            sys.exit()
+
+        if import_pdfs: fitter.importFitObjects(ws)
+        if savefigs: fitter.saveFig(ws, figpath)
+
         printFitStatus(fit_settings["type_analysis"], bin_key, status, res, prob_bins)
-                
+
 
     print(f"NUM of problematic bins = {len(prob_bins)}")
     print(prob_bins)
-
-    return ws
-
-
-if __name__ == '__main__':
+    ws.writeToFile(ws_name)
 
 
 
-    ROOT.gROOT.SetBatch(True)
-    ROOT.PyConfig.IgnoreCommandLineOptions = True
+
+def parallelize_fits(fitter, ws, import_pdfs, savefigs, figpath=None):
+    """
+    """
+    fitter.manageFit(ws)
+
+    if fitter.settings["type_analysis"] == "indep":
+        status = bool(fitter.results["pass"]["status"]*fitter.results["fail"]["status"])
+        res = {"pass" : fitter.results["pass"]["res_obj"], "fail" : fitter.results["fail"]["res_obj"]}
+    elif fitter.settings["type_analysis"] == "sim" or fitter.settings["type_analysis"] == "sim_sf":
+        res = {"sim" : fitter.results["sim"]["res_obj"]}
+        status = bool(fitter.results["sim"]["status"])
+
+    if import_pdfs is True: fitter.importFitObjects(ws)
+
+    if savefigs is True: fitter.saveFig(ws, figpath)
+    bin_key = fitter.bin_key
+
+    return (fitter, bin_key, status, res)
 
 
-    t0 = time.time()
-    custom_pdfs = ['RooCBExGaussShape',
-                   'RooDoubleCBFast', 'RooCMSShape', 'my_double_CB']
-    # import_pdf_library(custom_pdfs[2])
+def runParallelFits(ws_name, bins_dict, fit_settings, import_pdfs=False,  
+                    savefigs=False, figpath={"good":"figs/stuff", "check":"figs/check/stuff"}):
+    """
+    """
 
-    # -------------------------------------------------------------------------
-    # GENERAL SETTINGS
-    # ----------------
+    # ATTENTION: TO NOW IT IS ONLY AVAILABLE FOR INDEPENDENT FITS !!!
 
-    type_eff = "iso"
+    path = os.path.dirname(__file__)
+    ROOT.gSystem.cd(path)
 
-    type_analysis = "indep"
-        
-    bins = bin_dictionary("pt", "eta")
+    file_ws = ROOT.TFile(ws_name)
+    ws = file_ws.Get("w")
+
+    prob_bins = []
+
+    if fit_settings["type_analysis"] == "indep":
+        fitters = [IndepFitter(bin_key, fit_settings) for bin_key in bins_dict.keys()]
+    elif fit_settings["type_analysis"] == "sim" or fit_settings["type_analysis"] == "sim_sf":
+        fitters = [SimFitter(bin_key, fit_settings) for bin_key in bins_dict.keys()]
+    
+    figpath = figpath if savefigs is True else None
+    pool = Pool(processes=16)
+    fit_results = pool.starmap(parallelize_fits, 
+                               zip(fitters, repeat(ws), repeat(import_pdfs), repeat(savefigs), repeat(figpath)))
 
 
-    # -------------------------------------------------------------------------
-    # Dataset generation
-    # ------------------
-
-
-    '''
-    filename_data = f"/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
-    filename_mc = f"/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
-    dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
-    '''
+    print("FITS DONE")
 
     
-    filename_data = f"root_files/datasets/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
-    filename_mc = f"root_files/datasets/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
-    dirname_bkg = "root_files/datasets"
-    
-    bkg_types = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
+    for fitres in fit_results:
+        fitter, bin_key, bin_status, res = fitres
+        if import_pdfs: fitter.importFitObjects(ws)
 
-    bkg_filenames = {}
-    [bkg_filenames.update({cat : 
-        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_types]
-    
+        print(f"Analyzing bin {bin_key}")
+        if bin_status is False:
+            prob_bins.append(fitres["bin_key"])
+        printFitStatus(fit_settings["type_analysis"], fitres[1], bin_status, res, prob_bins)
 
-    lumi_scales = lumi_factors(type_eff, bkg_types)
-
-    lumi_scale_signal = lumi_scales.pop("Zmumu")
     
 
-    import_dictionary = {
-        "data" : filename_data,
-        "mc" : {
-            "filename": filename_mc,
-            "lumi_scale" : lumi_scale_signal
-        },
-        # "bkg" : {
-        #    "filenames" : bkg_filenames,
-        #   "lumi_scales" : lumi_scales
-        # } 
-    }
-
-    # workspace_name = f"root_files/ws/ws_bkg_studies.root"
-    # workspace_name = "root_files/ws_{type_eff}_indep_mcbkg_mergedbins.root"
-
-    binning_mass = "mass_60_120"
-
-    workspace_name = f"root_files/iso_workspace.root"
-    
-    # ws = ws_init(import_dictionary, type_analysis, "pt", "eta", binning_mass)
-    # ws.writeToFile(workspace_name)
-
-    # file = ROOT.TFile(workspace_name, "READ")
-    # ws = file.Get("w")
-
-    '''
-    import_dict_bkg =  {
-        "bkg" : {
-            "filenames" : bkg_filenames,
-            "lumi_scales" : lumi_scales
-        } 
-    }
-    # ws_bkg = ws_init(import_dict_bkg, type_analysis, "pt_12bins", "eta_16bins", binning_mass, 
-    #                  import_existing_ws=True, existing_ws_filename=workspace_name, altBinning_bkg=True)
-    # ws_bkg.writeToFile(workspace_name)
-    '''
-
-
-    # ------------------------------------------------------------------------
-   
-    # results_name = f"results/results_{type_eff}_{type_analysis}.pkl"
-   
-    figpath = {"good": "figs/", "check": "figs/"} 
-
-    ws = make_fits(workspace_name, type_eff, type_analysis, bins, fit_settings_iso, 
-                  import_pdfs=False, savefigs=True, figpath=figpath)
-
-    # ws.writeToFile(workspace_name)
- 
-
-    #print("RISULTATI SCRITTI SU PICKLE FILE")
-
-    t1 = time.time()
-
-    print(f"TEMPO = {t1-t0}")
+    print(f"NUM of problematic bins = {len(prob_bins)}")
+    print(prob_bins)
+    ws.writeToFile(ws_name)
