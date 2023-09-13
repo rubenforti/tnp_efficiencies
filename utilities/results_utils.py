@@ -49,7 +49,7 @@ class results_manager:
                     res_fail = import_ws.obj(f"results_fail_{bin_key}")
                     self.add_result({"pass":res_pass, "fail":res_fail}, bin_key)
                 elif self._analysis == 'sim':
-                    self.add_result({"sim":import_ws.obj(f"results_{bin_key}")}, bin_key)
+                    self.add_result({"sim":import_ws.obj(f"results_sim_{bin_key}")}, bin_key)
                 else:
                     print("ERROR: analysis type not recognized")
         
@@ -93,12 +93,13 @@ class results_manager:
         elif self._analysis == 'sim':
             # res = ws.obj(f"results_({bin_pt}|{bin_eta})")
             results = res["sim"]
+            pars = results.floatParsFinal()
             #new_res = {f"{bin_pt},{bin_eta}": {
             new_res = {f"{bin_key}": {
                 # "efficiency" : (res.floatParsFinal().find(f"efficiency_({bin_pt}|{bin_eta})").getVal(),
                 #                 res.floatParsFinal().find(f"efficiency_({bin_pt}|{bin_eta})").getError()),
-                "efficiency" : (results.floatParsFinal().find(f"efficiency_{bin_key}").getVal(),
-                                results.floatParsFinal().find(f"efficiency_{bin_key}").getError()),
+                "efficiency" : (pars.find(f"efficiency_{bin_key}").getVal(),
+                                pars.find(f"efficiency_{bin_key}").getError()),
                 "parameters": results.floatParsFinal(),
                 "corrmatrix": results.covarianceMatrix(),
                 "status": (results.status(), results.covQual(), results.edm())
@@ -247,6 +248,8 @@ def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict, nbins_eta):
 
         eff_1, deff_1 = res_bmark.getEff(bin_key)
         eff_2, deff_2 = res_new.getEff(bin_key)
+
+        print(eff_1, eff_2)
 
         if "delta" in hist_dict.keys():
             hist_dict["delta"].Fill(eff_2-eff_1)

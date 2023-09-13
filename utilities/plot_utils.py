@@ -66,6 +66,7 @@ def plot_minv_distrib_with_fit(pad, axis, data, pdf_fit):
 
     CMS_lumi(pad, 5, 0, simulation=False)
     pad.Update()
+    
 
 ###############################################################################
 
@@ -151,10 +152,10 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
      for par in pass_obj["res"].floatParsFinal()]
 
     stats_pass.AddText("------------------------------")
-    # stats_box.AddText(f"Chi2/ndof = {round(res.chi2(), 2) / pars.getSize()}")
     stats_pass.AddText(f"Status = {pass_obj['res'].status()}")
     stats_pass.AddText(f"Cov quality = {pass_obj['res'].covQual()}")
     stats_pass.AddText(f"Edm = {pass_obj['res'].edm()}")
+    # stats_box.AddText(f"Chi2/ndof = {round(res.chi2(), 2) / pars.getSize()}")
     stats_pass.Draw()
     c.Update()
 

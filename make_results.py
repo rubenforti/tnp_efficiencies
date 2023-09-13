@@ -7,41 +7,56 @@ from utilities.results_utils import results_manager, init_results_histos, fill_r
 
 NBINS = 75
 
-eff_min = 0.85
+eff_min = 0.88
 rel_err_eff_min = 1e-4
-rel_err_eff_max = 0.01
+rel_err_eff_max = 7e-3
 sf_min = 0.99
-sf_max = 1.01
+sf_max = 1.03
 
 
-delta_min = -8e-3
-delta_error_min = -1e-3
-pull_min = -3
-rm1_min = -0.01
-ratio_error_min = 0.5
+delta_min = -4e-3
+delta_error_min = -4e-4
+pull_min = -1.2
+rm1_min = -4e-3
+ratio_error_min = 0.7
 
-res_array_dict = {
-    "eff" : array("d", [round(eff_min + (1-eff_min)*(i/NBINS), 4) for i in range(NBINS+1)]),
-    "rel_err_eff" : array("d", [round(rel_err_eff_min + (rel_err_eff_max-rel_err_eff_min)*(i/NBINS), 6) 
-                                for i in range(NBINS+1)]),
-    "sf" : array("d", [round(sf_min + (sf_max-sf_min)*(i/NBINS), 5) for i in range(NBINS+1)]),
-
+res_var_dict = {
+    "efficiency" : {
+        "title" : "Efficiency", 
+        "array" : array("d", [round(eff_min + (1-eff_min)*(i/NBINS), 4) for i in range(NBINS+1)])},
+    "rel_err_efficiency" : {
+        "title" : "Relative error on efficiency", 
+        "array" : array("d", [round(rel_err_eff_min + (rel_err_eff_max-rel_err_eff_min)*(i/NBINS), 6) for i in range(NBINS+1)])},
+    "sf" : {
+        "title" : "Scale Factor", 
+        "array" : array("d", [round(sf_min + (sf_max-sf_min)*(i/NBINS), 5) for i in range(NBINS+1)])},
+}
+resCmp_var_dict = {
+    "delta" : {
+        "title" : "Delta efficiency", 
+        "array" : array("d", [round(delta_min + (-2*delta_min/NBINS)*i, 6) for i in range(NBINS+1)])},
+    "delta_error" : {
+        "title" : "Delta error", 
+        "array" : array("d", [round(delta_error_min + (-2*delta_error_min/NBINS)*i, 6) for i in range(NBINS+1)])},
+    "pull" : {
+        "title" : "Pull", 
+        "array" : array("d", [round(pull_min + (-2*pull_min/NBINS)*i, 6) for i in range(NBINS+1)])},
+    "rm1" : {
+        "title" : "Relative bias", 
+        "array" : array("d", [round(rm1_min + (-2*rm1_min/NBINS)*i, 6) for i in range(NBINS+1)])},
+    "ratio_error" : {
+        "title" : "Ratio error", 
+        "array" : array("d", [round(ratio_error_min + (2*(1-ratio_error_min)/NBINS)*i, 6) for i in range(NBINS+1)])}
 }
 
-cmpres_array_dict = {
-    "delta" : array("d", [round(delta_min + (-2*delta_min/NBINS)*i, 6) for i in range(NBINS+1)]),
-    "delta_error" : array("d", [round(delta_error_min + (-2*delta_error_min/NBINS)*i, 6) for i in range(NBINS+1)]),
-    "pull" : array("d", [round(pull_min + (-2*pull_min/NBINS)*i, 6) for i in range(NBINS+1)]),
-    "rm1" : array("d", [round(rm1_min + (-2*rm1_min/NBINS)*i, 6) for i in range(NBINS+1)]),
-    "ratio_error" : array("d", [round(ratio_error_min + (2*(1-ratio_error_min)/NBINS)*i, 6) for i in range(NBINS+1)])
-}
+
 
 ###############################################################################
 
 def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
     """
     """
-    file_in = ROOT.TFile.Open(ws_name, "UPDATE")
+    file_in = ROOT.TFile(ws_name, "READ")
     ws = file_in.Get("w")
 
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
@@ -50,17 +65,17 @@ def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
     
     results = results_manager(type_analysis, binning_pt, binning_eta, import_ws=ws)
 
-
     histos ={}
     
-    [histos.update(init_results_histos(res, res, res_array_dict[res], bins_pt, bins_eta)) 
-     for res in ["efficiency", "eff_rel_error", "sf"]]
+    for res_key in ["efficiency", "rel_err_efficiency", "sf"]:
+        histos.update(init_results_histos(res_key, res_var_dict[res_key]["title"], 
+                                          res_var_dict[res_key]["array"], bins_pt, bins_eta))
 
     
     for bin_key in bin_dict.keys():
         
         _, bin_pt, bin_eta = bin_dict[bin_key]
-
+    
         eff, d_eff = results.getEff(bin_key)
         eff_mc, d_eff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
                                            ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
@@ -69,13 +84,13 @@ def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
 
         histos["efficiency"].Fill(eff)
         histos["efficiency_2d"].SetBinContent(bin_pt, bin_eta, eff)
-        histos["eff_rel_error"].Fill(d_eff/eff)
-        histos["eff_rel_error_2d"].SetBinContent(bin_pt, bin_eta, d_eff/eff)
+        histos["rel_err_efficiency"].Fill(d_eff/eff)
+        histos["rel_err_efficiency_2d"].SetBinContent(bin_pt, bin_eta, d_eff/eff)
         histos["sf"].Fill(eff/eff_mc)
         histos["sf_2d"].SetBinContent(bin_pt, bin_eta, eff/eff_mc)
     
 
-    file_out = ROOT.TFile(ws_name.replace("ws", "hres"), "RECREATE")
+    file_out = ROOT.TFile(ws_name.replace("ws", "res"), "RECREATE")
     file_out.cd()
     [histo.Write() for histo in histos.values()]
     file_out.Close()
@@ -117,11 +132,13 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
     print("N keys", len(dict_new.keys()))
  
     histos = {}
-    [histos.update(init_results_histos(res_key, res_key, cmpres_array_dict[res_key], bins_pt, bins_eta)) 
+    [histos.update(init_results_histos(res_key, resCmp_var_dict[res_key]["title"], 
+                                       resCmp_var_dict[res_key]["array"], bins_pt, bins_eta)) 
      for res_key in res_list]
 
     fill_res_histograms(res_benchmark, res_new, histos, bin_dict, len(bins_eta)-1) 
 
+    '''
     histos_copy = histos.copy()
     for hist_key in histos_copy.keys():
         if "2d" in hist_key:
@@ -131,9 +148,10 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
             histo_eta = histos[hist_key].ProjectionY(hist_key.replace("2d", "eta"), 1, len(bins_pt)-1)
             histo_eta.Scale(1/(len(bins_pt)-1))
             histos.update({histo_pt.GetName() : histo_pt, histo_eta.GetName() : histo_eta})
+    '''
        
 
-    file_out = ROOT.TFile(ws_new_filename.replace("ws", "hres_cmp"), "RECREATE")
+    file_out = ROOT.TFile(ws_new_filename.replace("ws", "resCmp"), "RECREATE")
     file_out.cd()
     [histo.Write() for histo in histos.values()]
     file_out.Close()
@@ -153,7 +171,8 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list, file_
     nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
 
     histos = {}
-    [histos.update(init_results_histos(res_key, res_key, cmpres_array_dict[res_key], bins_pt, bins_eta)) 
+    [histos.update(init_results_histos(res_key, res_var_dict[res_key]["title"], 
+                                       res_var_dict[res_key]["array"], bins_pt, bins_eta)) 
      for res_key in res_list]
 
     results = results_manager("indep", binning_pt, binning_eta, import_ws=ws)
@@ -207,19 +226,21 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list, file_
 
 if __name__ == '__main__':
 
-    res_list = cmpres_array_dict.keys()
+    resCmp_list = resCmp_var_dict.keys()
+    print(resCmp_list)
 
-    '''
-    ws_results = [["results/benchmark_trig_plus/ws_triggerplus_indep_bmark.root", "results/benchmark_trig_plus/old_results.txt"],
-                  ["results/benchmark_trig_minus/ws_triggerminus_indep_bmark.root", "results/benchmark_trig_minus/old_results.txt"],]
+    
+    #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
+    ws_filename = "results/iso_sim/ws_iso_sim.root"
 
-    for ws_new, ws_benchmark in ws_results:
-        compare_efficiency(ws_benchmark, ws_new, "pt", "eta", res_list)
-    '''
-    
-    ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
-    
-    compare_eff_pseudodata(ws_filename, "pt", "eta", res_list, "results/pseudodata_trig_minus/hres_cmp_pseudodata.root")
+    ws_benchmark_filename = "results/benchmark_iso/old_results.txt"
+    # ws_benchmark_filename = "results/benchmark_iso/ws_iso_indep_benchmark.root"
+
+
+    save_eff_results(ws_filename, "sim", "pt", "eta")
+    compare_efficiency(ws_benchmark_filename, ws_filename, "pt", "eta", resCmp_list)
+
+    #compare_eff_pseudodata(ws_filename, "pt", "eta", res_list, "results/pseudodata_trig_minus/hres_cmp_pseudodata.root")
 
     
 

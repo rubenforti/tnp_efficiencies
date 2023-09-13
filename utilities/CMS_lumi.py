@@ -10,7 +10,7 @@ cmsText     = "CMS"
 cmsTextFont   = 61  
 
 writeExtraText = True
-extraText   = "Preliminary"
+extraText   = "private work"
 extraTextFont = 52 
 
 lumiTextSize     = 0.6
@@ -39,9 +39,9 @@ def CMS_lumi(pad,  iPeriod,  iPosX, simulation = False):
     if(iPosX/10==0 ): outOfFrame = True
 
     if simulation:
-        extraText = "   Simulation Preliminary"
+        extraText = "   private work - simulation"
     else:
-        extraText = "   Preliminary"
+        extraText = "   private work"
 
     alignY_=3
     alignX_=2
