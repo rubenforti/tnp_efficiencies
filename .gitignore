@@ -148,6 +148,7 @@ root_files/
 figs/fit_*/
 figs/bkg_*/
 figs/check_fits/
+figs/prova_parallel/
 results/benchmark_iso/fit_plots_old/
 results/*/fit_plots/
 
