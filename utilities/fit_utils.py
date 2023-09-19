@@ -34,7 +34,9 @@ def check_existing_fit(type_analysis, ws, bin_key):
 def pearson_chi2_eval(histo, pdf):
     """
     """
-    chi2_obj = ROOT.RooChi2Var("chi2", "chi2", pdf, histo)
+    chi2_obj = ROOT.RooChi2Var("chi2", "chi2", pdf, histo,
+                                ROOT.RooFit.Range("fitRange"),
+                                ROOT.RooFit.DataError(ROOT.RooAbsData.Expected))
     chi2_val = chi2_obj.getVal() 
 
     return chi2_val
@@ -48,9 +50,15 @@ def llr_eval(histo, pdf, axis):
     binning = axis.getBinning()
     NBINS = binning.numBins()   
     EVTS = histo.sumEntries()
+    BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
 
     sum_ll = 0
     max_ll = 0
+
+    n_fitted_events=0
+    for server in pdf.servers():
+        if "nsig" in server.GetName() or "nbkg" in server.GetName():
+            n_fitted_events += server.getVal()
 
     for i in range(NBINS):
     
@@ -58,7 +66,7 @@ def llr_eval(histo, pdf, axis):
         weight = histo.weight(i)
 
         pdf_val = pdf.getVal(ROOT.RooArgSet(axis))
-        mu = EVTS*(axis.getMax()-axis.getMin())*pdf_val/NBINS
+        mu = n_fitted_events*BIN_VOLUME*pdf_val
         mu = round(mu, 5)
 
         new_sumll = weight*ROOT.TMath.Log(mu) - mu if mu>0 else 0.0
@@ -67,11 +75,7 @@ def llr_eval(histo, pdf, axis):
         if weight > 0:
             max_ll += 2*weight*ROOT.TMath.Log(weight) - 2*weight
 
-    n_fitted_events=0
-    for server in pdf.servers():
-        if "nsig" in server.GetName() or "nbkg" in server.GetName():
-            n_fitted_events += server.getVal()
-
+    
     sum_ll += 2*EVTS*ROOT.TMath.Log(n_fitted_events) - 2*n_fitted_events
     max_ll += 2*EVTS*ROOT.TMath.Log(EVTS) - 2*EVTS
 
@@ -91,20 +95,20 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
     """
     """
 
-    type_an = "indep" if "pass" in res.GetName() or "fail" in res.GetName() else None
-    type_an = "sim" if "sim" in res.GetName() else None
-
-    if type_an == "indep":
+    if ("pass" in res.GetName()) or ("fail" in res.GetName()):
         flag = "pass" if "pass" in res.GetName() else "fail"
         chi2val = llr_eval(histo[flag], pdf[flag], axis[flag]) \
             if type_chi2=="llr" else pearson_chi2_eval(histo[flag], pdf[flag])
         ndof = histo[flag].numEntries() - res.floatParsFinal().getSize()
-    elif type_an == "sim":
+        res.SetTitle(str(chi2val))
+    
+    elif "sim" in res.GetName():
         chi2val = 0
         for flag in ["pass", "fail"]:
             if type_chi2=="llr": chi2val = chi2val + llr_eval(histo[flag], pdf[flag], axis[flag]) 
             else: chi2val = chi2val + pearson_chi2_eval(histo[flag], pdf[flag])
         ndof = histo["pass"].numEntries() + histo["fail"].numEntries() - res.floatParsFinal().getSize()
+        res.SetTitle(str(chi2val))
 
     else:
         print("ERROR: status_chi2() function is not implemented for this type of fit")
@@ -161,15 +165,16 @@ def llr_test_bkg(histo, pdf, alpha=0.05):
 
     profiled_var = ROOT.RooRealVar()
 
-    for idx in range(pars_set.getSize()):
-        if pars_set[idx].GetName() == 'nbkg':
-            profiled_var = pars_set[idx]
+    for par in pars_set:
+        if 'nbkg' in par.GetName(): profiled_var = par
 
-    null_profiled_var = ROOT.RooRealVar("nbkg", "nbkg", 0, 0, 0)
+    null_profiled_var = ROOT.RooRealVar("nbkg", "nbkg", 0)
+    null_profiled_var.setConstant(True)
 
-    llr_obj = ROOT.RooStats.ProfileLikelihoodCalculator(
-        histo, pdf, ROOT.RooArgSet(profiled_var), alpha,
-        ROOT.RooArgSet(null_profiled_var))
+
+    llr_obj = ROOT.RooStats.ProfileLikelihoodCalculator(histo, pdf, 
+                                                        ROOT.RooArgSet(profiled_var), alpha,
+                                                        ROOT.RooArgSet(null_profiled_var))
 
     test_res = llr_obj.GetHypoTest()
 
@@ -177,7 +182,7 @@ def llr_test_bkg(histo, pdf, alpha=0.05):
 
     print(f"p-value for null hypo is: {pval}")
 
-    null = True if pval > 0.05 else False
+    null = True if pval > alpha else False
 
     return null
 

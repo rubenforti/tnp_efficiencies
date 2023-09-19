@@ -4,6 +4,7 @@ import ROOT
 import sys
 import os
 import pickle
+from copy import copy
 from array import array
 from utilities.base_library import lumi_factors, binning, sumw2_error
 from utilities.CMS_lumi import CMS_lumi
@@ -32,11 +33,17 @@ def plot_minv_distrib_with_fit(pad, axis, data, pdf_fit):
     pad.cd()
 
     plot_frame = axis.frame(ROOT.RooFit.Bins(axis.getBins("plot_binning")))
-    
     plot_frame.SetTitle("")
-    plot_frame.SetTitleSize(0)
+    # plot_frame.SetTitleSize(0)
     frame_yaxis = plot_frame.GetYaxis()
-    frame_yaxis.SetTitleOffset(1.75)
+    frame_yaxis.SetTitleOffset(1.2)
+    frame_yaxis.SetTitle("Events / (1 GeV)")
+    # frame_yaxis.SetTitleSize(0.08)
+    frame_axis = plot_frame.GetXaxis()
+    frame_axis.SetTitle("M_{inv} TP [GeV]")
+    # frame_axis.SetTitleSize(0.05)
+    frame_axis.SetTitleOffset(1.2)
+
 
     data.plotOn(plot_frame,
                 ROOT.RooFit.Binning("plot_binning"),
@@ -44,11 +51,12 @@ def plot_minv_distrib_with_fit(pad, axis, data, pdf_fit):
     data.statOn(plot_frame,
                 ROOT.RooFit.Label(pad.GetTitle()),
                 ROOT.RooFit.What("H"),
-                ROOT.RooFit.Layout(0.65, 0.95, 0.95))
+                ROOT.RooFit.Layout(0.68, 0.95, 0.95))
 
     pdf_fit.plotOn(plot_frame,
                    ROOT.RooFit.Name("Fit"),
                    ROOT.RooFit.NormRange("fitRange"),
+                   ROOT.RooFit.Range("fitRange"),
                    ROOT.RooFit.LineColor(ROOT.kRed))
     
     for comp in pdf_fit.getComponents():
@@ -83,50 +91,56 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
                          "scale_factor" : [scale_factor, dscale_factor]
                         }
     """
-    c = ROOT.TCanvas(f"pf_plot_{bin_key}", f"pf_plot_{bin_key}", 900, 1200)
+    c = ROOT.TCanvas(f"pf_plot_{bin_key}", f"pf_plot_{bin_key}", 1600, 1200)
     c.cd()
 
     style_settings()
 
-    title_plot_edge = 0.8
-    plot_info_edge = 0.25
+    main_info_edge = 0.865
+    plot_info_edge = 0.285
 
-    pad_title_eff = ROOT.TPad("pad_title_eff", "pad_title_eff", 0, title_plot_edge, 1, 1)
-    pad_plot_pass = ROOT.TPad("pad_plot_pass", "Passing probes", 0, plot_info_edge, 0.5, title_plot_edge)
-    pad_plot_fail = ROOT.TPad("pad_plot_fail", "Failing probes", 0.5, plot_info_edge, 1, title_plot_edge)
-    pad_info_pass = ROOT.TPad("pad_info_pass", "pad_info_pass", 0, 0, 0.5, plot_info_edge)
-    pad_info_fail = ROOT.TPad("pad_info_fail", "pad_info_fail", 0.5, 0, 1, plot_info_edge)
+    pad_title_eff = ROOT.TPad("pad_title_eff", "pad_title_eff", 0.35, 0.93, 0.65, 0.995)
+    pad_main_info = ROOT.TPad("pad_main_info", "main_info", 0.1, main_info_edge, 0.9, 0.93)
+    pad_plot_pass = ROOT.TPad("pad_plot_pass", "Passing probes", 0, plot_info_edge, 0.5, main_info_edge)
+    pad_plot_fail = ROOT.TPad("pad_plot_fail", "Failing probes", 0.5, plot_info_edge, 1, main_info_edge)
+    pad_info = ROOT.TPad("pad_info", "pad_info", 0, 0, 1, plot_info_edge)
 
     
-    pad_title_eff.SetMargin(0.15, 0.15, 0.1, 0.1)
+    pad_title_eff.SetMargin(0.15, 0.15, 0.15, 0.15)
     pad_title_eff.Draw()
 
-    pad_plot_pass.SetMargin(0.15, 0.05, 0.05, 0.05)
+    pad_main_info.SetMargin(0.15, 0.15, 0.15, 0.15)
+    pad_main_info.Draw()
+
+    pad_plot_pass.SetMargin(0.15, 0.05, 0.1, 0.05)
     pad_plot_pass.Draw()
 
-    pad_plot_fail.SetMargin(0.15, 0.05, 0.05, 0.05)
+    pad_plot_fail.SetMargin(0.15, 0.05, 0.1, 0.05)
     pad_plot_fail.Draw()
 
-    pad_info_pass.SetMargin(0.15, 0.05, 0.05, 0.05)
-    pad_info_pass.Draw()
-
-    pad_info_fail.SetMargin(0.15, 0.05, 0.05, 0.05)
-    pad_info_fail.Draw()
-
+    pad_info.SetMargin(0.15, 0.05, 0.05, 0.05), 
+    pad_info.Draw()
+    
     pad_title_eff.cd()
-    main_info_box = ROOT.TPaveText(0, 0.1, 1, 0.9, "NDC NB")
-    main_info_box.SetFillColor(0)
+    titlebox = ROOT.TPaveText(0, 0.1, 1, 0.9, "NDC NB")
+    titlebox.SetFillColor(33)
     # titlebox.SetTextFont(42)
-    main_info_box.SetTextSize(0.12)
-    main_info_box.AddText(f"Bin {bin_key}")
-    main_info_box.AddText( "----------------------------------------")
+    titlebox.SetTextSize(0.3)
+    titlebox.AddText(0.5, 0.5, f"Bin {bin_key}")
+    titlebox.Draw()
+    c.Update()
+
+    pad_main_info.cd()
+    main_info_box = ROOT.TPaveText(0, 0.1, 1., 0.9, "NDC NB")
+    main_info_box.SetFillColor(33)
+    # titlebox.SetTextFont(42)
+    main_info_box.SetTextSize(0.35)
     eff, deff = plot_objects["efficiency"]
-    main_info_box.AddText(f"Efficiency = {round(eff*100,2)} #pm {round(deff*100,2)} %")
     eff_mc, deff_mc = plot_objects["efficiency_mc"]
-    main_info_box.AddText(f"Efficiency MC = {round(eff_mc*100,2)} #pm {round(deff_mc*100,2)} %")
     scale_factor, dscale_factor = plot_objects["scale_factor"]
-    main_info_box.AddText(f"Scale factor = {round(scale_factor,4)} #pm {round(dscale_factor,4)}")
-    # print(f"Scale factor = {round(scale_factor, 4)} #pm {round(dscale_factor, 4)}")   
+    main_info_box.AddText(0.2, 0.5, f"#varepsilon = {(eff*100):.2f} #pm {(deff*100):.2f} %")
+    main_info_box.AddText(0.5, 0.5, f"#varepsilon MC = {(eff_mc*100):.2f} #pm {(deff_mc*100):.2f} %")
+    main_info_box.AddText(0.8, 0.5, f"SF = {scale_factor:.4f} #pm {dscale_factor:.4f}")
     main_info_box.Draw()
     c.Update()
 
@@ -142,79 +156,105 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
     plot_minv_distrib_with_fit(pad_plot_pass, pass_obj["axis"], pass_obj["data"], pass_obj["model"])
     plot_minv_distrib_with_fit(pad_plot_fail, fail_obj["axis"], fail_obj["data"], fail_obj["model"])
 
-   
-    pad_info_pass.cd()
-    stats_pass = ROOT.TPaveText(0, 0.05, 1., 0.95, "NDC NB")
-    stats_pass.SetFillColor(0)
-    stats_pass.SetTextSize(0.07)
 
-    [stats_pass.AddText(f"{par.GetTitle()} = {round(par.getVal(),3)} #pm {round(par.getError(),3)}") 
-     for par in pass_obj["res"].floatParsFinal()]
+    pad_info.cd()
+    uplim_stats_gen = 0.05 if type_analysis == "indep" else 0.6
+    stats_pass = ROOT.TPaveText(0, uplim_stats_gen, 0.5, 0.95, "NDC NB")
+    stats_fail = ROOT.TPaveText(0.5, uplim_stats_gen, 1., 0.95, "NDC NB")
+    stats_gen = ROOT.TPaveText(0, 0.05, 1., 0.6, "NDC NB")
+    stats_pass.SetFillColor(0), stats_pass.SetTextSize(0.07)
+    stats_fail.SetFillColor(0), stats_fail.SetTextSize(0.07)
+    stats_gen.SetFillColor(0), stats_gen.SetTextSize(0.07)
 
-    stats_pass.AddText("------------------------------")
-    stats_pass.AddText(f"Status = {pass_obj['res'].status()}")
-    stats_pass.AddText(f"Cov quality = {pass_obj['res'].covQual()}")
-    stats_pass.AddText(f"Edm = {pass_obj['res'].edm()}")
-    # stats_box.AddText(f"Chi2/ndof = {round(res.chi2(), 2) / pars.getSize()}")
-    stats_pass.Draw()
-    c.Update()
+    if type_analysis == "indep":
+        [stats_pass.AddText(f"{par.GetTitle()} = {par.getVal():.3f} #pm {par.getError():.3f}") 
+         for par in pass_obj["res"].floatParsFinal()]
+        stats_pass.AddText("------------------------------")
+        stats_pass.AddText(f"Status = {pass_obj['res'].status()}")
+        stats_pass.AddText(f"Cov quality = {pass_obj['res'].covQual()}")
+        stats_pass.AddText(f"Edm = {pass_obj['res'].edm():.5f}")
+        ndof = pass_obj["data"].numEntries() - pass_obj["res"].floatParsFinal().getSize()
+        chi2 = float(pass_obj["res"].GetTitle())
+        stats_pass.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
+        stats_pass.Draw()
+        c.Update()
 
+        [stats_fail.AddText(f"{par.GetTitle()} = {par.getVal():.3f} #pm {par.getError():.3f}") 
+         for par in fail_obj["res"].floatParsFinal()]
+        stats_fail.AddText("------------------------------")
+        # stats_box.AddText(f"Chi2/ndof = {res.chi2(), 2) / pars.getSize()}")
+        stats_fail.AddText(f"Status = {fail_obj['res'].status()}")
+        stats_fail.AddText(f"Cov quality = {fail_obj['res'].covQual()}")
+        stats_fail.AddText(f"Edm = {fail_obj['res'].edm():.5f}")
+        ndof = fail_obj["data"].numEntries() - fail_obj["res"].floatParsFinal().getSize()
+        chi2 = float(pass_obj["res"].GetTitle())
+        fail_obj.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
+        stats_fail.Draw()
+        c.Update()
 
-    pad_info_fail.cd()
-    stats_fail = ROOT.TPaveText(0, 0.05, 1., 0.95, "NDC NB")
-    stats_fail.SetFillColor(0)
-    stats_fail.SetTextSize(0.07)
+    else:
+        for par in pass_obj["res"].floatParsFinal():
+            if "pass" in par.GetName():
+                stats_pass.AddText(f"{par.GetTitle()} = {par.getVal():.2f} #pm {par.getError():.2f}")
+            elif "fail" in par.GetName():
+                stats_fail.AddText(f"{par.GetTitle()} = {par.getVal():.2f} #pm {par.getError():.2f}")
+            else:
+                if "efficiency" in par.GetName():
+                    stats_gen.AddText(f"{par.GetTitle()} = {par.getVal():.4f} #pm {par.getError():.4f}")
+                else:
+                    stats_gen.AddText(f"{par.GetTitle()} = {par.getVal():.2f} #pm {par.getError():.2f}")
 
-    [stats_fail.AddText(f"{par.GetTitle()} = {round(par.getVal(),3)} #pm {round(par.getError(),3)}") 
-     for par in fail_obj["res"].floatParsFinal()]
-
-    stats_fail.AddText("------------------------------")
-    # stats_box.AddText(f"Chi2/ndof = {round(res.chi2(), 2) / pars.getSize()}")
-    stats_fail.AddText(f"Status = {fail_obj['res'].status()}")
-    stats_fail.AddText(f"Cov quality = {fail_obj['res'].covQual()}")
-    stats_fail.AddText(f"Edm = {fail_obj['res'].edm()}")
-    stats_fail.Draw()
-    c.Update()
+        stats_gen.AddText("------------------------------------------------------------")
+        stats_gen.AddText(f"Status = {pass_obj['res'].status()}")
+        stats_gen.AddText(f"Cov quality = {pass_obj['res'].covQual()}")
+        stats_gen.AddText(f"Edm = {pass_obj['res'].edm():.5f}")
+        ndof = pass_obj["data"].numEntries() + fail_obj["data"].numEntries() - \
+            pass_obj["res"].floatParsFinal().getSize()
+        chi2 = float(pass_obj["res"].GetTitle())
+        stats_gen.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
+        stats_pass.Draw(), stats_fail.Draw(), stats_gen.Draw()
+        c.Update()
 
     c.SaveAs(f"{figpath}/fit_pf_{type_analysis}_{bin_key}.pdf")
 
 ###############################################################################
 
-def plot_bkg_on_histo(plot_objects, flag, bin_key, logscale=True, figpath=''):
+def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     """
-    Function that creates and saves the plot containing a reference histogram 
-    (data or signal MC), the distributions of the various bkg processes and the
-    total bkg; for graphical choice, the bkg distributions of single processes 
-    and the signal MC distribution are plotted as RooHistPdf. The objects to be 
-    plotted are contained in the dictionary "plot_objects", which must be 
-    structured as follows:
-        plot_objects = { "axis" : RooRealVar,
-                         "total_bkg" : { "roohisto":RooDataHist, "lumi_scale":float, "integral":float, "color":int },
-                         "{bkg_process}_bkg" : { "roohisto":RooDataHist, "histo_pdf":RooHistPdf,
-                                                 "lumi_scale":float, "integral":float, "color":int },
-                         "MC_signal (optional)" : as above,
-                         "data (optional)" : RooDataHist,
-                         "fit_pars (optional)" : { "nsig":RooRealVar, "nbkg":RooRealVar },
-                         "pdf_bkg_fit (optional)" : {"pdf":RooAbsPdf, "norm":RooRealVar, "color":int }
-                        }
+    Function that creates and saves the plot containing the mass distributions 
+    of the various bkg processes and the total bkg; a reference histogram 
+    (data or signal MC) can be plotted in the same figure. For graphical 
+    choice, the bkg distributions of single processes (and the signal MC 
+    distribution) are plotted as RooHistPdf.
+    The objects to be plotted are contained in the dictionary "plot_objects", 
+    which must be structured as follows:
+        plot_objects = { 
+            "axis" : RooRealVar,
+            "total_bkg" : { "roohisto":RooDataHist, "lumi_scale":float, "integral":float, "color":int },
+            "{bkg_process}_bkg" : { "roohisto":RooDataHist, "histo_pdf":RooHistPdf,
+                                    "lumi_scale":float, "integral":float, "color":int },
+            "MC_signal (optional)" : as above,
+            "data (optional)" : RooDataHist,
+            "fit_pars (optional)" : { "nsig":RooRealVar, "nbkg":RooRealVar },
+            "pdf_bkg_fit (optional)" : {"pdf":RooAbsPdf, "norm":RooRealVar, "color":int }
             }
-    
+        }
     """
 
     imported_data, imported_mc_sig, imported_pdf_bkg = False, False, False
 
-    c = ROOT.TCanvas(f"c_{bin_key}_{flag}", "c", 1200, 900)
+    c = ROOT.TCanvas(f"c_{bin_key}_{flag}", "c", 1600, 900)
     c.cd()
 
     style_settings()
 
     pad_title = ROOT.TPad("pad_title", "pad_title", 0, 0.9, 1, 1)
-    pad_plot = ROOT.TPad("pad_plot", "pad_plot", 0, 0, 0.7, 0.9)
+    pad_plot = ROOT.TPad("pad_plot", "pad_plot", 0, 0, 0.6, 0.9)
     # pad_pull = ROOT.TPad("pad_pull", "pad_pull", 0, 0, 0.65, 0.25)
-    pad_info = ROOT.TPad("pad_info", "pad_info", 0.7, 0.1, 1, 0.9)
+    pad_info = ROOT.TPad("pad_info", "pad_info", 0.6, 0.1, 1, 0.9)
 
     pad_title.SetMargin(0.1, 0.1, 0.1, 0.1), pad_title.Draw()
-    pad_plot.SetMargin(0.15, 0.05, 0.05, 0.05), pad_plot.Draw()
+    pad_plot.SetMargin(0.12, 0.05, 0.12, 0.05), pad_plot.Draw()
     pad_info.SetMargin(0.05, 0.05, 0.1, 0.9), pad_info.Draw()
 
     pad_title.cd()
@@ -226,8 +266,9 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, logscale=True, figpath=''):
     titlebox.Draw()
     c.Update()
 
-    axis = plot_objects.pop("axis")
+    plot_objects = copy(plot_dictionary)
 
+    axis = plot_objects.pop("axis")
 
     pad_plot.cd()
     frame = axis.frame(ROOT.RooFit.Bins(axis.getBins("plot_binning")))
@@ -235,10 +276,13 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, logscale=True, figpath=''):
     frame.SetTitleSize(0)
     frame_yaxis = frame.GetYaxis()
     frame_yaxis.SetTitle("Events / (1 GeV)")
+    frame_yaxis.SetTitleSize(0.035)
+    frame_yaxis.SetTitleOffset(1.2)
     frame_axis = frame.GetXaxis()
-    frame_axis.SetLabelSize(0)
-    xtitle = frame_axis.GetTitle()
-    frame_axis.SetTitleSize(0)
+    # xtitle = frame_axis.GetTitle(), frame_axis.SetTitleSize(0)
+    frame_axis.SetTitle("M_{inv} TP [GeV]")
+    frame_axis.SetTitleSize(0.035)
+    frame_axis.SetTitleOffset(1.2)
 
     ctrl_plot_max = 0
 
@@ -307,29 +351,61 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, logscale=True, figpath=''):
                                  )
     
     pad_info.cd()
-    textbox = ROOT.TPaveText(0, 0.4, 1, 0.8, "NDC NB")
+    textbox = ROOT.TPaveText(0, 0., 0.9, 0.55, "NDC NB")
     textbox.SetFillColor(0)
-    textbox.SetTextSize(0.05)
+    textbox.SetTextSize(0.04)
     textbox.SetTextAlign(12)
     
+    legend = ROOT.TLegend(0.1, 0.65, 0.9, 0.95)
+    legend.SetNColumns(2)
+    legend.SetFillColor(0)
+    legend.SetTextSize(0.04)
+    legend.SetTextAlign(12)
+    legend.SetBorderSize(0)
+    if imported_data:
+        legend.AddEntry("Data", "Data", "lep")
+        legend_obj.SetLineColor(ROOT.kBlack)
+        legend_obj.SetLineWidth(3)
+    if imported_mc_sig:
+        legend.AddEntry("MC signal", "MC signal", "l")
+        legend_obj = legend.GetListOfPrimitives().Last()
+        legend_obj.SetLineColor(mc_sig_dict["color"])
+        legend_obj.SetLineWidth(3)
+    if imported_pdf_bkg:
+        legend.AddEntry("Fitted bkg", "Fitted bkg", "l")
+        legend_obj = legend.GetListOfPrimitives().Last()
+        legend_obj.SetLineColor(pdf_bkg_obj["color"])
+        legend_obj.SetLineWidth(3)
+
+    legend.AddEntry("Total bkg", "Total bkg", "lp")
+    legend_obj = legend.GetListOfPrimitives().Last()
+    legend_obj.SetMarkerStyle(ROOT.kFullCircle)
+    legend_obj.SetMarkerColor(total_bkg["color"])
+    legend_obj.SetMarkerSize(2)
+    legend_obj.SetLineColor(total_bkg["color"])
+    legend_obj.SetLineWidth(2)
+
     sigma_histo_bkg = sumw2_error(total_bkg['roohisto'])
     if imported_data:
         textbox.AddText(f"Data entries: {datahist.sumEntries()}")
     if imported_mc_sig:
         sigma_histo_signal = sumw2_error(mc_sig_dict['roohisto'])
-        textbox.AddText(f"MC signal entries: {round(mc_sig_dict['integral'],2)} #pm {round(sigma_histo_signal,2)}") 
+        textbox.AddText(
+            f"MC signal entries: {mc_sig_dict['integral']:.2f} #pm {sigma_histo_signal:.2f}") 
     if imported_pdf_bkg:
-        textbox.AddText(f"Nbkg from fit: {round(pdf_bkg_obj['norm'].getVal(),2)} #pm {round(pdf_bkg_obj['norm'].getError(),2)}")
+        textbox.AddText(
+            f"Nbkg from fit: {pdf_bkg_obj['norm'].getVal():.2f} #pm {pdf_bkg_obj['norm'].getError:.2f}")
 
-    textbox.AddText(f"Nbkg from MC: {round(total_bkg['integral'],2)} #pm {round(sigma_histo_bkg,2)}")
+    textbox.AddText(f"Nbkg from MC: {total_bkg['integral']:.2f} #pm {sigma_histo_bkg:.2f}")
         
     if imported_pdf_bkg:
         delta_bkg = total_bkg['integral'] - pdf_bkg_obj['norm'].getVal()
         sigma_on_delta_bkg = (sigma_histo_bkg**2 + pdf_bkg_obj['norm'].getError()**2)**0.5
         nsigma = delta_bkg/sigma_on_delta_bkg
-        textbox.AddText(f"Distance in #sigma = {round(nsigma, 2)}")
+        textbox.AddText(f"Distance in #sigma = {nsigma:.2f}")
     
     textbox.AddText("--------------------")
+    textbox.AddText("Num bkg:")
     c.Update()
 
     
@@ -337,7 +413,7 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, logscale=True, figpath=''):
         
         bkg_obj = plot_objects[bkg_key]
         
-        for nbins_bkg in [30, 20, 15, 10]:
+        for nbins_bkg in [60, 30, 20, 15, 10]:
             ctrl_plot_binning = 0
             axis.setBins(nbins_bkg, f"plot_binning_{bkg_key}")
             tmp_histo = ROOT.RooDataHist(bkg_obj["roohisto"].GetName(), bkg_obj["roohisto"].GetTitle(), 
@@ -351,20 +427,30 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, logscale=True, figpath=''):
 
             if ctrl_plot_binning==0 or nbins_bkg==10:
                 axis.setBins(nbins_bkg)
-                tmp_histpdf = ROOT.RooHistPdf(f"{bkg_key}_pdf", f"{bkg_key}_pdf", ROOT.RooArgSet(axis), tmp_histo)
+                tmp_histpdf = ROOT.RooHistPdf(f"{bkg_key}_pdf", f"{bkg_key}_pdf", 
+                                              ROOT.RooArgSet(axis), tmp_histo)
                 bkg_obj.update({"histo_pdf" : tmp_histpdf})
                 break
 
-        
         pad_plot.cd()
         bkg_obj["histo_pdf"].plotOn(frame, 
                          ROOT.RooFit.Name(bkg_key),
                          ROOT.RooFit.LineColor(bkg_obj["color"]),
                          ROOT.RooFit.LineStyle(1),
                          ROOT.RooFit.Normalization(bkg_obj["integral"], ROOT.RooAbsReal.NumEvent))
+
         pad_info.cd()
         bkg_error = sumw2_error(bkg_obj["roohisto"])
-        textbox.AddText(f"Num {bkg_key} = {round(bkg_obj['integral'],2)} #pm {round(bkg_error, 2)}")
+        bkg_key_plot = copy(bkg_key).replace("_bkg", "")
+        textbox.AddText(
+            f"  {bkg_key_plot} = {bkg_obj['integral']:.2f} #pm {bkg_error:.2f}")
+        legend.AddEntry(bkg_key_plot, bkg_key_plot, "l")
+        legend_obj = legend.GetListOfPrimitives().Last()
+        legend_obj.SetLineColor(bkg_obj["color"])
+        legend_obj.SetLineWidth(3)
+
+    
+    legend.Draw()
 
     pad_plot.cd()
     pad_plot.SetLogy() if logscale is True else pad_plot.SetLogy(False)
@@ -374,8 +460,7 @@ def plot_bkg_on_histo(plot_objects, flag, bin_key, logscale=True, figpath=''):
     frame.Draw()
     pad_plot.Update()
  
-
-    
+ 
     CMS_lumi(pad_plot, 5, 0, simulation=True)
 
     if imported_pdf_bkg:

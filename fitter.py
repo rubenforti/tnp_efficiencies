@@ -42,25 +42,6 @@ class AbsFitter():
             self.bkg_tothist = {}
 
 
-    def _importAxis(self, flag, ws):
-        """
-        Imports the axis from the workspace. If the simultaneous analysis is 
-        being performed, the same object is referenced for both the pass and
-        fail categories in the dictionary for the sake of simplicity; there 
-        are no problems in doing so, since the object in memory is the same. 
-        """
-        if self.settings["type_analysis"] == "sim" or self.settings["type_analysis"] == "sim_sf":
-            flag_ws = "sim" 
-        else:
-            flag_ws = flag
-        self.axis.update({flag : ws.var(f"x_{flag_ws}_{self.bin_key}")})
-        self.axis[flag].setRange("fitRange", 
-                                   self.settings["fit_range"][0], self.settings["fit_range"][1])
-        self.axis[flag].setBinning(ROOT.RooUniformBinning(self.axis[flag].getRange("fitRange")[0], 
-                                                          self.axis[flag].getRange("fitRange")[1], 
-                                                          self.settings["Nbins"][flag]), "cache")
-
-
     def _initParams(self, flag):
         """
         Transforms the list of numbers, representing each parameter (initial
@@ -142,11 +123,10 @@ class AbsFitter():
 
         roohist_pseudodata.add(ws.data(f"Minv_mc_{flag}_{self.bin_key}"))
 
-        for cat in self.settings["bkg_categories"]:
-            roohist_pseudodata.add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_{cat}")) 
+        [roohist_pseudodata.add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_{cat}"))
+         for cat in self.settings["bkg_categories"]]
 
         self.histo_data.update({flag : roohist_pseudodata})
-
 
     def checkExistingFit(self, ws):
         """
@@ -176,6 +156,23 @@ class AbsFitter():
             else:
                 self.existingFit = False
    
+    def importAxis(self, flag, ws):
+        """
+        Imports the axis from the workspace. If the simultaneous analysis is 
+        being performed, the same object is referenced for both the pass and
+        fail categories in the dictionary for the sake of simplicity; there 
+        are no problems in doing so, since the object in memory is the same. 
+        """
+        if self.settings["type_analysis"] == "sim" or self.settings["type_analysis"] == "sim_sf":
+            flag_ws = "sim" 
+        else:
+            flag_ws = flag
+        self.axis.update({flag : ws.var(f"x_{flag_ws}_{self.bin_key}")})
+        self.axis[flag].setRange("fitRange", 
+                                   self.settings["fit_range"][0], self.settings["fit_range"][1])
+        self.axis[flag].setBinning(ROOT.RooUniformBinning(self.axis[flag].getRange("fitRange")[0], 
+                                                          self.axis[flag].getRange("fitRange")[1], 
+                                                          self.settings["Nbins"][flag]), "cache")
 
     def initDatasets(self, ws, import_mc=False):
         """
@@ -186,7 +183,7 @@ class AbsFitter():
                 if import_mc is True:
                     self.histo_data.update({f"mc_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}")})
             else:
-                self.createPseudodata(flag, ws)
+                self._createPseudodata(flag, ws)
     
 
     def initNorm(self):
@@ -214,7 +211,6 @@ class AbsFitter():
         """
         """
         for flag in ["pass", "fail"]:
-            self._importAxis(flag, ws)
             self._initParams(flag)
             self._createSigPdf(flag, ws)
             self._createBkgPdf(flag, ws)
@@ -232,15 +228,26 @@ class AbsFitter():
     def doFit(self, flag):
         """
         """
+        if self.settings["type_analysis"] == "sim":
+            if self.settings["useMinos"] is False:
+                par_set = "none"
+            elif self.settings["useMinos"] == "eff":
+                par_set = ROOT.RooArgSet()
+                par_set.add(self.efficiency)
+            elif self.settings["useMinos"] == "all":
+                par_set = self.pdfs["fit_model"][flag].getParameters(self.histo_data[flag])
+
         res = self.pdfs["fit_model"][flag].fitTo(self.histo_data[flag],
                                                   ROOT.RooFit.Range("fitRange"),
                                                   ROOT.RooFit.Minimizer("Minuit2", "Migrad"),
-                                                  ROOT.RooFit.Strategy(2),
-                                                  # ROOT.RooFit.Minos(ROOT.RooArgSet(self.efficiency)),
+                                                  ROOT.RooFit.Minos(par_set),
+                                                  ROOT.RooFit.SumW2Error(False),
                                                   ROOT.RooFit.Save(1), 
                                                   ROOT.RooFit.PrintLevel(self.settings["fit_verb"]))
         res.SetName(f"results_{flag}_{self.bin_key}")
         
+        res.Print("v")
+
         fit_obj = {"axis" : self.axis, "histo" : self.histo_data, 
                    "pdf" : self.pdfs["fit_model"], "res" : res}
     
@@ -263,8 +270,9 @@ class AbsFitter():
             if type_an == "sim":
                 eff, d_eff = self.efficiency.getVal(), self.efficiency.getError()
                 fig_status = bool(self.results["sim"]["status"])
-                self.results.update({"pass" : {"res_obj":self.results["sim"]}, 
-                                    "fail" : {"res_obj":self.results["sim"]} })
+                self.results.update({"pass" : self.results["sim"]["res_obj"], 
+                                     "fail" : self.results["sim"]["res_obj"],
+                                     "sim" : self.results["sim"]["res_obj"]})
             else:
                 pass
             # ATTENZIONE: CONTROLLARE CHE SUCCEDE SE SI FA IL FIT CON L'OPZIONE "SIM_SF"
@@ -277,6 +285,7 @@ class AbsFitter():
             scale_factor = eff/eff_mc
             d_scale_factor = scale_factor*((d_eff/eff)**2 + (deff_mc/eff_mc)**2)**0.5
 
+            print(self.results)
             plot_objects={}
             fig_folder = figpath["good"] if fig_status is True else figpath["check"]
             for flag in ["pass", "fail"]:
@@ -284,9 +293,9 @@ class AbsFitter():
                             "axis" : self.axis[flag],
                             "data" : self.histo_data[flag],
                             "model" : self.pdfs["fit_model"][flag],
-                            "res" : self.results[flag]["res_obj"],
-                            # Aggiungere un chi2/ndof!
+                            "res" : self.results[flag],
                             } })
+            print(plot_objects["pass"]["res"])
             plot_objects.update({"efficiency" : [eff, d_eff],
                                 "efficiency_mc" : [eff_mc, deff_mc],
                                 "scale_factor" : [scale_factor, d_scale_factor]})
@@ -332,7 +341,7 @@ class IndepFitter(AbsFitter):
         self.checkExistingFit(ws)
 
         if self.existingFit is False:
-            
+            [self.importAxis(flag, ws) for flag in ["pass", "fail"]]
             self.initDatasets(ws)
             self.initNorm()
             self.initFitPdfs(ws)
@@ -482,7 +491,7 @@ class SimFitter(AbsFitter):
         self.checkExistingFit(ws)
 
         if self.existingFit is False:
-
+            [self.importAxis(flag, ws) for flag in ["pass", "fail"]]
             import_mc = True if self.settings["type_analysis"] == "sim_sf" else False
             self.initDatasets(ws, import_mc=import_mc)
             self.initNorm_sim()

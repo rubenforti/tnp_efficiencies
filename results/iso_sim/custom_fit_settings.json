@@ -57,17 +57,17 @@
         "Nbins" : {
             "pass" : 10000,
             "fail" : 10000
-        },
-        "bufFraction" : {
-            "pass" : 0.1,
-            "fail" : 0.1
         }
     },
 
     "run_4" : {
+        "bufFraction" : {
+            "pass" : 0.1,
+            "fail" : 0.1
+        },
         "Nbins" : {
-            "pass" : 8000,
-            "fail" : 8000
+            "pass" : 7500,
+            "fail" : 7500
         }
     },
 
@@ -83,7 +83,7 @@
             },
             "nbkg" : {
                 "pass" : ["0.05n", 0.1, "1.5n"],
-                "fail" : ["0.1n", 0.1, "1.5n"]
+                "fail" : ["0.05n", 0.1, "1.5n"]
            }
 
         }

@@ -5,7 +5,7 @@ import sys
 import os
 import ROOT
 from array import array
-
+from copy import copy
 
 binnings = {
     "pt": array('d', [24., 26., 28., 30., 32., 34., 36., 38., 40., 42., 44., 47., 50., 55., 60., 65.]),
@@ -15,10 +15,12 @@ binnings = {
     "pt_12bins" : array('d', [24., 28., 30., 32., 34., 36., 38., 40., 44., 50., 55., 60., 65.]),
     "pt_9bins" : array('d', [24., 28., 32., 36., 40., 44., 50., 55., 60., 65.]),
     "pt_6bins" : array('d', [24., 30., 36., 42., 50., 55., 65.]),
+    "pt_singlebin" : array('d', [24., 65.]),
     "eta_24bins" : array('d', [round(-2.4 + i*0.2, 2) for i in range(25)]),
     "eta_16bins" : array('d', [round(-2.4 + i*0.3, 2) for i in range(17)]),
     "eta_8bins" : array('d', [round(-2.4 + i*0.6, 2) for i in range(9)]),
     "eta_4bins" : array('d', [round(-2.4 + i*1.2, 2) for i in range(5)]),
+    "eta_singlebin" : array('d', [round(-2.4 + i*4.8, 2) for i in range(2)]),
     "mass_2GeV" : array('d', [60 + 2*i for i in range(31)]),
     "mass_3GeV" : array('d', [60 + 3*i for i in range(21)]),
     "mass_4GeV" : array('d', [60 + 4*i for i in range(16)]),
@@ -26,11 +28,11 @@ binnings = {
 
 lumi_data = 16.8  # fb^-1
 
-# sig_mc_repo = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS"
-# bkg_repo = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
+sig_mc_repo = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS"
+bkg_repo = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
 
-sig_mc_repo = "root_files/datasets"
-bkg_repo = "root_files/datasets"
+# sig_mc_repo = "root_files/datasets"
+# bkg_repo = "root_files/datasets"
 
 BR_TAUToMU = 0.1739
 BR_TAUToE = 0.1782
@@ -53,8 +55,7 @@ weightSum_signal = 50602137.0
 
 def binning(type):
     """
-    Returns the binning array for the given type of variable. The type can be "pt", "eta", 
-    "mass_50_130" or "mass_60_120"
+    Returns the binning array for the given type of variable.
     """
     return binnings[type]
 
@@ -126,7 +127,6 @@ def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
 def bin_global_idx_dict(binning_pt, binning_eta):
     """
     """
-
     bin_dict = bin_dictionary(binning_pt, binning_eta)
 
     bin_idx_dict = {}
@@ -164,7 +164,13 @@ def lumi_factors(type_eff, bkg_categories):
     lumi_sig = num_init_sig/xsection_sig
     lumi_scales.update({"Zmumu" : lumi_data/lumi_sig})
 
-    for cat in bkg_categories:
+    bkg_cat = copy(bkg_categories)
+
+    if "SameCharge" in bkg_cat: 
+        lumi_scales.update({"SameCharge" : 1.0})       
+        bkg_cat.remove("SameCharge")
+
+    for cat in bkg_cat:
         file = ROOT.TFile(f"{bkg_repo}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root")
         
         wsum_histo = file.Get("weightSum")
@@ -173,7 +179,7 @@ def lumi_factors(type_eff, bkg_categories):
         lumi_bkg = num_init/xsection
 
         scale = lumi_data/lumi_bkg
-
+    
         lumi_scales.update({cat : scale})
     
     return lumi_scales
@@ -198,7 +204,6 @@ def sumw2_error(histo):
     of the) sum of the errors associated to each bin. The errors considered are
     the "SumW2", already stored in the RooDataHist.
     """
-
     variance = 0
     for i in range(0, histo.numEntries()):
         histo.get(i)

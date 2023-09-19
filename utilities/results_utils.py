@@ -100,9 +100,9 @@ class results_manager:
                 #                 res.floatParsFinal().find(f"efficiency_({bin_pt}|{bin_eta})").getError()),
                 "efficiency" : (pars.find(f"efficiency_{bin_key}").getVal(),
                                 pars.find(f"efficiency_{bin_key}").getError()),
-                "parameters": results.floatParsFinal(),
-                "corrmatrix": results.covarianceMatrix(),
-                "status": (results.status(), results.covQual(), results.edm())
+                "pars_sim": results.floatParsFinal(),
+                "corrmatrix_sim": results.covarianceMatrix(),
+                "status_sim": (results.status(), results.covQual(), results.edm())
                 }
             }
             self._dict_results.update(new_res)
@@ -139,6 +139,20 @@ class results_manager:
             sys.exit()
 
         return eff
+    
+    def getPars(self, flag, bin_key=''):
+        """
+        """
+        if bin_key == "all":
+            pars = [] 
+            [pars.append(self._dict_results[key][f"pars_{flag}"]) for key in self._dict_results.keys()]
+        elif bin_key in self._dict_results.keys():
+            pars = self._dict_results[bin_key][f"pars_{flag}"]
+        else:
+            print("Bin key not present in the results object dictionary")
+            sys.exit()
+
+        return pars
     
     def getStatus(self, bin_key=''):
         """
@@ -248,8 +262,6 @@ def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict, nbins_eta):
 
         eff_1, deff_1 = res_bmark.getEff(bin_key)
         eff_2, deff_2 = res_new.getEff(bin_key)
-
-        print(eff_1, eff_2)
 
         if "delta" in hist_dict.keys():
             hist_dict["delta"].Fill(eff_2-eff_1)

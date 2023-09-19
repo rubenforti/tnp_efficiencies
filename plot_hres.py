@@ -9,17 +9,19 @@ from utilities.plot_utils import style_settings
 ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
-analysis = "iso_sim"
-folder = "results/iso_sim"
+analysis = "iso_indep_2gev"
+folder = "results/iso_indep_2gev"
 
 # -----------------------------------------------------------------------------
 
 file_hres = ROOT.TFile(f"{folder}/res_{analysis}.root", "READ")
-file_hres_cmp = ROOT.TFile(f"{folder}/resCmp_{analysis}.root", "READ")
+file_hres_cmp = ROOT.TFile(f"{folder}/res_cmp_{analysis}.root", "READ")
+file_hres_cmp_bmark = ROOT.TFile(f"{folder}/res_cmpBmark_{analysis}.root", "READ")
 
 histos = {}
-[histos.update({key.GetName() : file_hres.Get(key.GetName())}) for key in file_hres.GetListOfKeys()]
+#[histos.update({key.GetName() : file_hres.Get(key.GetName())}) for key in file_hres.GetListOfKeys()]
 [histos.update({key.GetName() : file_hres_cmp.Get(key.GetName())}) for key in file_hres_cmp.GetListOfKeys()]
+#[histos.update({key.GetName() : file_hres_cmp_bmark.Get(key.GetName())}) for key in file_hres_cmp_bmark.GetListOfKeys()]
 
 for hist_key in histos.keys():
 
@@ -76,6 +78,7 @@ for hist_key in histos.keys():
         hist.GetYaxis().SetTitle("Events")
         hist.GetYaxis().SetTitleOffset(1.25)
         hist.GetYaxis().SetTitleSize(0.04)
+        pad_plot.SetLogy()
     
     
     

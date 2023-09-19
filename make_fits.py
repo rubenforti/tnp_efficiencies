@@ -53,7 +53,7 @@ def runFits(ws_name, bins_dict, fit_settings, parallelize=True, import_pdfs=Fals
 
     for bin_key in bins_dict.keys():
         
-        # if bin_key != "[60.0to65.0][-1.3to-1.2]": continue
+        # if bin_key != "[24.0to26.0][-2.4to-2.3]": continue
 
         if fit_settings["type_analysis"] == "indep":
             fitter = IndepFitter(bin_key, fit_settings)            

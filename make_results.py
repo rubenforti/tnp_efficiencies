@@ -2,6 +2,7 @@
 """
 import ROOT
 from array import array
+from copy import copy
 from utilities.base_library import binning, bin_dictionary, eval_efficiency, sumw2_error
 from utilities.results_utils import results_manager, init_results_histos, fill_res_histograms
 
@@ -14,11 +15,11 @@ sf_min = 0.99
 sf_max = 1.03
 
 
-delta_min = -4e-3
-delta_error_min = -4e-4
-pull_min = -1.2
-rm1_min = -4e-3
-ratio_error_min = 0.7
+delta_min = -6e-5
+delta_error_min = -3e-6
+pull_min = -0.05
+rm1_min = -7e-5
+ratio_error_min = 0.995
 
 res_var_dict = {
     "efficiency" : {
@@ -97,7 +98,8 @@ def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
 
 ###############################################################################
 
-def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binning_eta, res_list):
+def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binning_eta, res_list,
+                       eval_nobkg_effect=False):
     """
     Compare the efficiencies and their error between two results files. The first file is 
     considered as benchmark
@@ -127,9 +129,22 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
     bin_dict = bin_dictionary(binning_pt, binning_eta)
 
-    dict_new = res_new._dict_results
-    print(type(dict_new))
-    print("N keys", len(dict_new.keys()))
+    bin_dict_original = copy(bin_dict)
+
+    if eval_nobkg_effect is True:
+        if t_an is "indep":
+            for b_key in bin_dict_original.keys():
+                pars_pass, pars_fail = [res_new.getPars(flag, b_key) for flag in ["pass", "fail"]]
+                if pars_pass.getSize() == 5 or pars_fail.getSize() == 5:
+                    bin_dict.pop(b_key)
+        elif t_an is "sim":
+            for b_key in bin_dict_original.keys():
+                pars_sim = res_new.getPars("sim", b_key)
+                if pars_sim.getSize() == 10:
+                    bin_dict.pop(b_key)
+        
+        NBINS = len(bin_dict.keys())
+    
  
     histos = {}
     [histos.update(init_results_histos(res_key, resCmp_var_dict[res_key]["title"], 
@@ -149,12 +164,17 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
             histo_eta.Scale(1/(len(bins_pt)-1))
             histos.update({histo_pt.GetName() : histo_pt, histo_eta.GetName() : histo_eta})
     '''
-       
 
-    file_out = ROOT.TFile(ws_new_filename.replace("ws", "resCmp"), "RECREATE")
+    add_flag = "cmp" if ".root" in ws_txt_bmark_filename else "cmpBmark"      
+
+    if eval_nobkg_effect: add_flag += "_noBkgFits"
+
+    file_out = ROOT.TFile(ws_new_filename.replace("ws", f"res_{add_flag}"), "RECREATE")
     file_out.cd()
     [histo.Write() for histo in histos.values()]
     file_out.Close()
+
+
 
 ###############################################################################
 
@@ -229,16 +249,19 @@ if __name__ == '__main__':
     resCmp_list = resCmp_var_dict.keys()
     print(resCmp_list)
 
+    benchmark_res_iso = "results/benchmark_iso/old_results.txt"
+    bmark_fit_filename = "results/benchmark_iso/ws_iso_indep_benchmark.root"
     
     #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
-    ws_filename = "results/iso_sim/ws_iso_sim.root"
+    ws_filename = "results/iso_indep_2gev/ws_iso_indep_2gev.root"
 
-    ws_benchmark_filename = "results/benchmark_iso/old_results.txt"
+    
     # ws_benchmark_filename = "results/benchmark_iso/ws_iso_indep_benchmark.root"
 
 
-    save_eff_results(ws_filename, "sim", "pt", "eta")
-    compare_efficiency(ws_benchmark_filename, ws_filename, "pt", "eta", resCmp_list)
+    # save_eff_results(ws_filename, "indep", "pt", "eta")
+    # compare_efficiency(benchmark_res_iso, ws_filename, "pt", "eta", resCmp_list)
+    compare_efficiency(bmark_fit_filename, ws_filename, "pt", "eta", resCmp_list)
 
     #compare_eff_pseudodata(ws_filename, "pt", "eta", res_list, "results/pseudodata_trig_minus/hres_cmp_pseudodata.root")
 
