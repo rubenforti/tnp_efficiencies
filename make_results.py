@@ -15,11 +15,11 @@ sf_min = 0.99
 sf_max = 1.03
 
 
-delta_min = -6e-5
-delta_error_min = -3e-6
-pull_min = -0.05
-rm1_min = -7e-5
-ratio_error_min = 0.995
+delta_min = -3e-3
+delta_error_min = -1.5e-3
+pull_min = -0.8
+rm1_min = -3e-3
+ratio_error_min = -0.3
 
 res_var_dict = {
     "efficiency" : {
@@ -47,7 +47,7 @@ resCmp_var_dict = {
         "array" : array("d", [round(rm1_min + (-2*rm1_min/NBINS)*i, 6) for i in range(NBINS+1)])},
     "ratio_error" : {
         "title" : "Ratio error", 
-        "array" : array("d", [round(ratio_error_min + (2*(1-ratio_error_min)/NBINS)*i, 6) for i in range(NBINS+1)])}
+        "array" : array("d", [round(ratio_error_min + (-2*ratio_error_min/NBINS)*i, 6) for i in range(NBINS+1)])}
 }
 
 
@@ -132,12 +132,12 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
     bin_dict_original = copy(bin_dict)
 
     if eval_nobkg_effect is True:
-        if t_an is "indep":
+        if t_an == "indep":
             for b_key in bin_dict_original.keys():
                 pars_pass, pars_fail = [res_new.getPars(flag, b_key) for flag in ["pass", "fail"]]
                 if pars_pass.getSize() == 5 or pars_fail.getSize() == 5:
                     bin_dict.pop(b_key)
-        elif t_an is "sim":
+        elif t_an == "sim":
             for b_key in bin_dict_original.keys():
                 pars_sim = res_new.getPars("sim", b_key)
                 if pars_sim.getSize() == 10:
@@ -253,15 +253,15 @@ if __name__ == '__main__':
     bmark_fit_filename = "results/benchmark_iso/ws_iso_indep_benchmark.root"
     
     #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
-    ws_filename = "results/iso_indep_2gev/ws_iso_indep_2gev.root"
+    # ws_filename = "results/iso_indep_mcbkg_merged/ws_iso_indep_mcbkg_merged.root"
 
     
-    # ws_benchmark_filename = "results/benchmark_iso/ws_iso_indep_benchmark.root"
+    ws_filename = "results/benchmark_iso/ws_iso_indep_benchmark.root"
 
 
     # save_eff_results(ws_filename, "indep", "pt", "eta")
-    # compare_efficiency(benchmark_res_iso, ws_filename, "pt", "eta", resCmp_list)
-    compare_efficiency(bmark_fit_filename, ws_filename, "pt", "eta", resCmp_list)
+    compare_efficiency(benchmark_res_iso, ws_filename, "pt", "eta", resCmp_list)
+    # compare_efficiency(bmark_fit_filename, ws_filename, "pt", "eta", resCmp_list)
 
     #compare_eff_pseudodata(ws_filename, "pt", "eta", res_list, "results/pseudodata_trig_minus/hres_cmp_pseudodata.root")
 

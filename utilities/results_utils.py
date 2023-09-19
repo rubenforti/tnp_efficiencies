@@ -276,8 +276,8 @@ def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict, nbins_eta):
             hist_dict["rm1"].Fill((eff_2/eff_1)-1)
             hist_dict["rm1_2d"].SetBinContent(bin_pt, bin_eta, (eff_2/eff_1)-1)
         if "ratio_error" in hist_dict.keys():
-            hist_dict["ratio_error"].Fill(deff_2/deff_1)
-            hist_dict["ratio_error_2d"].SetBinContent(bin_pt, bin_eta, deff_2/deff_1)
+            hist_dict["ratio_error"].Fill((deff_2/deff_1)-1)
+            hist_dict["ratio_error_2d"].SetBinContent(bin_pt, bin_eta, (deff_2/deff_1)-1)
     
         
 ###############################################################################
