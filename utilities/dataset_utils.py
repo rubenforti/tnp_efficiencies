@@ -51,15 +51,21 @@ def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_sca
 
     th1_histo = histo3d.ProjectionX(f"Histo_{type_set}_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")  # Option "e" is specified to calculate the bin errors in the new histogram for generic selection of bin_pt and bin_eta. Without it, it all works well ONLY IF the projection is done on one single bin of (pt, eta)
     
+    print("Th1 entries before scaling: ", th1_histo.Integral())
+    print("Under/overflow: ", th1_histo.GetBinContent(0), th1_histo.GetBinContent(th1_histo.GetNbinsX()+1))
+
     if global_scale > 0:
         th1_histo.Scale(global_scale)
 
-    print(f"TH1 integral = {th1_histo.Integral()}")
+    print(f"\nTH1 integral = {th1_histo.Integral()}")
     if th1_histo.Integral() < 0:
         print("ERROR: negative entries in TH1")
         print(f"{bin_pt}, {bin_eta}")
         # sys.exit()
+    
+    print(type_set, global_scale)
 
+    print(f"TH1 binning: {th1_histo.GetNbinsX()}")
     numBins = axis.getBinning().numBins()
     th1_histo.Rebin(int(th1_histo.GetNbinsX()/numBins))
 
@@ -68,6 +74,14 @@ def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_sca
     roohisto = ROOT.RooDataHist(f"Minv_{type_set}_{flag}_{bin_key}", f"Minv_{type_set}_{flag}_{bin_key}",
                                 ROOT.RooArgList(axis), th1_histo)
     
+    for i in range(60):
+        if roohisto.weight(i) != th1_histo.GetBinContent(i+1):
+            print("ERROR")
+            print(f"{bin_pt}, {bin_eta}")
+            sys.exit()
+
+    print(f"RooDataHist integral = {roohisto.sumEntries()}\n")
+
     return roohisto
 
 ###############################################################################
@@ -155,6 +169,7 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                 global_counter += 2
 
             if dataset_type == "mc":
+                print(sig_lumi_scale)
                 histo_pass = get_roohist(file, dataset_type, "pass", axis[1], 
                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
                 histo_fail = get_roohist(file, dataset_type, "fail", axis[0], 

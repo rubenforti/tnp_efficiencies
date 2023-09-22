@@ -16,10 +16,10 @@ sf_max = 1.03
 
 
 delta_min = -3e-3
-delta_error_min = -1.5e-3
-pull_min = -0.8
-rm1_min = -3e-3
-ratio_error_min = -0.3
+delta_error_min = -2e-3
+pull_min = -2
+rm1_min = -4e-3
+ratio_error_min = -0.4
 
 res_var_dict = {
     "efficiency" : {
@@ -46,7 +46,7 @@ resCmp_var_dict = {
         "title" : "Relative bias", 
         "array" : array("d", [round(rm1_min + (-2*rm1_min/NBINS)*i, 6) for i in range(NBINS+1)])},
     "ratio_error" : {
-        "title" : "Ratio error", 
+        "title" : "Ratio error minus 1", 
         "array" : array("d", [round(ratio_error_min + (-2*ratio_error_min/NBINS)*i, 6) for i in range(NBINS+1)])}
 }
 
@@ -121,10 +121,10 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
     file_new = ROOT.TFile(ws_new_filename, "READ")
     ws_new = file_new.Get("w")
 
-    print("indep" in ws_new_filename)
     for t_an in ["indep", "sim"]:
         if t_an in ws_new_filename:
             res_new = results_manager(t_an, binning_pt, binning_eta, import_ws=ws_new)
+            print(res_new)
 
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
     bin_dict = bin_dictionary(binning_pt, binning_eta)
@@ -138,6 +138,7 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
                 if pars_pass.getSize() == 5 or pars_fail.getSize() == 5:
                     bin_dict.pop(b_key)
         elif t_an == "sim":
+            print("A")
             for b_key in bin_dict_original.keys():
                 pars_sim = res_new.getPars("sim", b_key)
                 if pars_sim.getSize() == 10:
@@ -178,7 +179,7 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
 
 ###############################################################################
 
-def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list, file_output):
+def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list):
     """
     """
 
@@ -191,8 +192,8 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list, file_
     nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
 
     histos = {}
-    [histos.update(init_results_histos(res_key, res_var_dict[res_key]["title"], 
-                                       res_var_dict[res_key]["array"], bins_pt, bins_eta)) 
+    [histos.update(init_results_histos(res_key, resCmp_var_dict[res_key]["title"], 
+                                       resCmp_var_dict[res_key]["array"], bins_pt, bins_eta)) 
      for res_key in res_list]
 
     results = results_manager("indep", binning_pt, binning_eta, import_ws=ws)
@@ -233,13 +234,74 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list, file_
             histos["rm1"].Fill((eff/eff_mc)-1)
             histos["rm1_2d"].SetBinContent(bin_pt, bin_eta, (eff/eff_mc)-1)
         if "ratio_error" in histos.keys():
-            histos["ratio_error"].Fill(d_eff/d_eff_mc)
-            histos["ratio_error_2d"].SetBinContent(bin_pt, bin_eta, d_eff/d_eff_mc)
+            histos["ratio_error"].Fill((d_eff/d_eff_mc)-1)
+            histos["ratio_error_2d"].SetBinContent(bin_pt, bin_eta, (d_eff/d_eff_mc)-1)
 
-    resfile = ROOT.TFile(file_output, "RECREATE")
+    resfile = ROOT.TFile(ws_filename.replace("ws", f"res_cmpMC"), "RECREATE")
     resfile.cd()
     [histo.Write() for histo in histos.values()]             
     resfile.Close()
+
+###############################################################################
+
+def eval_minos(ws_hesse_filename, ws_filename, binning_pt, binning_eta):
+    """
+    """
+    file = ROOT.TFile.Open(ws_filename)
+    ws = file.Get("w")
+
+    file_hesse = ROOT.TFile.Open(ws_hesse_filename)
+    ws_hesse = file_hesse.Get("w")
+
+    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    bin_dict = bin_dictionary(binning_pt, binning_eta)
+
+    asymm_binning = array("d", [-0.5 + (i/75.) for i in range(76)])
+    ratio_errors_binning = array("d", [-0.3 + (0.6*i/75.) for i in range(76)])
+
+    histos ={}
+    
+    
+    histos.update(init_results_histos("asymm_minos", "MINOS error asymmetry",
+                                      asymm_binning, bins_pt, bins_eta))
+    histos.update(init_results_histos("ratio_errors", "Ratio errors",
+                                      ratio_errors_binning, bins_pt, bins_eta))
+    
+
+    for bin_key in bin_dict.keys():
+
+        _, bin_pt, bin_eta = bin_dict[bin_key]
+
+        res, res_hesse = ws.obj(f"results_sim_{bin_key}"), ws_hesse.obj(f"results_sim_{bin_key}")
+        
+        pars, pars_hesse = res.floatParsFinal(), res_hesse.floatParsFinal()
+
+        eff, eff_hesse = pars.find(f"efficiency_{bin_key}"), pars_hesse.find(f"efficiency_{bin_key}")
+
+        asymm_minos = (eff.getErrorHi() - abs(eff.getErrorLo()))/(eff.getErrorHi() + abs(eff.getErrorLo()))
+
+        minos_width = (eff.getErrorHi() + abs(eff.getErrorLo()))
+        hesse_width = eff_hesse.getError()*2
+
+        print(minos_width/hesse_width)
+        histos["asymm_minos"].Fill(asymm_minos)
+        histos["asymm_minos_2d"].SetBinContent(bin_pt, bin_eta, asymm_minos)
+        histos["ratio_errors"].Fill((minos_width/hesse_width)-1)
+        histos["ratio_errors_2d"].SetBinContent(bin_pt, bin_eta, (minos_width/hesse_width)-1)
+
+    
+    file_out = ROOT.TFile(ws_filename.replace("ws", "asym"), "RECREATE")
+    file_out.cd()
+    [histo.Write() for histo in histos.values()]
+    file_out.Close()
+
+
+    
+    
+
+
+
+
 
 ###############################################################################
 ###############################################################################
@@ -251,11 +313,11 @@ if __name__ == '__main__':
 
     benchmark_res_iso = "results/benchmark_iso/old_results.txt"
     bmark_fit_filename = "results/benchmark_iso/ws_iso_indep_benchmark.root"
+    # bmark_fit_filename = "results/iso_indep_2gev/ws_iso_indep_2gev.root"
     
     #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
-    # ws_filename = "results/iso_indep_mcbkg_merged/ws_iso_indep_mcbkg_merged.root"
+    # ws_filename = "results/pseudodata_iso/ws_iso_pseudodata.root"
 
-    
     ws_filename = "results/benchmark_iso/ws_iso_indep_benchmark.root"
 
 
@@ -263,7 +325,9 @@ if __name__ == '__main__':
     compare_efficiency(benchmark_res_iso, ws_filename, "pt", "eta", resCmp_list)
     # compare_efficiency(bmark_fit_filename, ws_filename, "pt", "eta", resCmp_list)
 
-    #compare_eff_pseudodata(ws_filename, "pt", "eta", res_list, "results/pseudodata_trig_minus/hres_cmp_pseudodata.root")
+    # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
+
+    # compare_eff_pseudodata(ws_filename, "pt", "eta", resCmp_list)
 
     
 

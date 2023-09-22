@@ -9,8 +9,19 @@ from array import array
 from utilities.base_library import lumi_factors, binning, sumw2_error
 from utilities.CMS_lumi import CMS_lumi
 
-bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
+bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau", "SameCharge"]
 
+colors = { 
+    "WW_bkg" : ROOT.kOrange+1,
+    "WZ_bkg" : ROOT.kYellow+3,
+    "ZZ_bkg" : ROOT.kGreen+1,
+    "TTSemileptonic_bkg" : ROOT.kCyan+1,
+    "Ztautau_bkg" : ROOT.kMagenta+1,
+    "SameCharge_bkg" : ROOT.kOrange+10,
+    "total_bkg" : ROOT.kRed,
+    "pdf_bkg_fit" : ROOT.kRed,
+    "signal" : ROOT.kBlue
+}
 
 def style_settings():
     """
@@ -187,8 +198,8 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
         stats_fail.AddText(f"Cov quality = {fail_obj['res'].covQual()}")
         stats_fail.AddText(f"Edm = {fail_obj['res'].edm():.5f}")
         ndof = fail_obj["data"].numEntries() - fail_obj["res"].floatParsFinal().getSize()
-        chi2 = float(pass_obj["res"].GetTitle())
-        fail_obj.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
+        chi2 = float(fail_obj["res"].GetTitle())
+        stats_fail.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
         stats_fail.Draw()
         c.Update()
 
@@ -230,13 +241,13 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     which must be structured as follows:
         plot_objects = { 
             "axis" : RooRealVar,
-            "total_bkg" : { "roohisto":RooDataHist, "lumi_scale":float, "integral":float, "color":int },
+            "total_bkg" : { "roohisto":RooDataHist, "lumi_scale":float, "integral":float},
             "{bkg_process}_bkg" : { "roohisto":RooDataHist, "histo_pdf":RooHistPdf,
-                                    "lumi_scale":float, "integral":float, "color":int },
+                                    "lumi_scale":float, "integral":float},
             "MC_signal (optional)" : as above,
             "data (optional)" : RooDataHist,
             "fit_pars (optional)" : { "nsig":RooRealVar, "nbkg":RooRealVar },
-            "pdf_bkg_fit (optional)" : {"pdf":RooAbsPdf, "norm":RooRealVar, "color":int }
+            "pdf_bkg_fit (optional)" : {"pdf":RooAbsPdf, "norm":RooRealVar}
             }
         }
     """
@@ -305,7 +316,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
         mc_sig_dict = plot_objects.pop("MC_signal")
         mc_sig_dict["histo_pdf"].plotOn(frame,
                                         ROOT.RooFit.Name("MC signal"),
-                                        ROOT.RooFit.LineColor(mc_sig_dict["color"]),
+                                        ROOT.RooFit.LineColor(colors["signal"]),
                                         ROOT.RooFit.Normalization(mc_sig_dict["integral"], ROOT.RooAbsReal.NumEvent))
         for bin_idx in range(mc_sig_dict["roohisto"].numEntries()):
             if mc_sig_dict["roohisto"].weight(bin_idx) > ctrl_plot_max:
@@ -316,7 +327,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
         pdf_bkg_obj = plot_objects.pop("pdf_bkg_fit")
         pdf_bkg_obj["pdf"].plotOn(frame, 
                                 ROOT.RooFit.Name("Fitted bkg"),
-                                ROOT.RooFit.LineColor(pdf_bkg_obj["color"]),
+                                ROOT.RooFit.LineColor(colors["pdf_bkg_fit"]),
                                 ROOT.RooFit.Normalization(pdf_bkg_obj["norm"].getVal(), ROOT.RooAbsReal.NumEvent))
 
 
@@ -346,8 +357,8 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
                                  ROOT.RooFit.Name("Total bkg"),
                                  ROOT.RooFit.Binning("plot_binning_total_bkg"),
                                  # ROOT.RooFit.Invisible(),
-                                 ROOT.RooFit.LineColor(total_bkg["color"]),
-                                 ROOT.RooFit.MarkerColor(total_bkg["color"])
+                                 ROOT.RooFit.LineColor(colors["total_bkg"]),
+                                 ROOT.RooFit.MarkerColor(colors["total_bkg"])
                                  )
     
     pad_info.cd()
@@ -364,25 +375,26 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     legend.SetBorderSize(0)
     if imported_data:
         legend.AddEntry("Data", "Data", "lep")
+        legend_obj = legend.GetListOfPrimitives().Last()
         legend_obj.SetLineColor(ROOT.kBlack)
         legend_obj.SetLineWidth(3)
     if imported_mc_sig:
         legend.AddEntry("MC signal", "MC signal", "l")
         legend_obj = legend.GetListOfPrimitives().Last()
-        legend_obj.SetLineColor(mc_sig_dict["color"])
+        legend_obj.SetLineColor(colors["signal"])
         legend_obj.SetLineWidth(3)
     if imported_pdf_bkg:
         legend.AddEntry("Fitted bkg", "Fitted bkg", "l")
         legend_obj = legend.GetListOfPrimitives().Last()
-        legend_obj.SetLineColor(pdf_bkg_obj["color"])
+        legend_obj.SetLineColor(colors["pdf_bkg_fit"])
         legend_obj.SetLineWidth(3)
 
     legend.AddEntry("Total bkg", "Total bkg", "lp")
     legend_obj = legend.GetListOfPrimitives().Last()
     legend_obj.SetMarkerStyle(ROOT.kFullCircle)
-    legend_obj.SetMarkerColor(total_bkg["color"])
+    legend_obj.SetMarkerColor(colors["total_bkg"])
     legend_obj.SetMarkerSize(2)
-    legend_obj.SetLineColor(total_bkg["color"])
+    legend_obj.SetLineColor(colors["total_bkg"])
     legend_obj.SetLineWidth(2)
 
     sigma_histo_bkg = sumw2_error(total_bkg['roohisto'])
@@ -394,7 +406,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
             f"MC signal entries: {mc_sig_dict['integral']:.2f} #pm {sigma_histo_signal:.2f}") 
     if imported_pdf_bkg:
         textbox.AddText(
-            f"Nbkg from fit: {pdf_bkg_obj['norm'].getVal():.2f} #pm {pdf_bkg_obj['norm'].getError:.2f}")
+            f"Nbkg from fit: {pdf_bkg_obj['norm'].getVal():.2f} #pm {pdf_bkg_obj['norm'].getError():.2f}")
 
     textbox.AddText(f"Nbkg from MC: {total_bkg['integral']:.2f} #pm {sigma_histo_bkg:.2f}")
         
@@ -435,7 +447,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
         pad_plot.cd()
         bkg_obj["histo_pdf"].plotOn(frame, 
                          ROOT.RooFit.Name(bkg_key),
-                         ROOT.RooFit.LineColor(bkg_obj["color"]),
+                         ROOT.RooFit.LineColor(colors[bkg_key]),
                          ROOT.RooFit.LineStyle(1),
                          ROOT.RooFit.Normalization(bkg_obj["integral"], ROOT.RooAbsReal.NumEvent))
 
@@ -446,7 +458,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
             f"  {bkg_key_plot} = {bkg_obj['integral']:.2f} #pm {bkg_error:.2f}")
         legend.AddEntry(bkg_key_plot, bkg_key_plot, "l")
         legend_obj = legend.GetListOfPrimitives().Last()
-        legend_obj.SetLineColor(bkg_obj["color"])
+        legend_obj.SetLineColor(colors[bkg_key])
         legend_obj.SetLineWidth(3)
 
     
@@ -463,6 +475,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
  
     CMS_lumi(pad_plot, 5, 0, simulation=True)
 
+    '''
     if imported_pdf_bkg:
         pad_pull.cd()
         pull = frame.pullHist("Total bkg", "Fitted bkg", True)
@@ -473,16 +486,131 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
         pull_axis.SetLabelSize(0.07)
         pull_axis.SetTitleOffset(1)
         pull.Draw()
-
+    '''
+    
     pad_info.cd()
     textbox.Draw()  
     c.Update()
 
-    #print(total_bkg["integral"], pdf_bkg_obj["norm"].getVal())
-
     c.SaveAs(f"{figpath}/bkg_{bin_key}_{flag}.pdf")
 
+###############################################################################
 
+def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=True, figpath=''):
+    """
+    """
+    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+
+    if not (len(bins_pt) ==2 or len(bins_eta) == 2):
+        print("ERROR: the projection has to be made by collapsing one of the two dimensions")
+        sys.exit()
+
+    if len(bins_pt) > len(bins_eta):
+        proj_axis = "pt"
+        proj_binning = bins_pt
+    else:
+        proj_axis = "eta"
+        proj_binning = bins_eta
+
+    c = ROOT.TCanvas(f"bkg_{proj_axis}_{flag}", "c", 900, 900)
+    c.cd()
+
+    style_settings()
+
+    pad_title = ROOT.TPad("pad_title", "pad_title", 0, 0.9, 1, 1)
+    pad_plot = ROOT.TPad("pad_plot", "pad_plot", 0, 0, 1, 0.9)
+
+    pad_title.SetMargin(0.1, 0.1, 0.1, 0.1), pad_title.Draw()
+    pad_plot.SetMargin(0.12, 0.05, 0.12, 0.05), pad_plot.Draw()
+
+    pad_title.cd()
+    titlebox = ROOT.TPaveText(0, 0, 1, 1, "NDC NB")
+    titlebox.SetFillColor(0)
+    # titlebox.SetTextFont(42)
+    titlebox.SetTextSize(0.35)
+    titlebox.AddText(f"Bkg {proj_axis} distrib. - {flag}ing probes")
+    titlebox.Draw()
+    c.Update()
+
+    plot_objects = copy(plot_dictionary)
+
+    # ref_histo = plot_objects.pop("ref_histo")
+
+    pad_plot.cd()
+    axis = ROOT.RooRealVar(proj_axis, proj_axis, proj_binning[0], proj_binning[-1])
+    axis.setBinning(ROOT.RooBinning(len(proj_binning)-1, proj_binning))
+
+    tot_bkg_roohist = ROOT.RooDataHist("tot_bkg_roohist", "tot_bkg_roohist", ROOT.RooArgSet(axis), "")
+
+    frame = axis.frame(ROOT.RooFit.Bins(axis.getBins()))
+    frame.SetTitle("")
+    frame.SetTitleSize(0)
+    frame_yaxis = frame.GetYaxis()
+    if proj_axis == "pt":
+        frame_yaxis.SetTitle("Events / (2 GeV)")
+    elif proj_axis == "eta":
+        frame_yaxis.SetTitle("Events / (0.1)")
+    frame_yaxis.SetTitleSize(0.035)
+    frame_yaxis.SetTitleOffset(1.2)
+    frame_axis = frame.GetXaxis()
+    # xtitle = frame_axis.GetTitle(), frame_axis.SetTitleSize(0)
+    if proj_axis == "pt":
+        frame_axis.SetTitle("p_{T}^{#mu} [GeV]")
+    elif proj_axis == "eta":
+        frame_axis.SetTitle("#eta^{#mu}")
+    frame_axis.SetTitleSize(0.035)
+    frame_axis.SetTitleOffset(1.2)
+
+
+    for bkg_key in plot_objects.keys():
+
+        bkg_hist = plot_objects[bkg_key]
+
+        if proj_axis == "pt":
+            nbins_eta = bkg_hist.GetNbinsY()
+            bkg_hist = bkg_hist.ProjectionX(f"{bkg_hist.GetName()}_{proj_axis}", 1, nbins_eta, "e")
+        elif proj_axis == "eta":
+            nbins_pt = bkg_hist.GetNbinsX()
+            bkg_hist = bkg_hist.ProjectionY(f"{bkg_hist.GetName()}_{proj_axis}", 1, nbins_pt, "e")
+        
+        roohisto_bkg = ROOT.RooDataHist(f"{bkg_key}_roohist", "", ROOT.RooArgSet(axis), bkg_hist)
+
+        roohistpdf = ROOT.RooHistPdf(f"{bkg_key}_pdf", "", ROOT.RooArgSet(axis), roohisto_bkg)
+
+        roohistpdf.plotOn(frame,
+                          ROOT.RooFit.Name(bkg_key),
+                          ROOT.RooFit.LineColor(colors[bkg_key]),
+                          ROOT.RooFit.LineStyle(1),
+                          ROOT.RooFit.Normalization(roohisto_bkg.sumEntries(), ROOT.RooAbsReal.NumEvent))
+        
+        tot_bkg_roohist.add(roohisto_bkg)
+
+    tot_bkg_roohist.plotOn(frame,
+                           ROOT.RooFit.Name("Total bkg"),
+                           ROOT.RooFit.Binning("plot_binning_total_bkg"),
+                           # ROOT.RooFit.Invisible(),
+                           ROOT.RooFit.LineColor(colors["total_bkg"]),
+                           ROOT.RooFit.MarkerColor(colors["total_bkg"]))
+    
+    pad_plot.SetLogy() if logscale is True else pad_plot.SetLogy(False)   
+
+    ctrl_plot_max=0
+    for bin_idx in range(tot_bkg_roohist.numEntries()):
+            if tot_bkg_roohist.weight(bin_idx) > ctrl_plot_max:
+                ctrl_plot_max = tot_bkg_roohist.weight(bin_idx)
+    frame.SetMaximum(1.5*ctrl_plot_max)
+    frame.SetMinimum(1)
+    frame.Draw()
+    pad_plot.Update()
+ 
+    CMS_lumi(pad_plot, 5, 0, simulation=True) 
+
+    c.Update()
+
+    c.SaveAs(f"{figpath}/bkg_{proj_axis}_{flag}.pdf")
+
+
+    
         
 
 

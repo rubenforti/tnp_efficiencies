@@ -28,11 +28,11 @@ binnings = {
 
 lumi_data = 16.8  # fb^-1
 
-sig_mc_repo = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS"
-bkg_repo = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
+# sig_mc_repo = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS"
+# bkg_repo = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
 
-# sig_mc_repo = "root_files/datasets"
-# bkg_repo = "root_files/datasets"
+sig_mc_repo = "root_files/datasets"
+bkg_repo = "root_files/datasets/bkg"
 
 BR_TAUToMU = 0.1739
 BR_TAUToE = 0.1782
@@ -175,10 +175,13 @@ def lumi_factors(type_eff, bkg_categories):
         
         wsum_histo = file.Get("weightSum")
         num_init = wsum_histo.Integral()
+        print(num_init)
         xsection = cross_section_bkg(cat)*1000  # has to be put in fb
         lumi_bkg = num_init/xsection
 
         scale = lumi_data/lumi_bkg
+
+        print(cat, lumi_bkg)
     
         lumi_scales.update({cat : scale})
     

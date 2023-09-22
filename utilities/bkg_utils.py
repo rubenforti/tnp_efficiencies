@@ -5,23 +5,11 @@ import sys
 from utilities.base_library import lumi_factors, binning, bin_dictionary, sumw2_error
 from utilities.base_library import eval_efficiency as eval_bkgfrac  #La formula è la stessa
 from utilities.results_utils import init_pass_fail_histos
-from utilities.plot_utils import plot_bkg
+from utilities.plot_utils import plot_bkg, plot_projected_bkg
 from array import array
 
 
 bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
-
-colors = { 
-    "WW" : ROOT.kOrange+1,
-    "WZ" : ROOT.kYellow+3,
-    "ZZ" : ROOT.kGreen+1,
-    "TTSemileptonic" : ROOT.kCyan+1,
-    "Ztautau" : ROOT.kMagenta+1,
-    "SameCharge" : ROOT.kOrange+10,
-    "total_bkg" : ROOT.kRed,
-    "pdf_bkg_fit" : ROOT.kRed,
-    "signal" : ROOT.kBlue
-}
 
 ###############################################################################
 
@@ -125,8 +113,7 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
             "roohisto" : bkg_histo,
             "histo_pdf" : ROOT.RooHistPdf(f"{cat}_bkg_pdf", f"{cat}_bkg_pdf", ROOT.RooArgSet(axis), bkg_histo, 0),
             "lumi_scale" : lumi_scales[cat],
-            "integral" : bkg_histo.sumEntries(),
-            "color" : colors[cat]
+            "integral" : bkg_histo.sumEntries()
             }
         })
 
@@ -139,8 +126,7 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
     datasets.update({"total_bkg" : {
         "roohisto": bkg_total_histo,
         "lumi_scale" : 1,
-        "integral" : bkg_total_histo.sumEntries(),
-        "color" : colors["total_bkg"]
+        "integral" : bkg_total_histo.sumEntries()
         }
     })
 
@@ -154,8 +140,7 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
             "roohisto" : histo_mc,
             "histo_pdf" : ROOT.RooHistPdf(f"MC_signal_pdf", f"MC_signal_pdf", ROOT.RooArgSet(axis), histo_mc, 0),
             "lumi_scale" : lumi_scales["Zmumu"],
-            "integral" : histo_mc.sumEntries(),
-            "color" : colors["signal"]
+            "integral" : histo_mc.sumEntries()
             }
         })
     
@@ -183,8 +168,7 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
 
         datasets.update({"pdf_bkg_fit" : {
             "pdf" : pdf_bkg_fit,
-            "norm" : norm_bkg,
-            "color" : colors["pdf_bkg_fit"]
+            "norm" : norm_bkg
             }
         })
 
@@ -249,24 +233,24 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                 datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
                                                import_data=True, import_fit_pdf_bkg=plot_fit_bkgpdf)
                 
-                integral_histo_bkg = datasets["total_bkg"]["integral"]
+                effective_figpath = f"{figpath}/minv_plots_w_data"
                 
-                norm_bkg = datasets["pdf_bkg_fit"]["norm"]
-                err_integral_histo_bkg = sumw2_error(datasets["total_bkg"]["roohisto"])
+                if plot_fit_bkgpdf and 1==0:
+                    integral_histo_bkg = datasets["total_bkg"]["integral"]
+                    norm_bkg = datasets["pdf_bkg_fit"]["norm"]
+                    err_integral_histo_bkg = sumw2_error(datasets["total_bkg"]["roohisto"])
 
-                nbkg_pull = (integral_histo_bkg - norm_bkg.getVal())/norm_bkg.getError()
-                histos[f"h_nbkg_pull_{flag}"].Fill(nbkg_pull)
-                histos[f"h_nbkg_pull_{flag}_2d"].SetBinContent(bin_pt, bin_eta, nbkg_pull)
-                
-                plot_bkg(datasets, flag, bin_key, figpath=f"{figpath}/minv_plots_w_data") 
+                    nbkg_pull = (integral_histo_bkg - norm_bkg.getVal())/norm_bkg.getError()
+                    histos[f"h_nbkg_pull_{flag}"].Fill(nbkg_pull)
+                    histos[f"h_nbkg_pull_{flag}_2d"].SetBinContent(bin_pt, bin_eta, nbkg_pull)
 
 
-            if plot_on_signal:
+            elif plot_on_signal:
         
                 datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
                                                import_mc_signal=True, import_fit_pars=compare_bkgfrac)
                 
-                plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=f"{figpath}/minv_plots_w_sig")
+                effective_figpath = f"{figpath}/minv_plots_w_sig"
                 
                 nbkg = datasets["total_bkg"]["integral"]
                 err_nbkg = sumw2_error(datasets["total_bkg"]["roohisto"])
@@ -308,6 +292,9 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
             else:
                 datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories)
+                effective_figpath = figpath
+
+            plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=effective_figpath)
             
             
     saveHists = False
@@ -327,7 +314,8 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
 
 def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta, 
-                       norm_data=False, norm_sig=False, norm_tot_bkg=False, filepath="bkg_studies"):
+                       norm_data=False, norm_sig=False, norm_tot_bkg=False, 
+                       plot_projected=False, filepath="bkg_studies"):
     """
     Makes 2d histograms containing the differential distribution of the various
     background samples; these distributions can be normalized w.r.t. data,
@@ -353,7 +341,6 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
     nbins_pt = len(bins_pt) - 1
     nbins_eta = len(bins_eta) - 1
 
-    rootfile_distrib = ROOT.TFile(f"{filepath}/bkg_2d_distrib.root", "RECREATE")
     
     histos = {}
 
@@ -410,14 +397,26 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
                 d_nfail = nfail*((d_nfail/nfail)**2 + 
                                  (sumw2_error(h_totbkg_fail)/h_totbkg_fail.sumEntries())**2)**0.5
             
-        
             histos[f"{cat}_pass_2d"].SetBinContent(bin_pt, bin_eta, npass)
             histos[f"{cat}_pass_2d"].SetBinError(bin_pt, bin_eta, d_npass)
             histos[f"{cat}_fail_2d"].SetBinContent(bin_pt, bin_eta, nfail)
             histos[f"{cat}_fail_2d"].SetBinError(bin_pt, bin_eta, d_nfail)
 
-        rootfile_distrib.cd()
-        histos[f"{cat}_pass_2d"].Write()
-        histos[f"{cat}_fail_2d"].Write()
-    
+
+    rootfile_distrib = ROOT.TFile(f"{filepath}/bkg_2d_distrib.root", "RECREATE")
+    rootfile_distrib.cd()
+    [histo.Write() for histo in histos.values()]
     rootfile_distrib.Close()
+
+    if plot_projected: 
+        hist_pass_dict, hist_fail_dict = {}, {}
+        for cat in bkg_categories: 
+            hist_pass_dict.update({cat : histos[f"{cat}_pass_2d"]})
+            hist_fail_dict.update({cat : histos[f"{cat}_fail_2d"]})
+
+        plot_projected_bkg(hist_pass_dict, binning_pt, "eta_singlebin", "pass", figpath=filepath)
+        plot_projected_bkg(hist_fail_dict, binning_pt, "eta_singlebin", "fail", figpath=filepath)
+        plot_projected_bkg(hist_pass_dict, "pt_singlebin", binning_eta, "pass", figpath=filepath)
+        plot_projected_bkg(hist_fail_dict, "pt_singlebin", binning_eta, "fail", figpath=filepath)
+
+

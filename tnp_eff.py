@@ -19,14 +19,14 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 #  GENERAL SETTINGS
 # ------------------
 type_eff = "iso"
-type_analysis = "sim"
+type_analysis = "indep"
 
-local_datasets = False
-load_McBkg = False
+local_datasets = True
+load_McBkg = True
 
-generate_datasets = False
-default_fit_settings = False
-nRUN = 8
+generate_datasets = True
+default_fit_settings = True
+nRUN = 5
 
 binning_pt, binning_eta, binning_mass = "pt", "eta", "mass_60_120"
 mergedbins_bkg = False
@@ -38,20 +38,24 @@ fit_on_pseudodata = False
 fit_verb = -1
 parallel_fits = False
 refit_nobkg = True
-useMinos = "eff"
+useMinos = False
 
-workspace_name = f"results/iso_sim_minos/ws_{type_eff}_{type_analysis}_minos_eff.root"
-import_pdfs = True
+# workspace_name = "root_files/ws_iso_prova.root"
+workspace_name = f"root_files/ws_iso_prova.root"
+# workspace_name = f"results/iso_indep_2gev_mcbkg/ws_{type_eff}_{type_analysis}_2gev_mcbkg.root"
+import_pdfs = False
 
 savefigs = False
 
 
-'''
-figpath = {"good": "results/pseudodata_iso/fit_plots", 
-           "check": "results/pseudodata_iso/fit_plots/check"} 
+
+figpath = {"good": "results/iso_indep_2gev_mcbkg/fit_plots", 
+           "check": "results/iso_indep_2gev_mcbkg/fit_plots/check"} 
 '''
 figpath = {"good": "results/iso_sim_minos/fit_plots", 
-           "check": "results/iso_sim_minos/fit_plots/check"} 
+           "check": "results/iso_sim_minos/fit_plots/check"}
+'''
+# figpath = {"check" : "."}
 
 if mergedbins_bkg and (binning_pt != "pt" or binning_eta != "eta"):
     print("ERROR: Evaluation of background in merged bins for its comparison on data is allowed only wrt reco-bins of pt and eta for data")
@@ -69,6 +73,7 @@ if generate_datasets:
     if load_McBkg or fit_on_pseudodata:
         lumi_scales = lumi_factors(type_eff, bkg_categories)
         lumi_scale_signal = lumi_scales.pop("Zmumu")
+        print("Lumi scale sig:  ", lumi_scale_signal)
     else: 
         lumi_scale_signal = 1
 
@@ -82,11 +87,11 @@ if generate_datasets:
         dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
 
     import_dictionary = {
-        "data" : filename_data, 
+        # "data" : filename_data, 
         "mc" : {"filename": filename_mc, "lumi_scale" : lumi_scale_signal}}
    
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass)
-    ws.writeToFile(workspace_name)
+    # ws.writeToFile(workspace_name)
 
     if load_McBkg or fit_on_pseudodata:
         bkg_filenames = {}
@@ -102,15 +107,16 @@ if generate_datasets:
         import_dict_bkg = {"bkg" : {"filenames" : bkg_filenames, "lumi_scales" : lumi_scales}}
 
         if mergedbins_bkg is False:
+            '''
             ws_bkg = ws_init(import_dict_bkg, type_analysis, binning_pt, binning_eta, 
                              binning_mass, import_existing_ws=True, existing_ws_filename=workspace_name, 
                              altBinning_bkg=False)
+            '''
         else:
             ws_bkg = ws_init(import_dict_bkg, type_analysis, binning_pt_bkg, binning_eta_bkg, 
                              binning_mass, import_existing_ws=True, existing_ws_filename=workspace_name, 
                              altBinning_bkg=True)
-
-        ws_bkg.writeToFile(workspace_name)
+        # ws_bkg.writeToFile(workspace_name)
 
 
 # -----------------------------------------------------------------------------------------------------------
@@ -143,14 +149,14 @@ if load_McBkg or fit_on_pseudodata:
 # -----------------------------------------------------------------------------------------------------------
 #  RUNNING FITS
 # --------------
-
+'''
 if parallel_fits is False:
     runFits(workspace_name, bin_dictionary(binning_pt, binning_eta), fit_settings, 
             import_pdfs=import_pdfs, savefigs=savefigs, figpath=figpath)
 else:
     runParallelFits(workspace_name, bin_dictionary(binning_pt, binning_eta), fit_settings,
                     import_pdfs=import_pdfs, savefigs=savefigs, figpath=figpath)
-
+'''
 
 # print(fit_settings)
 

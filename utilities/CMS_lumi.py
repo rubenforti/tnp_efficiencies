@@ -39,7 +39,7 @@ def CMS_lumi(pad,  iPeriod,  iPosX, simulation = False):
     if(iPosX/10==0 ): outOfFrame = True
 
     if simulation:
-        extraText = "   Private Work"
+        extraText = "   Private Work - simulation"
     else:
         extraText = "   Private Work"
 

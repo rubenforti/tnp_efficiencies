@@ -31,14 +31,44 @@ def check_existing_fit(type_analysis, ws, bin_key):
 
 ###############################################################################
 
-def pearson_chi2_eval(histo, pdf):
+def pearson_chi2_eval(histo, pdf, axis):
     """
     """
+
+    binning = axis.getBinning()
+    NBINS = binning.numBins()   
+    EVTS = histo.sumEntries()
+    BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
+
+    PRECISION = 1
+
+    n_fitted_events=0
+    for server in pdf.servers():
+        if "nsig" in server.GetName() or "nbkg" in server.GetName():
+            n_fitted_events += server.getVal()
+
+    chi2_val =0
+
+    for i in range(NBINS):
+    
+        axis.setVal(binning.binCenter(i))
+        weight = histo.weight(i)
+
+        pdf_val = pdf.getVal(ROOT.RooArgSet(axis))
+        mu = n_fitted_events*BIN_VOLUME*pdf_val
+        mu = round(mu, PRECISION)
+
+        if mu > 0:
+            chi2_val += (weight - mu)**2/mu
+
+
+    '''
+    # Old version: can be problematic if the pdf assumes values near 0 but not exactly 0
     chi2_obj = ROOT.RooChi2Var("chi2", "chi2", pdf, histo,
                                 ROOT.RooFit.Range("fitRange"),
                                 ROOT.RooFit.DataError(ROOT.RooAbsData.Expected))
     chi2_val = chi2_obj.getVal() 
-
+    '''
     return chi2_val
 
 ###############################################################################
@@ -98,7 +128,7 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
     if ("pass" in res.GetName()) or ("fail" in res.GetName()):
         flag = "pass" if "pass" in res.GetName() else "fail"
         chi2val = llr_eval(histo[flag], pdf[flag], axis[flag]) \
-            if type_chi2=="llr" else pearson_chi2_eval(histo[flag], pdf[flag])
+            if type_chi2=="llr" else pearson_chi2_eval(histo[flag], pdf[flag], axis[flag])
         ndof = histo[flag].numEntries() - res.floatParsFinal().getSize()
         res.SetTitle(str(chi2val))
     

@@ -9,19 +9,21 @@ from utilities.plot_utils import style_settings
 ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
-analysis = "iso_indep_benchmark"
-folder = "results/benchmark_iso"
+analysis = "iso_sim"
+folder = "results/iso_sim"
 
 # -----------------------------------------------------------------------------
 
 # file_hres = ROOT.TFile(f"{folder}/res_{analysis}.root", "READ")
 # file_hres_cmp = ROOT.TFile(f"{folder}/res_cmp_{analysis}.root", "READ")
-file_hres_cmp_bmark = ROOT.TFile(f"{folder}/res_cmpBmark_{analysis}.root", "READ")
+file_hres_cmp_bmark = ROOT.TFile(f"{folder}/res_cmp_onlyBkgFits_{analysis}.root", "READ")
+
 
 histos = {}
 #[histos.update({key.GetName() : file_hres.Get(key.GetName())}) for key in file_hres.GetListOfKeys()]
-#[histos.update({key.GetName() : file_hres_cmp.Get(key.GetName())}) for key in file_hres_cmp.GetListOfKeys()]
+# [histos.update({key.GetName() : file_hres_cmp.Get(key.GetName())}) for key in file_hres_cmp.GetListOfKeys()]
 [histos.update({key.GetName() : file_hres_cmp_bmark.Get(key.GetName())}) for key in file_hres_cmp_bmark.GetListOfKeys()]
+# [histos.update({key.GetName() : file_other.Get(key.GetName())}) for key in file_other.GetListOfKeys()]
 
 for hist_key in histos.keys():
 
@@ -95,6 +97,6 @@ for hist_key in histos.keys():
 
     c.Update()
 
-    c.SaveAs(f"{folder}/res_plots/{hist_key}.pdf")
+    c.SaveAs(f"{folder}/res_plots_w_bkg/{hist_key}.pdf")
 
 

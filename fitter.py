@@ -37,7 +37,7 @@ class AbsFitter():
         self.results = {}
 
 
-        if self.settings["bkg_model"] == "mc_raw":
+        if self.settings["bkg_model"]["pass"] == "mc_raw" or self.settings["bkg_model"]["fail"] == "mc_raw":
             self.bkg_categories = self.settings["bkg_categories"]
             self.bkg_tothist = {}
 
@@ -236,11 +236,13 @@ class AbsFitter():
                 par_set.add(self.efficiency)
             elif self.settings["useMinos"] == "all":
                 par_set = self.pdfs["fit_model"][flag].getParameters(self.histo_data[flag])
+        else:
+            par_set = "none"
 
         res = self.pdfs["fit_model"][flag].fitTo(self.histo_data[flag],
                                                   ROOT.RooFit.Range("fitRange"),
                                                   ROOT.RooFit.Minimizer("Minuit2", "Migrad"),
-                                                  ROOT.RooFit.Minos(par_set),
+                                                  #ROOT.RooFit.Minos(par_set),
                                                   ROOT.RooFit.SumW2Error(False),
                                                   ROOT.RooFit.Save(1), 
                                                   ROOT.RooFit.PrintLevel(self.settings["fit_verb"]))
@@ -293,7 +295,7 @@ class AbsFitter():
                             "axis" : self.axis[flag],
                             "data" : self.histo_data[flag],
                             "model" : self.pdfs["fit_model"][flag],
-                            "res" : self.results[flag],
+                            "res" : self.results[flag]["res_obj"],
                             } })
             print(plot_objects["pass"]["res"])
             plot_objects.update({"efficiency" : [eff, d_eff],

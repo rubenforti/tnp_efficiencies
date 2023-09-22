@@ -93,6 +93,10 @@ class results_manager:
         elif self._analysis == 'sim':
             # res = ws.obj(f"results_({bin_pt}|{bin_eta})")
             results = res["sim"]
+            if type(results) is not ROOT.RooFitResult:
+                print("ERROR: result object not recognized")
+                print(bin_key)
+                sys.exit()
             pars = results.floatParsFinal()
             #new_res = {f"{bin_pt},{bin_eta}": {
             new_res = {f"{bin_key}": {

@@ -25,11 +25,11 @@ binning_eta = "eta"
 binning_mass = "mass_60_120"
 
 
-ws_filename = "root_files/ws_bkg_prova.root"
+ws_filename = "bkg_studies/ws_iso_backgrounds.root"
 generate_datasets = False
-local_datasets = False
+local_datasets = True
 
-figpath = "bkg_studies/iso/negweights_bkg"
+figpath = "bkg_studies/iso"
 filepath = "bkg_studies/iso"
 
 negweights_eval = False
@@ -40,23 +40,24 @@ binnings_list = [["pt", "eta"], ["pt", "eta_24bins"], ["pt", "eta_16bins"],
 
 
 minv_plots = {
-    "flag" : False,
-    "plot_on_data" : False,
+    "flag" : True,
+    "plot_on_data" : True,
     "plot_fit_bkgpdf" : False,
-    "plot_on_sig" : True,
+    "plot_on_sig" : False,
     "compare_bkgfrac" : False,
     "logscale" : True,
 }
 plot_bkg_distrib = {
-    "flag" : True,
+    "flag" : False,
     "norm_on_data" : False,
     "norm_on_sig" : False,
     "norm_tot_bkg" : False,
+    "plot_projected" : True,
 }
 
 for tp in ["data", "sig"]:
-    minv_plots.update({f"plot_on_{tp}" : minv_plots[f"plot_on_{tp}"]*minv_plots["flag"]})
-    plot_bkg_distrib.update({f"norm_on_{tp}" : plot_bkg_distrib[f"norm_on_{tp}"]*plot_bkg_distrib["flag"]})
+    minv_plots.update({f"plot_on_{tp}" : bool(minv_plots[f"plot_on_{tp}"]*minv_plots["flag"])})
+    plot_bkg_distrib.update({f"norm_on_{tp}" : bool(plot_bkg_distrib[f"norm_on_{tp}"]*plot_bkg_distrib["flag"])})
 
 
 # -----------------------------------------------------------------------------------------------------------
@@ -94,6 +95,8 @@ if generate_datasets is True:
         import_dictionary.update({"mc" : {"filename":filename_mc, "lumi_scale":sig_lumi_scale}})
 
     bin_dict = bin_dictionary(binning_pt, binning_eta)
+
+    print(import_dictionary)
     
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass)
     ws.writeToFile(ws_filename)
@@ -108,6 +111,8 @@ if negweights_eval:
         show_negweighted_bins(ws_filename, bkg_categories, binning_pt, binning_eta, filepath=filepath) 
 
 if minv_plots["flag"]: 
+    print("Plotting minv distributions")
+    print(minv_plots["plot_on_data"], minv_plots["plot_fit_bkgpdf"], minv_plots["plot_on_sig"])
     bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, binning_eta,
                           plot_on_data=minv_plots["plot_on_data"], 
                           plot_fit_bkgpdf=minv_plots["plot_fit_bkgpdf"],
@@ -121,9 +126,8 @@ if plot_bkg_distrib["flag"]:
                        norm_data=plot_bkg_distrib["norm_on_data"],
                        norm_sig=plot_bkg_distrib["norm_on_sig"],
                        norm_tot_bkg=plot_bkg_distrib["norm_tot_bkg"], 
+                       plot_projected=plot_bkg_distrib["plot_projected"],
                        filepath=filepath)
-
-
 
 
 
