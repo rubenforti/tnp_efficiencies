@@ -2,6 +2,7 @@
 """
 import ROOT
 import time
+from copy import copy
 from utilities.base_library import lumi_factors, binning, bin_dictionary
 from utilities.dataset_utils import ws_init
 from utilities.bkg_utils import gen_bkg_2d_distrib, bkg_mass_distribution, show_negweighted_bins
@@ -17,8 +18,8 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 
 type_eff = "iso"
 type_analysis = "indep"
-bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau", "SameCharge"]
-# bkg_categories = ["Ztautau"]
+bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau", "SameCharge"]
+
 
 binning_pt = "pt"
 binning_eta = "eta"
@@ -27,28 +28,29 @@ binning_mass = "mass_60_120"
 
 ws_filename = "bkg_studies/ws_iso_backgrounds.root"
 generate_datasets = False
-local_datasets = True
+local_datasets = False
 
-figpath = "bkg_studies/iso"
-filepath = "bkg_studies/iso"
+figpath = "bkg_studies"
+filepath = "bkg_studies"
 
 negweights_eval = False
-binnings_list = [["pt", "eta"], ["pt", "eta_24bins"], ["pt", "eta_16bins"], 
+binnings_list = [["pt", "eta"]]
+                 
+''' ["pt", "eta_24bins"], ["pt", "eta_16bins"], 
                  ["pt", "eta_8bins"], ["pt_12bins", "eta"], ["pt_9bins", "eta"],
                  ["pt_6bins", "eta"], ["pt_12bins", "eta_24bins"], ["pt_9bins", "eta_16bins"],
-                 ["pt_12bins", "eta_16bins"], ["pt_9bins", "eta_24bins"]]
-
+                 ["pt_12bins", "eta_16bins"], ["pt_9bins", "eta_24bins"]] '''
 
 minv_plots = {
-    "flag" : True,
+    "flag" : False,
     "plot_on_data" : True,
     "plot_fit_bkgpdf" : False,
-    "plot_on_sig" : False,
+    "plot_on_sig" : True,
     "compare_bkgfrac" : False,
     "logscale" : True,
 }
 plot_bkg_distrib = {
-    "flag" : False,
+    "flag" : True,
     "norm_on_data" : False,
     "norm_on_sig" : False,
     "norm_tot_bkg" : False,
@@ -71,21 +73,22 @@ if generate_datasets is True:
         dirname_bkg = "root_files/datasets/bkg"
     else:
         filename_data = f"/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
-        filename_mc = f"/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
-        dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
+        filename_mc = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
+        dirname_bkg = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS"
     
-    dirname_bkg = "root_files/datasets/bkg"
+    # dirname_bkg = "root_files/datasets/bkg"
 
     lumi_scales = lumi_factors(type_eff, bkg_categories)
     sig_lumi_scale = lumi_scales.pop("Zmumu")
 
     bkg_filenames = {}
+    load_bkgCat = copy(bkg_categories)
     if "SameCharge" in bkg_categories:
-        bkg_categories.remove("SameCharge")
+        load_bkgCat.remove("SameCharge")
         bkg_filenames.update({"SameCharge" : 
-            f"{dirname_bkg}/tnp_{type_eff}_data_vertexWeights1_oscharge0.root"})
+            f"{dirname_bkg}/../SS/tnp_{type_eff}_data_vertexWeights1_oscharge0.root"})
     [bkg_filenames.update({cat : 
-        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_categories]
+        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in load_bkgCat]
     
     
     import_dictionary = {"bkg" : {"filenames":bkg_filenames, "lumi_scales":lumi_scales} }
@@ -95,8 +98,6 @@ if generate_datasets is True:
         import_dictionary.update({"mc" : {"filename":filename_mc, "lumi_scale":sig_lumi_scale}})
 
     bin_dict = bin_dictionary(binning_pt, binning_eta)
-
-    print(import_dictionary)
     
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass)
     ws.writeToFile(ws_filename)
@@ -128,7 +129,6 @@ if plot_bkg_distrib["flag"]:
                        norm_tot_bkg=plot_bkg_distrib["norm_tot_bkg"], 
                        plot_projected=plot_bkg_distrib["plot_projected"],
                        filepath=filepath)
-
 
 
 

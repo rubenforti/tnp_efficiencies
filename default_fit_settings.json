@@ -2,11 +2,8 @@
     "idip_trig_iso" : {
 
         "fit_checks" : "benchmark",
+        "type_refit" : "benchmark",
         "fit_range" : [60.0, 120.0],
-        "fit_strategy" : {
-            "pass" : 2,
-            "fail" : 2
-        },
         "Nbins" : {
             "pass" : 2000,
             "fail" : 2000

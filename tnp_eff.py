@@ -15,23 +15,30 @@ t0 = time.time()
 ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
+ROOT.Math.MinimizerOptions.SetDefaultMinimizer("Minuit2")
+
+
 # -----------------------------------------------------------------------------
 #  GENERAL SETTINGS
 # ------------------
 type_eff = "iso"
-type_analysis = "indep"
+type_analysis = "sim"
+name_analysis = ""
 
-local_datasets = True
-load_McBkg = True
+main_folder = "results"
 
-generate_datasets = True
-default_fit_settings = True
-nRUN = 5
+
+local_datasets = False
+load_McBkg = False
+
+generate_datasets = False
+default_fit_settings = False
+nRUN = 4
 
 binning_pt, binning_eta, binning_mass = "pt", "eta", "mass_60_120"
 mergedbins_bkg = False
 binning_pt_bkg, binning_eta_bkg = "pt_12bins", "eta_16bins"
-bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau", "SameCharge"]
+bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau", "SameCharge"]
 
 fit_on_pseudodata = False
 
@@ -40,20 +47,22 @@ parallel_fits = False
 refit_nobkg = True
 useMinos = False
 
-# workspace_name = "root_files/ws_iso_prova.root"
-workspace_name = f"root_files/ws_iso_prova.root"
-# workspace_name = f"results/iso_indep_2gev_mcbkg/ws_{type_eff}_{type_analysis}_2gev_mcbkg.root"
-import_pdfs = False
+folder = f"{main_folder}/{type_eff}_{type_analysis}_r628"
+workspace_name = f"{folder}/ws_{type_eff}_{type_analysis}.root"
+# folder = f"{main_folder}/benchmark_iso_r628"
+# workspace_name = f"results/benchmark_iso_r628/ws_iso_indep_bmark.root"
 
-savefigs = False
+import_pdfs = True
+
+savefigs = True
 
 
 
-figpath = {"good": "results/iso_indep_2gev_mcbkg/fit_plots", 
-           "check": "results/iso_indep_2gev_mcbkg/fit_plots/check"} 
+figpath = {"good": f"{folder}/fit_plots", 
+           "check": f"{folder}/fit_plots/check"} 
 '''
-figpath = {"good": "results/iso_sim_minos/fit_plots", 
-           "check": "results/iso_sim_minos/fit_plots/check"}
+figpath = {"good": folder, 
+           "check": folder}
 '''
 # figpath = {"check" : "."}
 
@@ -83,15 +92,15 @@ if generate_datasets:
         dirname_bkg = "root_files/datasets/bkg"
     else:
         filename_data = f"/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
-        filename_mc = f"/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
-        dirname_bkg = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
+        filename_mc = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
+        dirname_bkg = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS"
 
     import_dictionary = {
-        # "data" : filename_data, 
+        "data" : filename_data, 
         "mc" : {"filename": filename_mc, "lumi_scale" : lumi_scale_signal}}
    
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass)
-    # ws.writeToFile(workspace_name)
+    ws.writeToFile(workspace_name)
 
     if load_McBkg or fit_on_pseudodata:
         bkg_filenames = {}
@@ -100,23 +109,23 @@ if generate_datasets:
         if "SameCharge" in bkg_categories:
             load_bkgCat.remove("SameCharge")
             bkg_filenames.update({"SameCharge" : 
-                f"{dirname_bkg}/tnp_{type_eff}_data_vertexWeights1_oscharge0.root"})
+            f"{dirname_bkg}/../SS/tnp_{type_eff}_data_vertexWeights1_oscharge0.root"})
         [bkg_filenames.update({cat : 
             f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in load_bkgCat]
 
         import_dict_bkg = {"bkg" : {"filenames" : bkg_filenames, "lumi_scales" : lumi_scales}}
 
         if mergedbins_bkg is False:
-            '''
             ws_bkg = ws_init(import_dict_bkg, type_analysis, binning_pt, binning_eta, 
                              binning_mass, import_existing_ws=True, existing_ws_filename=workspace_name, 
                              altBinning_bkg=False)
-            '''
+
         else:
             ws_bkg = ws_init(import_dict_bkg, type_analysis, binning_pt_bkg, binning_eta_bkg, 
                              binning_mass, import_existing_ws=True, existing_ws_filename=workspace_name, 
                              altBinning_bkg=True)
-        # ws_bkg.writeToFile(workspace_name)
+
+        ws_bkg.writeToFile(workspace_name)
 
 
 # -----------------------------------------------------------------------------------------------------------
@@ -149,14 +158,14 @@ if load_McBkg or fit_on_pseudodata:
 # -----------------------------------------------------------------------------------------------------------
 #  RUNNING FITS
 # --------------
-'''
+
 if parallel_fits is False:
     runFits(workspace_name, bin_dictionary(binning_pt, binning_eta), fit_settings, 
             import_pdfs=import_pdfs, savefigs=savefigs, figpath=figpath)
 else:
     runParallelFits(workspace_name, bin_dictionary(binning_pt, binning_eta), fit_settings,
                     import_pdfs=import_pdfs, savefigs=savefigs, figpath=figpath)
-'''
+
 
 # print(fit_settings)
 

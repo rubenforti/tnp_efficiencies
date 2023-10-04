@@ -9,7 +9,7 @@ import copy
 from utilities.results_utils import results_manager, efficiency_from_res
 from utilities.plot_utils import plot_fitted_pass_fail
 from utilities.base_library import eval_efficiency, sumw2_error
-from utilities.fit_utils import fit_quality
+from utilities.fit_utils import fit_quality, llr_test_bkg
 
 
 class AbsFitter():
@@ -101,7 +101,7 @@ class AbsFitter():
             # histo_binning = axis.getBinning()
             self.bkg_tothist[flag] = ROOT.RooDataHist(
                 f"Minv_bkg_{flag}_{self.bin_key}_total", "bkg_total_histo",
-                ROOT.RooArgSet(self.axis[flag]), "")
+                ROOT.RooArgSet(self.axis[flag]), "x_binning")
 
             for cat in self.bkg_categories:
                 self.bkg_tothist[flag].add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_{cat}")) 
@@ -119,7 +119,8 @@ class AbsFitter():
         """
         roohist_pseudodata = ROOT.RooDataHist(
             f"Minv_pseudodata_{flag}_{self.bin_key}", "pseudodata_histo",
-            ROOT.RooArgSet(self.axis[flag]), "")
+            ROOT.RooArgSet(self.axis[flag]), "x_binning")
+        print(roohist_pseudodata.numEntries())
 
         roohist_pseudodata.add(ws.data(f"Minv_mc_{flag}_{self.bin_key}"))
 
@@ -240,15 +241,16 @@ class AbsFitter():
             par_set = "none"
 
         res = self.pdfs["fit_model"][flag].fitTo(self.histo_data[flag],
-                                                  ROOT.RooFit.Range("fitRange"),
-                                                  ROOT.RooFit.Minimizer("Minuit2", "Migrad"),
-                                                  #ROOT.RooFit.Minos(par_set),
-                                                  ROOT.RooFit.SumW2Error(False),
-                                                  ROOT.RooFit.Save(1), 
-                                                  ROOT.RooFit.PrintLevel(self.settings["fit_verb"]))
+                                                 ROOT.RooFit.Range("fitRange"),
+                                                 ROOT.RooFit.Minimizer("Minuit2", "Migrad"),
+                                                 #ROOT.RooFit.Minos(par_set),
+                                                 ROOT.RooFit.Strategy(2),
+                                                 ROOT.RooFit.SumW2Error(False),
+                                                 ROOT.RooFit.Save(1), 
+                                                 ROOT.RooFit.PrintLevel(self.settings["fit_verb"]))
         res.SetName(f"results_{flag}_{self.bin_key}")
         
-        res.Print("v")
+        # res.Print("v")
 
         fit_obj = {"axis" : self.axis, "histo" : self.histo_data, 
                    "pdf" : self.pdfs["fit_model"], "res" : res}
@@ -272,8 +274,8 @@ class AbsFitter():
             if type_an == "sim":
                 eff, d_eff = self.efficiency.getVal(), self.efficiency.getError()
                 fig_status = bool(self.results["sim"]["status"])
-                self.results.update({"pass" : self.results["sim"]["res_obj"], 
-                                     "fail" : self.results["sim"]["res_obj"],
+                self.results.update({"pass" : {"res_obj" : self.results["sim"]["res_obj"]}, 
+                                     "fail" : {"res_obj" : self.results["sim"]["res_obj"]},
                                      "sim" : self.results["sim"]["res_obj"]})
             else:
                 pass
@@ -288,6 +290,8 @@ class AbsFitter():
             d_scale_factor = scale_factor*((d_eff/eff)**2 + (deff_mc/eff_mc)**2)**0.5
 
             print(self.results)
+
+            #print(self.results)
             plot_objects={}
             fig_folder = figpath["good"] if fig_status is True else figpath["check"]
             for flag in ["pass", "fail"]:
@@ -297,7 +301,7 @@ class AbsFitter():
                             "model" : self.pdfs["fit_model"][flag],
                             "res" : self.results[flag]["res_obj"],
                             } })
-            print(plot_objects["pass"]["res"])
+            # print(plot_objects["pass"]["res"])
             plot_objects.update({"efficiency" : [eff, d_eff],
                                 "efficiency_mc" : [eff_mc, deff_mc],
                                 "scale_factor" : [scale_factor, d_scale_factor]})
@@ -322,12 +326,20 @@ class IndepFitter(AbsFitter):
     def attempt_noBkgFit(self, flag):
         """
         """
-        if self.settings["bkg_model"][flag] != "expo":
-            # Need to be implemented for, e.g., cmsshape
-            pass
-        else: 
+
+        print("\nAttempting to refit with no background\n")
+
+        if self.settings["type_refit"] == "benchmark":
             nsig_fitted, nbkg_fitted = self.norm["nsig"][flag], self.norm["nbkg"][flag]
-            if nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal():
+            refit_ctrl = nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal()
+        elif self.settings["type_refit"] == "new":
+            refit_ctrl = llr_test_bkg(self.histo_data[flag], self.pdfs["fit_model"][flag], alpha=0.05)
+        else:
+            print("ERROR: refit type not recognized")
+            sys.exit()
+
+        if refit_ctrl is True:
+            if self.settings["bkg_model"][flag] == "expo":
                 self.pars["tau"][flag].setVal(1)
                 self.pars["tau"][flag].setConstant()
                 self.norm["nbkg"][flag].setVal(0)
@@ -335,6 +347,10 @@ class IndepFitter(AbsFitter):
                 self.doFit(flag)
             else:
                 pass
+                # Need to be implemented for, e.g., cmsshape
+        else: 
+            print("Refit not triggered\n")
+            pass
     
 
     def manageFit(self, ws):

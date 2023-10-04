@@ -53,7 +53,7 @@ def runFits(ws_name, bins_dict, fit_settings, parallelize=True, import_pdfs=Fals
 
     for bin_key in bins_dict.keys():
         
-        # if bin_key != "[24.0to26.0][-2.4to-2.3]": continue
+        # if bin_key != "[24.0to26.0][-0.1to0.0]": continue
 
         if fit_settings["type_analysis"] == "indep":
             fitter = IndepFitter(bin_key, fit_settings)            
@@ -97,7 +97,7 @@ def parallelize_fits(fitter, ws, import_pdfs, savefigs, figpath=None):
         res = {"sim" : fitter.results["sim"]["res_obj"]}
         status = bool(fitter.results["sim"]["status"])
 
-    if import_pdfs is True: fitter.importFitObjects(ws)
+    # if import_pdfs is True: fitter.importFitObjects(ws)
 
     if savefigs is True: fitter.saveFig(ws, figpath)
     bin_key = fitter.bin_key
@@ -126,22 +126,21 @@ def runParallelFits(ws_name, bins_dict, fit_settings, import_pdfs=False,
         fitters = [SimFitter(bin_key, fit_settings) for bin_key in bins_dict.keys()]
     
     figpath = figpath if savefigs is True else None
-    pool = Pool(processes=16)
+    pool = Pool(processes=8)
     fit_results = pool.starmap(parallelize_fits, 
                                zip(fitters, repeat(ws), repeat(import_pdfs), repeat(savefigs), repeat(figpath)))
 
 
     print("FITS DONE")
 
-    
     for fitres in fit_results:
         fitter, bin_key, bin_status, res = fitres
         if import_pdfs: fitter.importFitObjects(ws)
 
         print(f"Analyzing bin {bin_key}")
         if bin_status is False:
-            prob_bins.append(fitres["bin_key"])
-        printFitStatus(fit_settings["type_analysis"], fitres[1], bin_status, res, prob_bins)
+            prob_bins.append(bin_key)
+        printFitStatus(fit_settings["type_analysis"], bin_key, bin_status, res, prob_bins)
 
     
 

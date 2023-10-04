@@ -9,21 +9,28 @@ from utilities.plot_utils import style_settings
 ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
-analysis = "iso_sim"
-folder = "results/iso_sim"
+analysis = "iso_indep_pseudodata_new"
+folder = "results/pseudodata_iso"
+
+cmpBmark = False
+
+bmark_flag = "Bmark" if cmpBmark else ""
+
 
 # -----------------------------------------------------------------------------
 
 # file_hres = ROOT.TFile(f"{folder}/res_{analysis}.root", "READ")
-# file_hres_cmp = ROOT.TFile(f"{folder}/res_cmp_{analysis}.root", "READ")
-file_hres_cmp_bmark = ROOT.TFile(f"{folder}/res_cmp_onlyBkgFits_{analysis}.root", "READ")
+# file_hres_cmp = ROOT.TFile(f"{folder}/res_cmp{bmark_flag}_{analysis}.root", "READ")
+file_hres_cmp = ROOT.TFile(f"{folder}/res_cmpMC_{analysis}.root", "READ")
+
 
 
 histos = {}
-#[histos.update({key.GetName() : file_hres.Get(key.GetName())}) for key in file_hres.GetListOfKeys()]
-# [histos.update({key.GetName() : file_hres_cmp.Get(key.GetName())}) for key in file_hres_cmp.GetListOfKeys()]
-[histos.update({key.GetName() : file_hres_cmp_bmark.Get(key.GetName())}) for key in file_hres_cmp_bmark.GetListOfKeys()]
+# [histos.update({key.GetName() : file_hres.Get(key.GetName())}) for key in file_hres.GetListOfKeys()]
+[histos.update({key.GetName() : file_hres_cmp.Get(key.GetName())}) for key in file_hres_cmp.GetListOfKeys()]
 # [histos.update({key.GetName() : file_other.Get(key.GetName())}) for key in file_other.GetListOfKeys()]
+
+print(histos.keys())
 
 for hist_key in histos.keys():
 
@@ -61,25 +68,35 @@ for hist_key in histos.keys():
         plot_name = ""
 
     pad_plot.cd()
+    hist.SetContour(51)
     hist.Draw("COLZ")
     hist.GetZaxis().SetTitle("")
     hist.SetTitleSize(0)
     hist.SetTitle("")
+
+    x_axis, y_axis, z_axis = hist.GetXaxis(), hist.GetYaxis(), hist.GetZaxis()
     
     if "2d" in hist_key:
-        hist.GetXaxis().SetTitle("p_{T}^{#mu} [GeV]")
-        hist.GetXaxis().SetTitleOffset(1.2)
-        hist.GetXaxis().SetTitleSize(0.04)
-        hist.GetYaxis().SetTitle("#eta^{#mu}")
-        hist.GetYaxis().SetTitleOffset(0.8)
-        hist.GetYaxis().SetTitleSize(0.04)
+        
+        h1d = histos[hist_key.replace("_2d", "")]
+        lowValZ = h1d.GetXaxis().GetXmin()
+        highValZ = h1d.GetXaxis().GetXmax()
+        z_axis.SetRangeUser(lowValZ, highValZ)
+        
+
+        x_axis.SetTitle("p_{T}^{#mu} [GeV]")
+        x_axis.SetTitleOffset(1.2)
+        x_axis.SetTitleSize(0.04)
+        y_axis.SetTitle("#eta^{#mu}")
+        y_axis.SetTitleOffset(0.8)
+        y_axis.SetTitleSize(0.04)
     else:
         hist.GetXaxis().SetTitle(x_title)
         hist.GetXaxis().SetTitleOffset(1.2)
         hist.GetXaxis().SetTitleSize(0.04)
-        hist.GetYaxis().SetTitle("Events")
-        hist.GetYaxis().SetTitleOffset(1.25)
-        hist.GetYaxis().SetTitleSize(0.04)
+        y_axis.SetTitle("Events")
+        y_axis.SetTitleOffset(1.25)
+        y_axis.SetTitleSize(0.04)
         pad_plot.SetLogy()
     
     
@@ -97,6 +114,6 @@ for hist_key in histos.keys():
 
     c.Update()
 
-    c.SaveAs(f"{folder}/res_plots_w_bkg/{hist_key}.pdf")
+    c.SaveAs(f"{folder}/res_plots/{hist_key}.pdf")
 
 

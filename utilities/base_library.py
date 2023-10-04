@@ -28,11 +28,12 @@ binnings = {
 
 lumi_data = 16.8  # fb^-1
 
-# sig_mc_repo = "/scratchnvme/rajarshi/Signal_TNP_3D_Histograms/OS"
-# bkg_repo = "/scratchnvme/rajarshi/Bkg_TNP_3D_Histograms/OS"
 
-sig_mc_repo = "root_files/datasets"
-bkg_repo = "root_files/datasets/bkg"
+sig_mc_repo = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS"
+bkg_repo = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS"
+
+# sig_mc_repo = "root_files/datasets"
+# bkg_repo = "root_files/datasets/bkg"
 
 BR_TAUToMU = 0.1739
 BR_TAUToE = 0.1782
@@ -44,12 +45,9 @@ xsec_bkg = {
     "WW" : 12.6,
     "WZ" : 5.4341,
     "ZZ" : 0.60,
-    "TTSemileptonic" : 366.34, 
+    "TTFullyleptonic" : 88.29, 
     "Ztautau" : xsec_ZmmPostVFP*Z_TAU_TO_LEP_RATIO
 }
-
-weightSum_signal = 50602137.0
-
 
 ###############################################################################
 
@@ -156,13 +154,14 @@ def lumi_factors(type_eff, bkg_categories):
     """
     lumi_scales = {}
 
-    # file_sig = ROOT.TFile(f"{sig_mc_repo}/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root")
-    # wsum_histo_sig = file_sig.Get("weightSum")
-    # num_init_sig = wsum_histo_sig.Integral()
-    num_init_sig = weightSum_signal
+    file_sig = ROOT.TFile(f"{sig_mc_repo}/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root")
+    wsum_histo_sig = file_sig.Get("weightSum")
+    num_init_sig = wsum_histo_sig.Integral()
     xsection_sig = xsec_ZmmPostVFP*1000  # has to be put in fb
     lumi_sig = num_init_sig/xsection_sig
     lumi_scales.update({"Zmumu" : lumi_data/lumi_sig})
+
+    print("Zmumu", lumi_sig)
 
     bkg_cat = copy(bkg_categories)
 

@@ -8,18 +8,18 @@ from utilities.results_utils import results_manager, init_results_histos, fill_r
 
 NBINS = 75
 
-eff_min = 0.88
+eff_min = 0.895
 rel_err_eff_min = 1e-4
 rel_err_eff_max = 7e-3
 sf_min = 0.99
 sf_max = 1.03
 
 
-delta_min = -3e-3
-delta_error_min = -2e-3
-pull_min = -2
-rm1_min = -4e-3
-ratio_error_min = -0.4
+delta_min = -2.5e-3
+delta_error_min = -1.2e-3
+pull_min = -1
+rm1_min = -3e-3
+ratio_error_min = -0.3
 
 res_var_dict = {
     "efficiency" : {
@@ -228,8 +228,8 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list):
             histos["delta_error"].Fill(d_eff-d_eff_mc)
             histos["delta_error_2d"].SetBinContent(bin_pt, bin_eta, d_eff-d_eff_mc)
         if "pull" in histos.keys():
-            histos["pull"].Fill((eff-eff_mc)/d_eff_mc)
-            histos["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff-eff_mc)/d_eff_mc)
+            histos["pull"].Fill((eff_mc-eff)/d_eff)
+            histos["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff_mc-eff)/d_eff)
         if "rm1" in histos.keys():
             histos["rm1"].Fill((eff/eff_mc)-1)
             histos["rm1_2d"].SetBinContent(bin_pt, bin_eta, (eff/eff_mc)-1)
@@ -312,18 +312,22 @@ if __name__ == '__main__':
     print(resCmp_list)
 
     benchmark_res_iso = "results/benchmark_iso/old_results.txt"
-    bmark_fit_filename = "results/benchmark_iso/ws_iso_indep_benchmark.root"
-    # bmark_fit_filename = "results/iso_indep_2gev/ws_iso_indep_2gev.root"
+
+    bmark_fit_filename = "results/benchmark_iso_r628/ws_iso_indep_bmark.root"
     
     #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
     # ws_filename = "results/pseudodata_iso/ws_iso_pseudodata.root"
 
-    ws_filename = "results/benchmark_iso/ws_iso_indep_benchmark.root"
+    ws_filename = "results/benchmark_iso_r628/ws_iso_indep_bmark.root"
+
+    # ws_filename = "results/pseudodata_iso/ws_iso_indep_pseudodata_new.root"
+
+    # bmark_fit_filename = "results/iso_indep_2gev_r628/ws_iso_indep_2gev.root"
+    # ws_filename = "results/iso_indep_2gev_mcbkg/ws_iso_indep_2gev_mcbkg.root"
 
 
-    # save_eff_results(ws_filename, "indep", "pt", "eta")
-    compare_efficiency(benchmark_res_iso, ws_filename, "pt", "eta", resCmp_list)
-    # compare_efficiency(bmark_fit_filename, ws_filename, "pt", "eta", resCmp_list)
+    save_eff_results(bmark_fit_filename, "indep", "pt", "eta")
+    # compare_efficiency(benchmark_res_iso, ws_filename, "pt", "eta", resCmp_list)
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 

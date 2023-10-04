@@ -5,11 +5,11 @@ import sys
 from utilities.base_library import lumi_factors, binning, bin_dictionary, sumw2_error
 from utilities.base_library import eval_efficiency as eval_bkgfrac  #La formula è la stessa
 from utilities.results_utils import init_pass_fail_histos
-from utilities.plot_utils import plot_bkg, plot_projected_bkg
+from utilities.plot_utils import plot_bkg, plot_2d_bkg_distrib, plot_projected_bkg
 from array import array
 
 
-bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
+bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau"]
 
 ###############################################################################
 
@@ -35,6 +35,8 @@ def show_negweighted_bins(ws_filename, bkg_categories, binning_pt, binning_eta, 
     neg_sumEntries_total = ROOT.TH2D("neg_sumEntries_total", "neg_sumEntries_total", 
                                      nbins_pt, bins_pt, nbins_eta, bins_eta)
     
+    print(type(neg_weight_single))
+    
     cnt_mergedpt=0
     for bin_key in bin_dict.keys():
 
@@ -59,8 +61,8 @@ def show_negweighted_bins(ws_filename, bkg_categories, binning_pt, binning_eta, 
             axis = ws.var(f"x_{flag}_{bin_key}")
             tot_histo = ROOT.RooDataHist("tot_histo", "tot_histo", ROOT.RooArgSet(axis), "")
 
-            for cat in bkg_categories:
-                bkg_data = ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")
+            for bkg_cat in bkg_categories:
+                bkg_data = ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
                 tot_histo.add(bkg_data) 
                 cnt_sum_single = cnt_sum_single+1 if bkg_data.sumEntries() < 0 else cnt_sum_single
                     
@@ -68,10 +70,9 @@ def show_negweighted_bins(ws_filename, bkg_categories, binning_pt, binning_eta, 
 
             for idx in range(tot_histo.numEntries()):
                 cnt_weight_total = cnt_weight_total+1 if tot_histo.weight(idx) < 0 else cnt_weight_total
-                for cat in bkg_categories:
-                    histo = ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")
+                for bkg_cat in bkg_categories:
+                    histo = ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
                     cnt_weight_single = cnt_weight_single+1 if histo.weight(idx) < 0 else cnt_weight_single
-
 
         neg_weight_single.SetBinContent(bin_pt, bin_eta, cnt_weight_single)
         neg_weight_total.SetBinContent(bin_pt, bin_eta, cnt_weight_total)
@@ -100,19 +101,20 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
     lumi_scales = lumi_factors(type_eff, bkg_categories)
 
     axis = ws.var(f"x_{flag}_{bin_key}")
+    print(type(axis))
     axis.setBins(60, "plot_binning")
 
     datasets = {}
     datasets.update({"axis" : axis})
 
-    for cat in bkg_categories:
+    for bkg_cat in bkg_categories:
 
-        bkg_histo = ws.data(f"Minv_bkg_{flag}_{bin_key}_{cat}")
+        bkg_histo = ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
 
-        datasets.update({f"{cat}_bkg" : {
+        datasets.update({f"{bkg_cat}_bkg" : {
             "roohisto" : bkg_histo,
-            "histo_pdf" : ROOT.RooHistPdf(f"{cat}_bkg_pdf", f"{cat}_bkg_pdf", ROOT.RooArgSet(axis), bkg_histo, 0),
-            "lumi_scale" : lumi_scales[cat],
+            "histo_pdf" : ROOT.RooHistPdf(f"{bkg_cat}_bkg_pdf", f"{bkg_cat}_bkg_pdf", ROOT.RooArgSet(axis), bkg_histo, 0),
+            "lumi_scale" : lumi_scales[bkg_cat],
             "integral" : bkg_histo.sumEntries()
             }
         })
@@ -185,9 +187,11 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
     These bkg distributions can be compared to the MC signal or the data distributions.
     """
 
+    '''
     if plot_on_data and plot_on_signal:
         print("ERROR: plotting on data AND signal is not available now")
         sys.exit()
+    '''
 
     file = ROOT.TFile(ws_filename, "READ")
     ws = file.Get("w")
@@ -206,7 +210,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
     histos = {}
 
-    if plot_on_data:
+    if plot_on_data and plot_fit_bkgpdf:
         histos.update(init_pass_fail_histos("h_nbkg_pull", "Nbkg MC vs fit [nsigma]", 
                                             array('d', bins_sigma), bins_pt, bins_pt))
     if plot_on_signal and compare_bkgfrac:
@@ -215,7 +219,9 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
         histos.update(init_pass_fail_histos("h_bkgfrac_ratio", "Bkg fraction mc/fit ratio", 
                                             array('d', bins_ratio), bins_pt, bins_pt))
 
-    for bin_key in bin_dict:
+    for bin_key in bin_dict.keys():
+
+        # if bin_key != "[24.0to26.0][-2.4to-2.3]": continue
 
         _, bin_pt, bin_eta = bin_dict[bin_key]
 
@@ -228,13 +234,16 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
         for flag in ["pass", "fail"]:
             
+            print(flag, bin_key)
+
             if plot_on_data:
 
                 datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
                                                import_data=True, import_fit_pdf_bkg=plot_fit_bkgpdf)
                 
-                effective_figpath = f"{figpath}/minv_plots_w_data"
-                
+                plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=f"{figpath}/minv_plots_w_data")
+
+         
                 if plot_fit_bkgpdf and 1==0:
                     integral_histo_bkg = datasets["total_bkg"]["integral"]
                     norm_bkg = datasets["pdf_bkg_fit"]["norm"]
@@ -245,12 +254,12 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                     histos[f"h_nbkg_pull_{flag}_2d"].SetBinContent(bin_pt, bin_eta, nbkg_pull)
 
 
-            elif plot_on_signal:
+            if plot_on_signal:
         
                 datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
                                                import_mc_signal=True, import_fit_pars=compare_bkgfrac)
                 
-                effective_figpath = f"{figpath}/minv_plots_w_sig"
+                plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=f"{figpath}/minv_plots_w_sig")
                 
                 nbkg = datasets["total_bkg"]["integral"]
                 err_nbkg = sumw2_error(datasets["total_bkg"]["roohisto"])
@@ -290,11 +299,9 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                     histos[f"h_bkgfrac_pull_{flag}"].Fill(bkg_frac_pull)
                     histos[f"h_bkgfrac_pull_{flag}_2d"].SetBinContent(bin_pt, bin_eta, bkg_frac_pull)
 
-            else:
+            if plot_on_data is False and plot_on_signal is False:
                 datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories)
-                effective_figpath = figpath
-
-            plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=effective_figpath)
+                plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=figpath)
             
             
     saveHists = False
@@ -344,9 +351,12 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
     
     histos = {}
 
-    for cat in bkg_categories:
+    for bkg_cat in bkg_categories:
 
-        histos.update(init_pass_fail_histos(cat, cat, bins_pt, bins_pt, bins_eta))
+        histos.update(init_pass_fail_histos(bkg_cat, bkg_cat, bins_pt, bins_pt, bins_eta))
+
+        del histos[f"{bkg_cat}_pass"]
+        del histos[f"{bkg_cat}_fail"]
 
         cnt_mergedpt = 0
 
@@ -362,8 +372,8 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
                 bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
                 cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
                     
-            h_pass = ws.data(f"Minv_bkg_pass_{bin_key}_{cat}")
-            h_fail = ws.data(f"Minv_bkg_fail_{bin_key}_{cat}")
+            h_pass = ws.data(f"Minv_bkg_pass_{bin_key}_{bkg_cat}")
+            h_fail = ws.data(f"Minv_bkg_fail_{bin_key}_{bkg_cat}")
             npass = h_pass.sumEntries()
             d_npass = sumw2_error(h_pass)
             nfail = h_fail.sumEntries()
@@ -397,10 +407,13 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
                 d_nfail = nfail*((d_nfail/nfail)**2 + 
                                  (sumw2_error(h_totbkg_fail)/h_totbkg_fail.sumEntries())**2)**0.5
             
-            histos[f"{cat}_pass_2d"].SetBinContent(bin_pt, bin_eta, npass)
-            histos[f"{cat}_pass_2d"].SetBinError(bin_pt, bin_eta, d_npass)
-            histos[f"{cat}_fail_2d"].SetBinContent(bin_pt, bin_eta, nfail)
-            histos[f"{cat}_fail_2d"].SetBinError(bin_pt, bin_eta, d_nfail)
+            histos[f"{bkg_cat}_pass_2d"].SetBinContent(bin_pt, bin_eta, npass)
+            histos[f"{bkg_cat}_pass_2d"].SetBinError(bin_pt, bin_eta, d_npass)
+            histos[f"{bkg_cat}_fail_2d"].SetBinContent(bin_pt, bin_eta, nfail)
+            histos[f"{bkg_cat}_fail_2d"].SetBinError(bin_pt, bin_eta, d_nfail)
+        
+        hist_dict_bkgcat = {"pass" : histos[f"{bkg_cat}_pass_2d"], "fail" : histos[f"{bkg_cat}_fail_2d"]}
+        plot_2d_bkg_distrib(hist_dict_bkgcat, bkg_cat, figpath=f"{filepath}/bkg_2d_distrib")
 
 
     rootfile_distrib = ROOT.TFile(f"{filepath}/bkg_2d_distrib.root", "RECREATE")
@@ -410,9 +423,9 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
 
     if plot_projected: 
         hist_pass_dict, hist_fail_dict = {}, {}
-        for cat in bkg_categories: 
-            hist_pass_dict.update({cat : histos[f"{cat}_pass_2d"]})
-            hist_fail_dict.update({cat : histos[f"{cat}_fail_2d"]})
+        for bkg_cat in bkg_categories: 
+            hist_pass_dict.update({f"{bkg_cat}_bkg" : histos[f"{bkg_cat}_pass_2d"]})
+            hist_fail_dict.update({f"{bkg_cat}_bkg" : histos[f"{bkg_cat}_fail_2d"]})
 
         plot_projected_bkg(hist_pass_dict, binning_pt, "eta_singlebin", "pass", figpath=filepath)
         plot_projected_bkg(hist_fail_dict, binning_pt, "eta_singlebin", "fail", figpath=filepath)

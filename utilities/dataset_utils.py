@@ -43,16 +43,13 @@ def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_sca
 
     histo3d = file.Get(f"{flag}_mu_{type_suffix}")
 
-
-    if type(bin_pt) is int:
-        bin_pt = [bin_pt, bin_pt]
-    if type(bin_eta) is int:
-        bin_eta = [bin_eta, bin_eta]    
+    if type(bin_pt) is int:  bin_pt = [bin_pt, bin_pt]
+    if type(bin_eta) is int: bin_eta = [bin_eta, bin_eta]    
 
     th1_histo = histo3d.ProjectionX(f"Histo_{type_set}_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")  # Option "e" is specified to calculate the bin errors in the new histogram for generic selection of bin_pt and bin_eta. Without it, it all works well ONLY IF the projection is done on one single bin of (pt, eta)
     
-    print("Th1 entries before scaling: ", th1_histo.Integral())
-    print("Under/overflow: ", th1_histo.GetBinContent(0), th1_histo.GetBinContent(th1_histo.GetNbinsX()+1))
+    # print("Th1 entries before scaling: ", th1_histo.Integral())
+    # print("Under/overflow: ", th1_histo.GetBinContent(0), th1_histo.GetBinContent(th1_histo.GetNbinsX()+1))
 
     if global_scale > 0:
         th1_histo.Scale(global_scale)
@@ -63,9 +60,8 @@ def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_sca
         print(f"{bin_pt}, {bin_eta}")
         # sys.exit()
     
-    print(type_set, global_scale)
+    # print(type_set, global_scale)
 
-    print(f"TH1 binning: {th1_histo.GetNbinsX()}")
     numBins = axis.getBinning().numBins()
     th1_histo.Rebin(int(th1_histo.GetNbinsX()/numBins))
 
@@ -74,13 +70,18 @@ def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_sca
     roohisto = ROOT.RooDataHist(f"Minv_{type_set}_{flag}_{bin_key}", f"Minv_{type_set}_{flag}_{bin_key}",
                                 ROOT.RooArgList(axis), th1_histo)
     
-    for i in range(60):
-        if roohisto.weight(i) != th1_histo.GetBinContent(i+1):
-            print("ERROR")
-            print(f"{bin_pt}, {bin_eta}")
-            sys.exit()
 
-    print(f"RooDataHist integral = {roohisto.sumEntries()}\n")
+    print(bin_pt, bin_eta)
+
+    print(axis.getBinning().numBins())
+    if axis.getBinning().numBins() == th1_histo.GetNbinsX():
+        print(f"TH1 binning: {th1_histo.GetNbinsX()}")
+        for i in range(th1_histo.GetNbinsX()):
+            if roohisto.weight(i) != th1_histo.GetBinContent(i+1):
+                print("ERROR")
+                print(f"{bin_pt}, {bin_eta}")
+                sys.exit()
+        print(f"RooDataHist integral = {roohisto.sumEntries()}\n")
 
     return roohisto
 

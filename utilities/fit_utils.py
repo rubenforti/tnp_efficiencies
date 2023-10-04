@@ -37,7 +37,7 @@ def pearson_chi2_eval(histo, pdf, axis):
 
     binning = axis.getBinning()
     NBINS = binning.numBins()   
-    EVTS = histo.sumEntries()
+    # EVTS = histo.sumEntries()
     BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
 
     PRECISION = 1
@@ -48,6 +48,7 @@ def pearson_chi2_eval(histo, pdf, axis):
             n_fitted_events += server.getVal()
 
     chi2_val =0
+    used_bins = 0
 
     for i in range(NBINS):
     
@@ -60,6 +61,7 @@ def pearson_chi2_eval(histo, pdf, axis):
 
         if mu > 0:
             chi2_val += (weight - mu)**2/mu
+            used_bins += 1
 
 
     '''
@@ -69,7 +71,7 @@ def pearson_chi2_eval(histo, pdf, axis):
                                 ROOT.RooFit.DataError(ROOT.RooAbsData.Expected))
     chi2_val = chi2_obj.getVal() 
     '''
-    return chi2_val
+    return chi2_val, used_bins
 
 ###############################################################################
 
@@ -90,6 +92,7 @@ def llr_eval(histo, pdf, axis):
         if "nsig" in server.GetName() or "nbkg" in server.GetName():
             n_fitted_events += server.getVal()
 
+    used_bins = 0
     for i in range(NBINS):
     
         axis.setVal(binning.binCenter(i))
@@ -104,10 +107,11 @@ def llr_eval(histo, pdf, axis):
 
         if weight > 0:
             max_ll += 2*weight*ROOT.TMath.Log(weight) - 2*weight
+            used_bins += 1
 
     
-    sum_ll += 2*EVTS*ROOT.TMath.Log(n_fitted_events) - 2*n_fitted_events
-    max_ll += 2*EVTS*ROOT.TMath.Log(EVTS) - 2*EVTS
+    # sum_ll += 2*EVTS*ROOT.TMath.Log(n_fitted_events) - 2*n_fitted_events
+    # max_ll += 2*EVTS*ROOT.TMath.Log(EVTS) - 2*EVTS
 
     llr = max_ll - sum_ll
 
@@ -116,7 +120,7 @@ def llr_eval(histo, pdf, axis):
     print("SumLL, MaxLL", sum_ll, max_ll)
     print("***")
 
-    return llr
+    return llr, used_bins
 
 
 ###############################################################################
@@ -127,17 +131,22 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
 
     if ("pass" in res.GetName()) or ("fail" in res.GetName()):
         flag = "pass" if "pass" in res.GetName() else "fail"
-        chi2val = llr_eval(histo[flag], pdf[flag], axis[flag]) \
+        chi2val, used_bins = llr_eval(histo[flag], pdf[flag], axis[flag]) \
             if type_chi2=="llr" else pearson_chi2_eval(histo[flag], pdf[flag], axis[flag])
-        ndof = histo[flag].numEntries() - res.floatParsFinal().getSize()
+        ndof = used_bins - res.floatParsFinal().getSize()
         res.SetTitle(str(chi2val))
     
     elif "sim" in res.GetName():
         chi2val = 0
+        used_bins = 0
         for flag in ["pass", "fail"]:
-            if type_chi2=="llr": chi2val = chi2val + llr_eval(histo[flag], pdf[flag], axis[flag]) 
-            else: chi2val = chi2val + pearson_chi2_eval(histo[flag], pdf[flag])
-        ndof = histo["pass"].numEntries() + histo["fail"].numEntries() - res.floatParsFinal().getSize()
+            if type_chi2=="llr": 
+                chi2val += llr_eval(histo[flag], pdf[flag], axis[flag])[0]
+                used_bins += llr_eval(histo[flag], pdf[flag], axis[flag])[1]
+            else: 
+                chi2val += pearson_chi2_eval(histo[flag], pdf[flag], axis[flag])[0]
+                used_bins += pearson_chi2_eval(histo[flag], pdf[flag], axis[flag])[1]
+        ndof = used_bins - res.floatParsFinal().getSize()
         res.SetTitle(str(chi2val))
 
     else:
@@ -164,24 +173,23 @@ def fit_quality(fit_obj, type_checks="benchmark"):
         check_covm = (fit_obj["res"].covQual() == 3)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
                                  fit_obj["res"], type_chi2="pearson", nsigma=15)
-    elif type_checks == "new_checks":
+    elif type_checks == "new":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 1e-3)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
                                  fit_obj["res"], type_chi2="llr", nsigma=5)
     elif type_checks == "pseudodata":
-        check_migrad = (fit_obj["res"].status() == 0 or fit_obj["res"].status() == 1)
+        check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
+        check_edm = (fit_obj["res"].edm() < 1e-3)
     '''
     # Not used, could be useful if Sumw2Error turns out to be needed
     elif type_checks == "pseudodata_sumw2":
         check_migrad = fit_obj["res"].status()==0
         check_covm = (fit_obj["res"].covQual()==2 or fit_obj["res"].covQual()==3)
         return bool(check_migrad*check_covm)
-    '''
-
-    
+    '''    
     return bool(check_migrad*check_covm*check_edm*check_chi2)
 
 
@@ -191,27 +199,38 @@ def fit_quality(fit_obj, type_checks="benchmark"):
 def llr_test_bkg(histo, pdf, alpha=0.05):
     """
     """
-    pars_set = pdf.getParameters(histo)
 
-    profiled_var = ROOT.RooRealVar()
+    norm = ROOT.RooRealVar()
+    tau = ROOT.RooRealVar()
 
-    for par in pars_set:
-        if 'nbkg' in par.GetName(): profiled_var = par
+    for par in pdf.getParameters(histo):
+        print(par)
+        if 'nbkg' in par.GetName(): norm = par
+        if 'tau' in par.GetName(): tau = par
 
-    null_profiled_var = ROOT.RooRealVar("nbkg", "nbkg", 0)
-    null_profiled_var.setConstant(True)
 
+    poi_set = ROOT.RooArgSet("POI_set")
+    poi_set.add(norm)
+    poi_set.add(tau)
 
-    llr_obj = ROOT.RooStats.ProfileLikelihoodCalculator(histo, pdf, 
-                                                        ROOT.RooArgSet(profiled_var), alpha,
-                                                        ROOT.RooArgSet(null_profiled_var))
+    null_par_set = ROOT.RooArgSet("null_params")
 
+    null_par_set.addClone(norm)
+    null_par_set.addClone(tau)
+    null_par_set.setRealValue(norm.GetName(), 0)
+    null_par_set.setRealValue(tau.GetName(), 2)
+
+    llr_obj = ROOT.RooStats.ProfileLikelihoodCalculator(histo, pdf, ROOT.RooArgSet(norm, tau), 1-alpha, null_par_set)
+    #llr_obj.SetConfidenceLevel(1-alpha)
+
+    # Null hypotesis is that the background is 0.
     test_res = llr_obj.GetHypoTest()
-
+    test_res.Print()
     pval = test_res.NullPValue()
 
     print(f"p-value for null hypo is: {pval}")
 
+    # If the p-value is smaller than alpha, we reject the null hypothesis
     null = True if pval > alpha else False
 
     return null

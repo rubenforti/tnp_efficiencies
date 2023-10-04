@@ -149,14 +149,25 @@ figs/fit_*/
 figs/bkg_*/
 figs/check_fits/
 figs/prova_parallel/
-results/benchmark_iso/fit_plots_old/
-results/*/fit_plots/
 
-bkg_studies/*/plot_*/
-bkg_studies/*/minv_*/
+results_master_thesis/*/fit_plots/
+results_master_thesis/bkg_studies/plot_*/
+results_master_thesis/bkg_studies/minv_*/
+results_master_thesis/*/ws_*.root
 
 
-results/*/ws_*.root
+stuff/old_results_involving_bkg/
+stuff/other_results
+stuff/figs/
+stuff/logbook.txt
+
+
+prova_*.py
+
+
+
+
+
 
 
 

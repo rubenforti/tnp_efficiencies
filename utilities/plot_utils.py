@@ -9,13 +9,13 @@ from array import array
 from utilities.base_library import lumi_factors, binning, sumw2_error
 from utilities.CMS_lumi import CMS_lumi
 
-bkg_categories= ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau", "SameCharge"]
+bkg_categories= ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau", "SameCharge"]
 
 colors = { 
     "WW_bkg" : ROOT.kOrange+1,
     "WZ_bkg" : ROOT.kYellow+3,
     "ZZ_bkg" : ROOT.kGreen+1,
-    "TTSemileptonic_bkg" : ROOT.kCyan+1,
+    "TTFullyleptonic_bkg" : ROOT.kCyan+1,
     "Ztautau_bkg" : ROOT.kMagenta+1,
     "SameCharge_bkg" : ROOT.kOrange+10,
     "total_bkg" : ROOT.kRed,
@@ -185,8 +185,11 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
         stats_pass.AddText(f"Cov quality = {pass_obj['res'].covQual()}")
         stats_pass.AddText(f"Edm = {pass_obj['res'].edm():.5f}")
         ndof = pass_obj["data"].numEntries() - pass_obj["res"].floatParsFinal().getSize()
-        chi2 = float(pass_obj["res"].GetTitle())
-        stats_pass.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
+        try:
+            chi2 = float(pass_obj["res"].GetTitle())
+            stats_pass.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
+        except:
+            print("Chi2/ndof not available")
         stats_pass.Draw()
         c.Update()
 
@@ -198,8 +201,11 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
         stats_fail.AddText(f"Cov quality = {fail_obj['res'].covQual()}")
         stats_fail.AddText(f"Edm = {fail_obj['res'].edm():.5f}")
         ndof = fail_obj["data"].numEntries() - fail_obj["res"].floatParsFinal().getSize()
-        chi2 = float(fail_obj["res"].GetTitle())
-        stats_fail.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
+        try:
+            chi2 = float(fail_obj["res"].GetTitle())
+            stats_fail.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
+        except:
+            print("Chi2/ndof not available")
         stats_fail.Draw()
         c.Update()
 
@@ -221,8 +227,11 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
         stats_gen.AddText(f"Edm = {pass_obj['res'].edm():.5f}")
         ndof = pass_obj["data"].numEntries() + fail_obj["data"].numEntries() - \
             pass_obj["res"].floatParsFinal().getSize()
-        chi2 = float(pass_obj["res"].GetTitle())
-        stats_gen.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
+        try:
+            chi2 = float(pass_obj["res"].GetTitle())
+            stats_gen.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
+        except:
+            print("Chi2/ndof not available")
         stats_pass.Draw(), stats_fail.Draw(), stats_gen.Draw()
         c.Update()
 
@@ -306,7 +315,8 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
         datahist = plot_objects.pop("data")
         datahist.plotOn(frame, 
                         ROOT.RooFit.Binning("plot_binning"),
-                        ROOT.RooFit.Name("Data"))
+                        ROOT.RooFit.Name("Data"),
+                        ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson))
         for bin_idx in range(datahist.numEntries()):
             if datahist.weight(bin_idx) > ctrl_plot_max:
                 ctrl_plot_max = datahist.weight(bin_idx)
@@ -356,6 +366,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     total_bkg["roohisto"].plotOn(frame,
                                  ROOT.RooFit.Name("Total bkg"),
                                  ROOT.RooFit.Binning("plot_binning_total_bkg"),
+                                 ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2),
                                  # ROOT.RooFit.Invisible(),
                                  ROOT.RooFit.LineColor(colors["total_bkg"]),
                                  ROOT.RooFit.MarkerColor(colors["total_bkg"])
@@ -421,7 +432,13 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     c.Update()
 
     
-    for bkg_key in plot_objects:
+    for bkg_key in plot_objects.keys():
+        
+        if bkg_key != "TTFullyleptonic_bkg":
+            bkg_key_print = copy(bkg_key).replace("_bkg", "") 
+        else:
+            bkg_key_print = "TTLeptonic"
+    
         
         bkg_obj = plot_objects[bkg_key]
         
@@ -446,17 +463,16 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
 
         pad_plot.cd()
         bkg_obj["histo_pdf"].plotOn(frame, 
-                         ROOT.RooFit.Name(bkg_key),
+                         ROOT.RooFit.Name(bkg_key_print),
                          ROOT.RooFit.LineColor(colors[bkg_key]),
                          ROOT.RooFit.LineStyle(1),
                          ROOT.RooFit.Normalization(bkg_obj["integral"], ROOT.RooAbsReal.NumEvent))
 
         pad_info.cd()
         bkg_error = sumw2_error(bkg_obj["roohisto"])
-        bkg_key_plot = copy(bkg_key).replace("_bkg", "")
         textbox.AddText(
-            f"  {bkg_key_plot} = {bkg_obj['integral']:.2f} #pm {bkg_error:.2f}")
-        legend.AddEntry(bkg_key_plot, bkg_key_plot, "l")
+            f"  {bkg_key_print} = {bkg_obj['integral']:.2f} #pm {bkg_error:.2f}")
+        legend.AddEntry(bkg_key_print, bkg_key_print, "l")
         legend_obj = legend.GetListOfPrimitives().Last()
         legend_obj.SetLineColor(colors[bkg_key])
         legend_obj.SetLineWidth(3)
@@ -467,8 +483,8 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     pad_plot.cd()
     pad_plot.SetLogy() if logscale is True else pad_plot.SetLogy(False)
     
-    frame.SetMaximum(1.5*ctrl_plot_max)      
-    frame.SetMinimum(5e-2)
+    frame.SetMaximum(2.5*ctrl_plot_max)      
+    frame.SetMinimum(1e-1)
     frame.Draw()
     pad_plot.Update()
  
@@ -496,7 +512,97 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
 
 ###############################################################################
 
-def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=True, figpath=''):
+def plot_2d_bkg_distrib(histos_dict, bkg_cat, figpath=""):
+    """
+    """
+    c = ROOT.TCanvas(f"c_{bkg_cat}", "c", 1600, 900)
+    c.cd()
+
+    if bkg_cat != "TTFullyleptonic_bkg":
+        bkg_key_print = copy(bkg_cat).replace("_bkg", "") 
+    else:
+        bkg_key_print = "TTLeptonic"
+
+    hist_pass, hist_fail = histos_dict["pass"], histos_dict["fail"]
+
+    style_settings()
+
+    pad_title = ROOT.TPad("pad_title", "pad_title", 0, 0.94, 1, 1)
+    pad_subtitle_pass = ROOT.TPad("pad_subtitle_pass", "pad_subtitle_pass", 0, 0.9, 0.5, 0.94)
+    pad_subtitle_fail = ROOT.TPad("pad_subtitle_fail", "pad_subtitle_fail", 0.5, 0.9, 1, 0.94)
+    pad_pass = ROOT.TPad("pad_pass", "pad_plot", 0, 0, 0.5, 0.9)
+    pad_fail = ROOT.TPad("pad_fail", "pad_plot", 0.5, 0, 1, 0.9)
+
+    pad_title.SetMargin(0.1, 0.1, 0.1, 0.1), pad_title.Draw()
+    pad_subtitle_pass.SetMargin(0.1, 0.1, 0.1, 0.1), pad_subtitle_pass.Draw()
+    pad_subtitle_fail.SetMargin(0.1, 0.1, 0.1, 0.1), pad_subtitle_fail.Draw()
+    pad_pass.SetMargin(0.1, 0.135, 0.12, 0.05), pad_pass.Draw()
+    pad_fail.SetMargin(0.1, 0.135, 0.12, 0.05), pad_fail.Draw()
+
+
+    pad_title.cd()
+    titlebox = ROOT.TPaveText(0, 0, 1, 1, "NDC NB")
+    titlebox.SetFillColor(0)
+    # titlebox.SetTextFont(42)
+    titlebox.SetTextSize(0.6)
+    titlebox.AddText(f"{bkg_key_print}  2D distribution")
+    titlebox.Draw()
+    c.Update()
+
+    pad_subtitle_pass.cd()
+    title_pass = ROOT.TPaveText(0, 0, 1, 1, "NDC NB")
+    title_pass.SetFillColor(0)
+    title_pass.SetTextSize(0.6)
+    title_pass.AddText(f"Passing probes")
+    title_pass.Draw()
+    c.Update()
+
+    pad_subtitle_fail.cd()
+    title_fail = ROOT.TPaveText(0, 0, 1, 1, "NDC NB")
+    title_fail.SetFillColor(0)
+    title_fail.SetTextSize(0.6)
+    title_fail.AddText(f"Failing probes")
+    title_fail.Draw()
+    c.Update()
+
+    pad_pass.cd()
+    hist_pass.Draw("colz")
+    hist_pass.SetTitle("")
+    hist_pass.SetTitleSize(0)
+    Yaxis_pass = hist_pass.GetYaxis()
+    Yaxis_pass.SetTitle("#eta^{#mu}")
+    Yaxis_pass.SetTitleSize(0.035)
+    Yaxis_pass.SetTitleOffset(1.2)
+    Xaxis_pass = hist_pass.GetXaxis()
+    Xaxis_pass.SetTitle("p_{T}^{#mu} [GeV]")
+    Xaxis_pass.SetTitleSize(0.035)
+    Xaxis_pass.SetTitleOffset(1.2)
+    CMS_lumi(pad_pass, 5, 0, simulation=True)
+    pad_pass.Update()
+
+
+    pad_fail.cd()
+    hist_fail.Draw("colz")
+    hist_fail.SetTitle("")
+    hist_fail.SetTitleSize(0)
+    Yaxis_fail = hist_fail.GetYaxis()
+    Yaxis_fail.SetTitle("#eta^{#mu}")
+    Yaxis_fail.SetTitleSize(0.035)
+    Yaxis_fail.SetTitleOffset(1.2)
+    Xaxis_fail = hist_fail.GetXaxis()
+    Xaxis_fail.SetTitle("p_{T}^{#mu} [GeV]")
+    Xaxis_fail.SetTitleSize(0.035)
+    Xaxis_fail.SetTitleOffset(1.2)
+    CMS_lumi(pad_fail, 5, 0, simulation=True)
+    pad_fail.Update()
+
+    c.SaveAs(f"{figpath}/{bkg_cat}_distrib_2d.pdf")
+
+###############################################################################
+
+
+def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=True, 
+                       figpath=''):
     """
     """
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
@@ -512,7 +618,7 @@ def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=
         proj_axis = "eta"
         proj_binning = bins_eta
 
-    c = ROOT.TCanvas(f"bkg_{proj_axis}_{flag}", "c", 900, 900)
+    c = ROOT.TCanvas(f"bkg_{proj_axis}_{flag}", "c", 1200, 1200)
     c.cd()
 
     style_settings()
@@ -564,6 +670,11 @@ def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=
 
     for bkg_key in plot_objects.keys():
 
+        if bkg_key != "TTFullyleptonic_bkg":
+            bkg_key_print = copy(bkg_key).replace("_bkg", "") 
+        else:
+            bkg_key_print = "TTLeptonic"
+
         bkg_hist = plot_objects[bkg_key]
 
         if proj_axis == "pt":
@@ -578,7 +689,7 @@ def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=
         roohistpdf = ROOT.RooHistPdf(f"{bkg_key}_pdf", "", ROOT.RooArgSet(axis), roohisto_bkg)
 
         roohistpdf.plotOn(frame,
-                          ROOT.RooFit.Name(bkg_key),
+                          ROOT.RooFit.Name(bkg_key_print),
                           ROOT.RooFit.LineColor(colors[bkg_key]),
                           ROOT.RooFit.LineStyle(1),
                           ROOT.RooFit.Normalization(roohisto_bkg.sumEntries(), ROOT.RooAbsReal.NumEvent))
