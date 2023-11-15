@@ -7,17 +7,27 @@ import ROOT
 from utilities.base_library import binning, bin_dictionary, lumi_factors, get_idx_from_bounds, bin_global_idx_dict
 
 
+bkg_datasets_sel = {
+    "WW" : 1,
+    "WZ" : 1,
+    "ZZ" : 1,
+    "TTFullyleptonic" : 1,
+    "TTSemileptonic" : 0,
+    "Ztautau" : 1,
+    "SameCharge" : 1,
+    "WJets" : 0
+}
+
+
 def import_pdf_library(*functions):
     """
     """
     current_path = os.path.dirname(__file__)
+    import_path = os.path.join(current_path, '..', 'libCpp')
     
     for function in functions:
-        header_incl = ' #include "libCpp/'+function+'.h"'
-        sourcefile = os.path.join(current_path, 'libCpp', f'{function}.cc')
-        # print(sourcefile)
-        ctrl_head = ROOT.gInterpreter.Declare(header_incl)
-        ctrl_source = ROOT.gSystem.CompileMacro(sourcefile, opt="ks")
+        ctrl_head = ROOT.gInterpreter.Declare(f' #include "{import_path}/{function}.h"')
+        ctrl_source = ROOT.gSystem.CompileMacro(f"{import_path}/{function}.cc", opt="ks")
 
         if ctrl_head is not True:
             print("ERROR in header loading")
@@ -26,13 +36,30 @@ def import_pdf_library(*functions):
             print("ERROR in sourcefile compiling and loading")
             sys.exit()
 
+
+###############################################################################
+
+def import_totbkg_hist(ws, bin_key, bkg_categories):
+    """
+    """
+    for flag in ["pass", "fail"]:
+        axis = ws.var(f"x_{flag}_{bin_key}")
+        bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo", 
+                                       ROOT.RooArgSet(axis), "plot_binning")
+
+        for bkg_cat in bkg_categories:
+            bkg_dataset = ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
+            if bkg_datasets_sel[bkg_cat] == 1: bkg_total_histo.add(bkg_dataset)
+
+        ws.Import(bkg_total_histo)
+
+
 ###############################################################################
 
 def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_scale=-1.):
     """
     Returns a RooDataHists of the variable TP_invmass, in a single (pt, eta) bin
     """
-
     if type_set=="data" or type_set=="data_SC":
         type_suffix = "RunGtoH"
     elif type_set=="mc" or type_set=="mc_w" or type_set=="bkg":
@@ -172,9 +199,9 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
             if dataset_type == "mc":
                 print(sig_lumi_scale)
                 histo_pass = get_roohist(file, dataset_type, "pass", axis[1], 
-                                        bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
+                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
                 histo_fail = get_roohist(file, dataset_type, "fail", axis[0], 
-                                        bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
+                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
                 ws.Import(histo_pass)
                 ws.Import(histo_fail)
                 global_counter += 2

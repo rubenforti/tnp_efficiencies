@@ -17,7 +17,7 @@ colors = {
     "ZZ_bkg" : ROOT.kGreen+1,
     "TTFullyleptonic_bkg" : ROOT.kCyan+1,
     "Ztautau_bkg" : ROOT.kMagenta+1,
-    "SameCharge_bkg" : ROOT.kOrange+10,
+    "SameCharge_bkg" : ROOT.kOrange+8,
     "total_bkg" : ROOT.kRed,
     "pdf_bkg_fit" : ROOT.kRed,
     "signal" : ROOT.kBlue
@@ -66,15 +66,15 @@ def plot_minv_distrib_with_fit(pad, axis, data, pdf_fit):
 
     pdf_fit.plotOn(plot_frame,
                    ROOT.RooFit.Name("Fit"),
-                   ROOT.RooFit.NormRange("fitRange"),
-                   ROOT.RooFit.Range("fitRange"),
+                   #ROOT.RooFit.NormRange("x_binning"),
+                   #ROOT.RooFit.Range("x_binning"),
                    ROOT.RooFit.LineColor(ROOT.kRed))
     
     for comp in pdf_fit.getComponents():
         if "bkg" in comp.GetName():
             bkg_set = ROOT.RooArgSet(comp)
             pdf_fit.plotOn(plot_frame,
-                ROOT.RooFit.NormRange("fitRange"),
+                # ROOT.RooFit.NormRange("x_binning"),
                 ROOT.RooFit.Name("Bkg pdf"),
                 ROOT.RooFit.Components(bkg_set),
                 ROOT.RooFit.LineColor(ROOT.kBlue),
@@ -158,8 +158,8 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figp
     pass_obj = plot_objects["pass"]
     fail_obj = plot_objects["fail"]
 
-    binning_pass = pass_obj["axis"].getBinning()
-    binning_fail = fail_obj["axis"].getBinning()
+    binning_pass = pass_obj["axis"].getBinning("x_binning")
+    binning_fail = fail_obj["axis"].getBinning("x_binning")
     
     pass_obj["axis"].setBins(binning_pass.numBins(), "plot_binning")
     fail_obj["axis"].setBins(binning_fail.numBins(), "plot_binning")
@@ -342,8 +342,18 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
 
 
     total_bkg = plot_objects.pop("total_bkg")
+
+    binning_plot = axis.getBinning("plot_binning")
+    nbins_plot_max = binning_plot.numBins()
+
+    if nbins_plot_max == 80: 
+        list_nbins_plot = [80, 40, 20, 16, 10]
+    elif nbins_plot_max == 60:
+        list_nbins_plot = [60, 30, 20, 15, 10]
+    else:
+        list_nbins_plot = [nbins_plot_max]
     
-    for nbins_total_bkg in [60, 30, 20]:
+    for nbins_total_bkg in list_nbins_plot:
             
             ctrl_plot_binning = 0
             axis.setBins(nbins_total_bkg, f"plot_binning_total_bkg")
@@ -442,7 +452,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
         
         bkg_obj = plot_objects[bkg_key]
         
-        for nbins_bkg in [60, 30, 20, 15, 10]:
+        for nbins_bkg in list_nbins_plot:
             ctrl_plot_binning = 0
             axis.setBins(nbins_bkg, f"plot_binning_{bkg_key}")
             tmp_histo = ROOT.RooDataHist(bkg_obj["roohisto"].GetName(), bkg_obj["roohisto"].GetTitle(), 

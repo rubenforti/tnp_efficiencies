@@ -66,7 +66,6 @@ ClassImp(RooCMSShape)
  }
 
 
-
  Int_t RooCMSShape::getAnalyticalIntegral(RooArgSet& allVars, RooArgSet& analVars, const char* rangeName) const
  {
    if (matchArgs(allVars,analVars,x)) return 1 ;
@@ -106,3 +105,4 @@ ClassImp(RooCMSShape)
    assert(0) ;
    return 0 ;
  }
+

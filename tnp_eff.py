@@ -21,11 +21,11 @@ ROOT.Math.MinimizerOptions.SetDefaultMinimizer("Minuit2")
 # -----------------------------------------------------------------------------
 #  GENERAL SETTINGS
 # ------------------
-type_eff = "iso"
-type_analysis = "sim"
+type_eff = "trackingplus"
+type_analysis = "indep"
 name_analysis = ""
 
-main_folder = "results"
+main_folder = "root_files"
 
 
 local_datasets = False
@@ -33,9 +33,9 @@ load_McBkg = False
 
 generate_datasets = False
 default_fit_settings = False
-nRUN = 4
+nRUN = 3
 
-binning_pt, binning_eta, binning_mass = "pt", "eta", "mass_60_120"
+binning_pt, binning_eta, binning_mass = "pt_tracking", "eta", "mass_50_130"
 mergedbins_bkg = False
 binning_pt_bkg, binning_eta_bkg = "pt_12bins", "eta_16bins"
 bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau", "SameCharge"]
@@ -47,13 +47,12 @@ parallel_fits = False
 refit_nobkg = True
 useMinos = False
 
-folder = f"{main_folder}/{type_eff}_{type_analysis}_r628"
-workspace_name = f"{folder}/ws_{type_eff}_{type_analysis}.root"
-# folder = f"{main_folder}/benchmark_iso_r628"
-# workspace_name = f"results/benchmark_iso_r628/ws_iso_indep_bmark.root"
+#folder = f"{main_folder}/{type_eff}_{type_analysis}_r628"
+#workspace_name = f"{folder}/ws_{type_eff}_{type_analysis}.root"
+folder = f"trackingplus_res"
+workspace_name = f"trackingplus_res/ws_trackingplus.root"
 
 import_pdfs = True
-
 savefigs = True
 
 
@@ -91,7 +90,7 @@ if generate_datasets:
         filename_mc = f"root_files/datasets/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
         dirname_bkg = "root_files/datasets/bkg"
     else:
-        filename_data = f"/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
+        filename_data = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
         filename_mc = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
         dirname_bkg = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS"
 
@@ -141,7 +140,9 @@ if default_fit_settings:
     if ("idip" in type_eff) or ("trigger" in type_eff) or ("iso" in type_eff):
         fit_settings = fit_settings_json["idip_trig_iso"]
     else:
-        fit_settings = fit_settings_json[type_eff]
+        for pm_flag in ["plus", "minus"]:
+            if pm_flag in type_eff: fit_settings = fit_settings_json[type_eff.replace(pm_flag, "")]
+
 else:
     fit_settings = fit_settings_json["run_1"]
     [fit_settings.update(fit_settings_json[f"run_{run_idx}"]) for run_idx in range(2, nRUN+1)]
@@ -174,4 +175,4 @@ else:
 
 t1 = time.time()
 
-print(f"TEMPO = {t1-t0}")
+print(f"TEMPO = {(t1-t0)/60} min")

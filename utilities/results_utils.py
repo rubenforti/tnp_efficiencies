@@ -31,7 +31,7 @@ class results_manager:
     """
     """
 
-    def __init__(self, type_analysis, binning_pt, binning_eta, import_ws="", import_txt=""):
+    def __init__(self, type_analysis, binning_pt, binning_eta, import_ws="", import_txt="", altSig_check=False):
         """
         """
         self._dict_results = {}
@@ -61,7 +61,10 @@ class results_manager:
             print(import_txt[3])
             bin_dict = bin_dictionary(binning_pt, binning_eta)
             for bin_key in bin_dict.keys():
-                self.add_result_from_txt(import_txt, idx_list, bin_key)
+                if altSig_check is False:
+                    self.add_result_from_txt(import_txt, idx_list, bin_key)
+                else:
+                    self.add_result_from_txt_altSig(import_txt, idx_list, bin_key)
                 idx_list += 1
 
 
@@ -116,6 +119,11 @@ class results_manager:
     def add_result_from_txt(self, row_list, idx_list, bin_key):
         elements = row_list[idx_list].split('\t')
         eff, deff = float(elements[4]), float(elements[5])
+        self._dict_results.update({bin_key : {"efficiency" : (eff, deff)}})
+    
+    def add_result_from_txt_altSig(self, row_list, idx_list, bin_key):
+        elements = row_list[idx_list].split('\t')
+        eff, deff = float(elements[8]), float(elements[9])
         self._dict_results.update({bin_key : {"efficiency" : (eff, deff)}})
 
     def Open(self, filename):

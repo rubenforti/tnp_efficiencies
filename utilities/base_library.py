@@ -15,6 +15,7 @@ binnings = {
     "pt_12bins" : array('d', [24., 28., 30., 32., 34., 36., 38., 40., 44., 50., 55., 60., 65.]),
     "pt_9bins" : array('d', [24., 28., 32., 36., 40., 44., 50., 55., 60., 65.]),
     "pt_6bins" : array('d', [24., 30., 36., 42., 50., 55., 65.]),
+    "pt_tracking" : array('d', [24., 35., 45., 55., 65.]),
     "pt_singlebin" : array('d', [24., 65.]),
     "eta_24bins" : array('d', [round(-2.4 + i*0.2, 2) for i in range(25)]),
     "eta_16bins" : array('d', [round(-2.4 + i*0.3, 2) for i in range(17)]),
@@ -29,8 +30,11 @@ binnings = {
 lumi_data = 16.8  # fb^-1
 
 
-sig_mc_repo = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS"
-bkg_repo = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS"
+CHECK_SAMECHARGE = True
+sc_id = ["OS", 1] if CHECK_SAMECHARGE is True else ["SS", 0]
+
+sig_mc_repo = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/{sc_id[0]}"
+bkg_repo = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/{sc_id[0]}"
 
 # sig_mc_repo = "root_files/datasets"
 # bkg_repo = "root_files/datasets/bkg"
@@ -113,6 +117,9 @@ def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
             if binning_pt_name == "pt" and binning_eta_name == "eta":
                 index_dictionary.update({bin_key : [global_idx, idx_pt, idx_eta]})
                 global_idx +=1
+            elif "tracking" in binning_pt_name:
+                index_dictionary.update({bin_key : [global_idx, idx_pt, idx_eta]})
+                global_idx +=1
             else:
                 global_idx, bounds_idx_pt, bounds_idx_eta = get_idx_from_bounds(
                     [binning_pt[idx_pt-1], binning_pt[idx_pt]], [binning_eta[idx_eta-1], binning_eta[idx_eta]])
@@ -154,7 +161,7 @@ def lumi_factors(type_eff, bkg_categories):
     """
     lumi_scales = {}
 
-    file_sig = ROOT.TFile(f"{sig_mc_repo}/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root")
+    file_sig = ROOT.TFile(f"{sig_mc_repo}/tnp_{type_eff}_mc_vertexWeights1_oscharge{sc_id[1]}.root")
     wsum_histo_sig = file_sig.Get("weightSum")
     num_init_sig = wsum_histo_sig.Integral()
     xsection_sig = xsec_ZmmPostVFP*1000  # has to be put in fb
@@ -170,7 +177,7 @@ def lumi_factors(type_eff, bkg_categories):
         bkg_cat.remove("SameCharge")
 
     for cat in bkg_cat:
-        file = ROOT.TFile(f"{bkg_repo}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root")
+        file = ROOT.TFile(f"{bkg_repo}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge{sc_id[1]}.root")
         
         wsum_histo = file.Get("weightSum")
         num_init = wsum_histo.Integral()
@@ -179,8 +186,7 @@ def lumi_factors(type_eff, bkg_categories):
         lumi_bkg = num_init/xsection
 
         scale = lumi_data/lumi_bkg
-
-        print(cat, lumi_bkg)
+        print(cat, lumi_bkg, scale)
     
         lumi_scales.update({cat : scale})
     

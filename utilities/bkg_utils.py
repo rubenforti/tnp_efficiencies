@@ -5,6 +5,7 @@ import sys
 from utilities.base_library import lumi_factors, binning, bin_dictionary, sumw2_error
 from utilities.base_library import eval_efficiency as eval_bkgfrac  #La formula è la stessa
 from utilities.results_utils import init_pass_fail_histos
+from utilities.dataset_utils import import_totbkg_hist
 from utilities.plot_utils import plot_bkg, plot_2d_bkg_distrib, plot_projected_bkg
 from array import array
 
@@ -102,7 +103,9 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
 
     axis = ws.var(f"x_{flag}_{bin_key}")
     print(type(axis))
-    axis.setBins(60, "plot_binning")
+
+    binning = axis.getBinning("x_binning")
+    axis.setBins(binning.numBins(), "plot_binning")
 
     datasets = {}
     datasets.update({"axis" : axis})
@@ -234,7 +237,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
         for flag in ["pass", "fail"]:
             
-            print(flag, bin_key)
+            # print(flag, bin_key)
 
             if plot_on_data:
 
@@ -351,7 +354,12 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
     
     histos = {}
 
+    norm_general_flag = norm_data or norm_sig or norm_tot_bkg
+
+
     for bkg_cat in bkg_categories:
+        print(bkg_cat)
+        # if bkg_cat!="SameCharge": continue
 
         histos.update(init_pass_fail_histos(bkg_cat, bkg_cat, bins_pt, bins_pt, bins_eta))
 
@@ -360,7 +368,11 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
 
         cnt_mergedpt = 0
 
+        isTotBkgImported = False
+
         for bin_key in bin_dict:
+
+            # if bin_key != "[24.0to26.0][-2.4to-2.3]": sys.exit()
 
             _, bin_pt, bin_eta = bin_dict[bin_key]
 
@@ -371,50 +383,44 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
                 bin_pt_list = bin_pt
                 bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
                 cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
-                    
-            h_pass = ws.data(f"Minv_bkg_pass_{bin_key}_{bkg_cat}")
-            h_fail = ws.data(f"Minv_bkg_fail_{bin_key}_{bkg_cat}")
-            npass = h_pass.sumEntries()
-            d_npass = sumw2_error(h_pass)
-            nfail = h_fail.sumEntries()
-            d_nfail = sumw2_error(h_fail)
 
+            num_events = {}
 
-            if norm_data:
-                h_data_pass = ws.data(f"Minv_data_pass_{bin_key}")
-                h_data_fail = ws.data(f"Minv_data_fail_{bin_key}")
-                # print(n_pass, h_data_pass.sumEntries())
-                npass, nfail = npass/h_data_pass.sumEntries(), nfail/h_data_fail.sumEntries()   
-                d_npass = npass*((d_npass/npass)**2 + (1/h_data_pass.sumEntries())**2)**0.5
-                d_nfail = nfail*((d_nfail/nfail)**2 + (1/h_data_fail.sumEntries())**2)**0.5
-
-            if norm_sig:
-                h_mc_pass = ws.data(f"Minv_mc_pass_{bin_key}")
-                h_mc_fail = ws.data(f"Minv_mc_fail_{bin_key}")
-                # print(n_pass, h_data_pass.sumEntries())
-                d_npass = npass*((d_npass/npass)**2 + 
-                                 (sumw2_error(h_mc_pass)/h_mc_pass.sumEntries())**2)**0.5
-                d_nfail = nfail*((d_nfail/nfail)**2 + 
-                                 (sumw2_error(h_mc_fail)/h_mc_fail.sumEntries())**2)**0.5
-
-            if norm_tot_bkg:
-                h_totbkg_pass = ws.data(f"Minv_bkg_pass_{bin_key}_total")
-                h_totbkg_fail = ws.data(f"Minv_bkg_fail_{bin_key}_total")
-                # print(n_pass, h_data_pass.sumEntries())
-                npass, nfail = npass/h_data_pass.sumEntries(), nfail/h_data_fail.sumEntries()
-                d_npass = npass*((d_npass/npass)**2 + 
-                                 (sumw2_error(h_totbkg_pass)/h_totbkg_pass.sumEntries())**2)**0.5
-                d_nfail = nfail*((d_nfail/nfail)**2 + 
-                                 (sumw2_error(h_totbkg_fail)/h_totbkg_fail.sumEntries())**2)**0.5
+            for flag in ["pass", "fail"]:
+                num_events.update({
+                    flag : ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}").sumEntries(),
+                    f"error {flag}" : sumw2_error(ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}"))
+                    })
+                
+                if norm_data: h_norm = ws.data(f"Minv_data_{flag}_{bin_key}")
+                elif norm_sig: h_norm = ws.data(f"Minv_mc_{flag}_{bin_key}")
+                elif norm_tot_bkg:
+                    if isTotBkgImported is False: 
+                        import_totbkg_hist(ws, bin_key, bkg_categories)
+                        isTotBkgImported = True
+                    h_norm = ws.data(f"Minv_bkg_{flag}_{bin_key}_total")
+                
+                if h_norm.sumEntries() > 0 and num_events[flag] > 0:
+                    if h_norm.sumEntries() < num_events[flag]:
+                        print(num_events[flag], h_norm.sumEntries())
+                    num_events[flag] = num_events[flag]/h_norm.sumEntries()
+                    num_events[f"error {flag}"] = num_events[flag]*(
+                        (num_events[f"error {flag}"]/num_events[flag])**2 + (sumw2_error(h_norm)/h_norm.sumEntries())**2)**0.5
+                else:
+                    num_events[flag], num_events[f"error {flag}"] = 0, 0
             
-            histos[f"{bkg_cat}_pass_2d"].SetBinContent(bin_pt, bin_eta, npass)
-            histos[f"{bkg_cat}_pass_2d"].SetBinError(bin_pt, bin_eta, d_npass)
-            histos[f"{bkg_cat}_fail_2d"].SetBinContent(bin_pt, bin_eta, nfail)
-            histos[f"{bkg_cat}_fail_2d"].SetBinError(bin_pt, bin_eta, d_nfail)
-        
+            histos[f"{bkg_cat}_pass_2d"].SetBinContent(bin_pt, bin_eta, num_events["pass"])
+            histos[f"{bkg_cat}_pass_2d"].SetBinError(bin_pt, bin_eta, num_events["error pass"])
+            histos[f"{bkg_cat}_fail_2d"].SetBinContent(bin_pt, bin_eta, num_events["fail"])
+            histos[f"{bkg_cat}_fail_2d"].SetBinError(bin_pt, bin_eta, num_events["error fail"])
+
+            isTotBkgImported = False
+
         hist_dict_bkgcat = {"pass" : histos[f"{bkg_cat}_pass_2d"], "fail" : histos[f"{bkg_cat}_fail_2d"]}
         plot_2d_bkg_distrib(hist_dict_bkgcat, bkg_cat, figpath=f"{filepath}/bkg_2d_distrib")
 
+        isTotBkgImported = True
+    
 
     rootfile_distrib = ROOT.TFile(f"{filepath}/bkg_2d_distrib.root", "RECREATE")
     rootfile_distrib.cd()

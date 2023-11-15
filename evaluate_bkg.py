@@ -16,22 +16,22 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 #  GENERAL SETTINGS
 # ------------------
 
-type_eff = "iso"
+type_eff = "trackingplus"
 type_analysis = "indep"
 bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau", "SameCharge"]
 
 
-binning_pt = "pt"
+binning_pt = "pt_tracking"
 binning_eta = "eta"
-binning_mass = "mass_60_120"
+binning_mass = "mass_50_130"
 
 
-ws_filename = "bkg_studies/ws_iso_backgrounds.root"
-generate_datasets = False
+ws_filename = "root_files/ws_trackingplus.root"
+generate_datasets = False       
 local_datasets = False
 
-figpath = "bkg_studies"
-filepath = "bkg_studies"
+figpath = "trackingplus_figs"
+filepath = "trackingplus_figs"
 
 negweights_eval = False
 binnings_list = [["pt", "eta"]]
@@ -53,8 +53,8 @@ plot_bkg_distrib = {
     "flag" : True,
     "norm_on_data" : False,
     "norm_on_sig" : False,
-    "norm_tot_bkg" : False,
-    "plot_projected" : True,
+    "norm_tot_bkg" : True,
+    "plot_projected" : False,
 }
 
 for tp in ["data", "sig"]:
@@ -72,7 +72,7 @@ if generate_datasets is True:
         filename_mc = f"root_files/datasets/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
         dirname_bkg = "root_files/datasets/bkg"
     else:
-        filename_data = f"/scratchnvme/wmass/Steve_root_files/Standard_SF_files/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
+        filename_data = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
         filename_mc = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
         dirname_bkg = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS"
     

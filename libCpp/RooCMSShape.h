@@ -44,11 +44,12 @@ public:
   inline ~RooCMSShape() {}
   Double_t evaluate() const ;
 
+  
   Int_t getAnalyticalIntegral(RooArgSet& allVars, RooArgSet& analVars,
                               const char* rangeName=nullptr) const ;
 
   double analyticalIntegral(Int_t code, const char* rangeName=nullptr) const ;
-
+  
 
   ClassDef(RooCMSShape,2);
 

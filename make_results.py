@@ -5,8 +5,9 @@ from array import array
 from copy import copy
 from utilities.base_library import binning, bin_dictionary, eval_efficiency, sumw2_error
 from utilities.results_utils import results_manager, init_results_histos, fill_res_histograms
+from utilities.dataset_utils import import_pdf_library
 
-NBINS = 75
+NBINS = 40
 
 eff_min = 0.895
 rel_err_eff_min = 1e-4
@@ -15,11 +16,11 @@ sf_min = 0.99
 sf_max = 1.03
 
 
-delta_min = -2.5e-3
-delta_error_min = -1.2e-3
-pull_min = -1
-rm1_min = -3e-3
-ratio_error_min = -0.3
+delta_min = -5e-2
+delta_error_min = -1e-2
+pull_min = -5
+rm1_min = -5e-2
+ratio_error_min = -2
 
 res_var_dict = {
     "efficiency" : {
@@ -116,7 +117,7 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
         with open(ws_txt_bmark_filename, "r") as file_bmark:
             row_list = file_bmark.readlines()
         print(type(row_list))
-        res_benchmark = results_manager("indep", "pt", "eta", import_txt=row_list)
+        res_benchmark = results_manager("indep", "pt_tracking", "eta", import_txt=row_list)
     
     file_new = ROOT.TFile(ws_new_filename, "READ")
     ws_new = file_new.Get("w")
@@ -311,14 +312,16 @@ if __name__ == '__main__':
     resCmp_list = resCmp_var_dict.keys()
     print(resCmp_list)
 
-    benchmark_res_iso = "results/benchmark_iso/old_results.txt"
+    import_pdf_library("RooCMSShape")
+
+    benchmark_res_iso = "trackingplus_res/old_results.txt"
 
     bmark_fit_filename = "results/benchmark_iso_r628/ws_iso_indep_bmark.root"
     
     #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
     # ws_filename = "results/pseudodata_iso/ws_iso_pseudodata.root"
 
-    ws_filename = "results/benchmark_iso_r628/ws_iso_indep_bmark.root"
+    ws_filename = "trackingplus_res/ws_trackingplus_indep.root"
 
     # ws_filename = "results/pseudodata_iso/ws_iso_indep_pseudodata_new.root"
 
@@ -326,8 +329,8 @@ if __name__ == '__main__':
     # ws_filename = "results/iso_indep_2gev_mcbkg/ws_iso_indep_2gev_mcbkg.root"
 
 
-    save_eff_results(bmark_fit_filename, "indep", "pt", "eta")
-    # compare_efficiency(benchmark_res_iso, ws_filename, "pt", "eta", resCmp_list)
+    # save_eff_results(bmark_fit_filename, "indep", "pt", "eta")
+    compare_efficiency(benchmark_res_iso, ws_filename, "pt_tracking", "eta", resCmp_list)
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 
