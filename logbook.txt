@@ -1,0 +1,58 @@
+###############################################################################
+#######  Logbook for TnP-efficiencies measurement  ############################
+###############################################################################
+
+Legend:
+  - "p" = problem
+  - "s" = solution to be developed
+  - "r" = explanation of the reason for a choice
+  - "i" = improvement done
+  - "a" = assumption
+
+The dates reported are referred to specific commits to the repository
+
+
+06-13/11/2023
+-------------
+
+First glance on the tracking(plus) data, early evaluations are repoted below;
+the starting point for this analysis is the software version inherited from 
+Master Thesis (last commit on 4th october 2023).
+
+i1) Implemented the cmsshape as bkg pdf
+i2) External constraints implemented into the "fitter" classes
+
+p1) The passing probes (on OS data) have the expected shape, while the failing
+    ones not everywhere show a clear resonant peak.
+p2) The main background source is SameCharge (to be renamed SS_data?), while 
+    the others are negligible, especially for the failing probes.
+p3) In some cases, for failing probes, the SameCharge bkg is of the same order
+    of the data: this, together with the 1) point, suggests that the fits on 
+    these bins can be delicate.
+p4) Fit routine with default settings (cmsshape bkg for failing probes): 
+    noticed that in many cases, while the fit converges and all the quality 
+    controls are satisfied, some parameters are at limit.
+     
+Developed some ideas to implement an alternative efficiency estimation:
+s1) For the passing probes (OS data), the background can be taken from the 
+    SS_data; from that histogram, the SS_mc_signal has to be subtracted, in
+    order to not count the events with a mis-assigned charge. (Here we are
+    assuming Scale_factor~1)
+s2) For the failing probes, we can get rid of the fit procedure by directly 
+    counting the number of OS and SS data events:
+        Nsig_fail = (Ntot_OS - Ntot_SS)/(1-f),  f = N_mcSig(SS)/N_mcSig(OS+SS) 
+        a1) The number of bkg events estimated in the SS region has to be the
+            same (almost) as the number of bkg events in the OS region: this
+            can be checked by comparing events in the MC (when present) and by
+            studying the SS_data population the sidebands.
+        a2) The scale factor affects the contribution of the parameter "f"; at
+            this order we can assume f~1, but the impact of deviations has to
+            be checked.
+    The number Nsig_fail so extracted can be used directly in the formula for
+    the efficiency, OR as a medium/tight constraint for the fit procedure.
+
+In order to improve the robustness of the implementation of s1) and s2), new
+samples are needed:
+    - TTSemileptonic -> requested via CRAB
+    - Signal MC low mass -> requested via CRAB
+    - Data (OS and SS) -> mass range has to be expanded in Steve
