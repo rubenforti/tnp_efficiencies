@@ -17,7 +17,7 @@ colors = {
     "ZZ_bkg" : ROOT.kGreen+1,
     "TTFullyleptonic_bkg" : ROOT.kCyan+1,
     "Ztautau_bkg" : ROOT.kMagenta+1,
-    "SameCharge_bkg" : ROOT.kOrange+8,
+    "SameCharge_bkg" : ROOT.kOrange+6,
     "total_bkg" : ROOT.kRed,
     "pdf_bkg_fit" : ROOT.kRed,
     "signal" : ROOT.kBlue
@@ -251,7 +251,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
         plot_objects = { 
             "axis" : RooRealVar,
             "total_bkg" : { "roohisto":RooDataHist, "lumi_scale":float, "integral":float},
-            "{bkg_process}_bkg" : { "roohisto":RooDataHist, "histo_pdf":RooHistPdf,
+            "bkg_{process}" : { "roohisto":RooDataHist, "histo_pdf":RooHistPdf,
                                     "lumi_scale":float, "integral":float},
             "MC_signal (optional)" : as above,
             "data (optional)" : RooDataHist,

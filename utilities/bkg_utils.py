@@ -98,8 +98,6 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
     """
     Creates a dictionary containing the bkg MC datasets and the useful information related to them.
     """
-    
-    lumi_scales = lumi_factors(type_eff, bkg_categories)
 
     axis = ws.var(f"x_{flag}_{bin_key}")
     print(type(axis))
@@ -117,7 +115,6 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
         datasets.update({f"{bkg_cat}_bkg" : {
             "roohisto" : bkg_histo,
             "histo_pdf" : ROOT.RooHistPdf(f"{bkg_cat}_bkg_pdf", f"{bkg_cat}_bkg_pdf", ROOT.RooArgSet(axis), bkg_histo, 0),
-            "lumi_scale" : lumi_scales[bkg_cat],
             "integral" : bkg_histo.sumEntries()
             }
         })
@@ -130,7 +127,6 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
 
     datasets.update({"total_bkg" : {
         "roohisto": bkg_total_histo,
-        "lumi_scale" : 1,
         "integral" : bkg_total_histo.sumEntries()
         }
     })
@@ -144,7 +140,6 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
         datasets.update({"MC_signal" : {
             "roohisto" : histo_mc,
             "histo_pdf" : ROOT.RooHistPdf(f"MC_signal_pdf", f"MC_signal_pdf", ROOT.RooArgSet(axis), histo_mc, 0),
-            "lumi_scale" : lumi_scales["Zmumu"],
             "integral" : histo_mc.sumEntries()
             }
         })

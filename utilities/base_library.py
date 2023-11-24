@@ -192,6 +192,30 @@ def lumi_factors(type_eff, bkg_categories):
     
     return lumi_scales
 
+
+###############################################################################
+
+def lumi_factor(filepath, process):
+    """
+    Returns the lumi factor for the process in the given file
+    """
+    file = ROOT.TFile(filepath)
+    wsum_histo = file.Get("weightSum")
+    num_init = wsum_histo.Integral()
+
+    if "mc" in filepath:
+        xsection = xsec_ZmmPostVFP*1000 # has to be put in fb
+    else:
+        xsection = cross_section_bkg(process)*1000
+        
+    lumi_process = num_init/xsection
+
+    scale = lumi_data/lumi_process
+
+    return scale
+
+
+
 ###############################################################################
 
 def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):

@@ -4,10 +4,11 @@
 import sys
 import os
 import ROOT
-from utilities.base_library import binning, bin_dictionary, lumi_factors, get_idx_from_bounds, bin_global_idx_dict
+from copy import deepcopy
+from utilities.base_library import binning, bin_dictionary, lumi_factors, lumi_factor, get_idx_from_bounds, bin_global_idx_dict
 
 
-bkg_datasets_sel = {
+bkg_sum_selector = {
     "WW" : 1,
     "WZ" : 1,
     "ZZ" : 1,
@@ -15,12 +16,64 @@ bkg_datasets_sel = {
     "TTSemileptonic" : 0,
     "Ztautau" : 1,
     "SameCharge" : 1,
-    "WJets" : 0
+    "WJets" : 0,
+    "signalMC_SS" : -1.
 }
+
+def gen_import_dictionary(base_folder, type_eff, dset_names,
+                          ch_set = [""],
+                          scale_MC = False,
+                          add_SS_mc = False,
+                          add_SS_bkg = False):
+    """
+    """
+    import_dictionary = {}
+
+    for dset_name in dset_names:
+
+        import_dictionary[dset_name] = {}
+        import_dictionary[dset_name]["filenames"] = []
+        
+        lumi_scale = -1
+
+        S_sel, c_sel = "OS", "1"
+
+        flag_set = dset_name.replace("bkg_", "")  # If it is not a background, it simply copies the dataset name
+        
+        if "SameCharge" in dset_name: 
+            flag_set = "data"
+            S_sel, c_sel = "SS", "0"
+
+        for ch in ch_set:
+                
+                filename = f"{base_folder}/{S_sel}/tnp_{type_eff}{ch}_{flag_set}_vertexWeights1_oscharge{c_sel}.root"
+                import_dictionary[dset_name]["filenames"].append(filename)
+        
+        print(dset_name)
+        if (dset_name=="mc" and scale_MC is True) or ("bkg" in dset_name and "SameCharge" not in dset_name): 
+            lumi_scale = lumi_factor(filename, flag_set)
+        
+        import_dictionary[dset_name]["lumi_scale"] = lumi_scale
+
+        if dset_name=="mc" and add_SS_mc is True:
+            import_dictionary["mc_SS"] = deepcopy(import_dictionary["mc"])
+            import_dictionary["mc_SS"]["filenames"] = [f.replace("OS", "SS").replace("oscharge1", "oscharge0") 
+                                                       for f in import_dictionary["mc"]["filenames"]]
+            import_dictionary["mc_SS"]["lumi_scale"] = import_dictionary["mc"]["lumi_scale"]
+        
+        if "bkg" in dset_name and "SameCharge" not in dset_name and add_SS_bkg is True:
+            import_dictionary[f"bkg_{flag_set}_SS"] = deepcopy(import_dictionary[f"bkg_{flag_set}"])
+            import_dictionary[f"bkg_{flag_set}_SS"]["filenames"] = [f.replace("OS", "SS").replace("oscharge1", "oscharge0")
+                                                                    for f in import_dictionary[f"bkg_{flag_set}"]["filenames"]]
+            import_dictionary[f"bkg_{flag_set}_SS"]["lumi_scale"] = import_dictionary[f"bkg_{flag_set}"]["lumi_scale"]
+
+    return import_dictionary
+                
 
 
 def import_pdf_library(*functions):
     """
+    Imports the C++ defined functions into the ROOT interpreter. 
     """
     current_path = os.path.dirname(__file__)
     import_path = os.path.join(current_path, '..', 'libCpp')
@@ -39,89 +92,136 @@ def import_pdf_library(*functions):
 
 ###############################################################################
 
-def import_totbkg_hist(ws, bin_key, bkg_categories):
+def import_totbkg_hist(ws, bin_key, bkg_categories, bkg_selector=bkg_sum_selector):
     """
+    Imports into a workspace a RooDataHist that represents the total 
+    background, for a given pt-eta bin. The background sources need to be 
+    correctly normalized before calling this function, and their impact in 
+    the total bkg histogram is managed by the "bkg_selector" dictionary.
     """
     for flag in ["pass", "fail"]:
         axis = ws.var(f"x_{flag}_{bin_key}")
         bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo", 
-                                       ROOT.RooArgSet(axis), "plot_binning")
+                                       ROOT.RooArgSet(axis), "x_binning")
 
         for bkg_cat in bkg_categories:
             bkg_dataset = ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
-            if bkg_datasets_sel[bkg_cat] == 1: bkg_total_histo.add(bkg_dataset)
+            if bkg_selector[bkg_cat] == 1: 
+                bkg_total_histo.add(bkg_dataset)
+            elif bkg_selector[bkg_cat] == -1:
+                bkg_dataset_copy = bkg_dataset.Clone(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_copy")
+                for i in range(axis.getBinning("x_binning").numBins()):
+                    bkg_dataset_copy.get(i)
+                    bkg_dataset_copy.set(i, -1*bkg_dataset_copy.weight(i), bkg_dataset_copy.weightError(ROOT.RooAbsData.SumW2))
+                bkg_total_histo.add(bkg_dataset_copy)
+            else:
+                pass
 
         ws.Import(bkg_total_histo)
 
 
 ###############################################################################
 
-def get_roohist(file, type_set, flag, axis, bin_key, bin_pt, bin_eta, global_scale=-1.):
+def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta, 
+                global_scale=-1.):
     """
-    Returns a RooDataHists of the variable TP_invmass, in a single (pt, eta) bin
+    Returns a RooDataHists of the variable TP_mass, in a single pt-eta bin.
+    For MC datasets, the "global_scale" parameter is used to scale the
+    histogram to the correct luminosity.
     """
     if type_set=="data" or type_set=="data_SC":
         type_suffix = "RunGtoH"
     elif type_set=="mc" or type_set=="mc_w" or type_set=="bkg":
         type_suffix = "DY_postVFP"
     else:
-        print("ERROR: invalid category type given!")
-        sys.exit()
-
-    histo3d = file.Get(f"{flag}_mu_{type_suffix}")
+        sys.exit("ERROR: invalid category type given")
 
     if type(bin_pt) is int:  bin_pt = [bin_pt, bin_pt]
     if type(bin_eta) is int: bin_eta = [bin_eta, bin_eta]    
 
-    th1_histo = histo3d.ProjectionX(f"Histo_{type_set}_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")  # Option "e" is specified to calculate the bin errors in the new histogram for generic selection of bin_pt and bin_eta. Without it, it all works well ONLY IF the projection is done on one single bin of (pt, eta)
-    
-    # print("Th1 entries before scaling: ", th1_histo.Integral())
-    # print("Under/overflow: ", th1_histo.GetBinContent(0), th1_histo.GetBinContent(th1_histo.GetNbinsX()+1))
+    numBins = axis.getBinning("x_binning").numBins()
 
-    if global_scale > 0:
-        th1_histo.Scale(global_scale)
-
-    print(f"\nTH1 integral = {th1_histo.Integral()}")
-    if th1_histo.Integral() < 0:
-        print("ERROR: negative entries in TH1")
-        print(f"{bin_pt}, {bin_eta}")
-        # sys.exit()
-    
-    # print(type_set, global_scale)
-
-    numBins = axis.getBinning().numBins()
-    th1_histo.Rebin(int(th1_histo.GetNbinsX()/numBins))
+    n_files = len(files) if type(files) is list else 1
 
     if type_set=="data_SC": type_set = "bkg"
-    
+
     roohisto = ROOT.RooDataHist(f"Minv_{type_set}_{flag}_{bin_key}", f"Minv_{type_set}_{flag}_{bin_key}",
-                                ROOT.RooArgList(axis), th1_histo)
+                                ROOT.RooArgSet(axis), "x_binning")
     
+    print(type_suffix)
 
-    print(bin_pt, bin_eta)
+    tmp_histos, tmp_roohistos = [], []
 
-    print(axis.getBinning().numBins())
-    if axis.getBinning().numBins() == th1_histo.GetNbinsX():
-        print(f"TH1 binning: {th1_histo.GetNbinsX()}")
-        for i in range(th1_histo.GetNbinsX()):
-            if roohisto.weight(i) != th1_histo.GetBinContent(i+1):
-                print("ERROR")
-                print(f"{bin_pt}, {bin_eta}")
-                sys.exit()
-        print(f"RooDataHist integral = {roohisto.sumEntries()}\n")
+    print(f"\nImporting histograms in bin {bin_key}")
 
+    for it_file in range(n_files):
+        
+        file = files[it_file] if n_files > 1 else files
+
+        print(f"{flag}_mu_{type_suffix}")
+        histo3d = file.Get(f"{flag}_mu_{type_suffix}")
+
+        # In the projection, option "e" is specified to calculate the bin 
+        # content errors in the new histogram for generic selection of bin_pt
+        # and bin_eta. Without it, all works as expected ONLY IF the projection
+        # is done on a single bin of pt-eta
+        th1_histo = histo3d.ProjectionX(f"Histo_{type_set}_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")
+
+        if global_scale > 0: th1_histo.Scale(global_scale)
+
+
+        if th1_histo.Integral() < 0:
+            print(f"ERROR: negative entries in TH1 in bin {bin_pt}-{bin_eta}")
+            #sys.exit()
+
+        th1_histo.Rebin(int(th1_histo.GetNbinsX()/numBins))
+
+        tmp_histos.append(th1_histo.Clone(f"Minv_{type_set}_{flag}_{bin_key}_tmp"))
+
+        tmp_roohistos.append(ROOT.RooDataHist(f"Minv_{type_set}_{flag}_{bin_key}", f"Minv_{type_set}_{flag}_{bin_key}",
+                                      ROOT.RooArgList(axis), th1_histo))
+
+        roohisto.add(tmp_roohistos[it_file])
+
+    print("Beginning consistency check...")
+    th1_integral = 0
+    for it_file in range(n_files):
+        th1_integral += tmp_histos[it_file].Integral()
+    if round(th1_integral, 5) != round(roohisto.sumEntries(), 5):
+        sys.exit(f"ERROR: TH1 and RooDataHist have different integrals in bin {bin_key}")
+    for i in range(numBins):
+        roohisto.get(i)
+        th1_bincontent = 0
+        for it_file in range(n_files): 
+            th1_bincontent += tmp_histos[it_file].GetBinContent(i+1)
+        if round(roohisto.weight(i), 5) != round(th1_bincontent, 5):
+            # print(roohisto.weight(i), th1_bincontent)
+            sys.exit(f"ERROR: bin {i} has different content in TH1 and RooDataHist")
+    print("Consistency check passed, RooDataHist imported correctly\n")
+            
     return roohisto
+
 
 ###############################################################################
 
 def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mass, 
-            import_existing_ws=False, existing_ws_filename="", altBinning_bkg=False):
+            import_existing_ws = False, 
+            existing_ws_filename = "", 
+            lightMode_bkg = False, 
+            altBinning_bkg = False):
     """
-    Initializes a RooWorkspace with the datasets corresponding to a given efficiency step. The objects 
-    stored are RooDataHist of TP_invmass in every (pt,eta) bin. The datasets are of the type ("data, "mc",
-    "bkg") specified in the import_sets dictionary that must contain, as values: the path of the file for
-    "data" and "mc types; two other dictionaries in the the "bkg" case, containing the paths of the files 
-    and the dictionary of the luminosity scales.
+    Initializes a RooWorkspace with the datasets corresponding to a given 
+    efficiency step. The objects stored are RooDataHist of TP_mass in every 
+    pt-eta bin requested. The import_sets dictionary has as keys the names of 
+    the datasets to be imported ("data", "mc", and the various backgrounds) and
+    must contain as values:
+        - the paths of the file;
+        - the luminosity scale factors (for MC datasets);
+    The value of a MC dataset has to be a dictionary with the "filename" and 
+    "lumi_scale" keys. For "mc" case (referred to the signal template), it is
+    possible not to specify the luminosity scale factor, since it could be used
+    as a mere template: furhter consistency checks could be necessary in this
+    case, depending on the analysis requested. 
     """
 
     if altBinning_bkg is False:
@@ -141,134 +241,73 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
         x_binning = ROOT.RooUniformBinning(bins_mass[0], bins_mass[-1], len(bins_mass)-1, "x_binning")
         ws.Import(x)
 
-    global_counter = 0
+    for dataset_obj in import_datasets.values():
+        dataset_obj["filenames"] = [ROOT.TFile(v, "READ") for v in dataset_obj["filenames"]]
 
+    if lightMode_bkg is True:
+        # Importing only the total background histogram
+        bkg_merging_dict = {k : v for k, v in import_datasets.items() if k.startswith("bkg_")}
+        import_datasets  = {k : v for k, v in import_datasets.items() if not k.startswith("bkg_")}
 
-    for dataset_type in import_datasets:       
+    
+    # Loop over the pt-eta bins
+    for bin_key in bins.keys():
 
-        if dataset_type=="data":
-            file = ROOT.TFile(import_datasets[dataset_type], "READ")
-        elif dataset_type=="mc":
-            file = ROOT.TFile(import_datasets["mc"]["filename"], "READ")
-            sig_lumi_scale = import_datasets["mc"]["lumi_scale"]
-        elif dataset_type=="bkg":
-            file_set={}
-            for cat in import_datasets[dataset_type]["filenames"]:
-                file_set.update({cat : ROOT.TFile(import_datasets["bkg"]["filenames"][cat], "READ")})
-                print(file_set[cat].GetName())
-            bkg_lumi_scales = import_datasets["bkg"]["lumi_scales"]
-        else:
-            print("****\nINVALID DATASET TYPE\n****")
-            sys.exit()
-        
+        print(f"\n\n### Importing datasets in bin {bin_key} ###\n")
+        gl_idx, bin_pt, bin_eta = bins[bin_key]
 
-        for bin_key in bins:
+        flags = ["pass", "fail"] if type_analysis == "indep" else ["sim"]
+        for flag in flags:
 
-            gl_idx, bin_pt, bin_eta = bins[bin_key]
-
-            if import_existing_ws is True:
-                if type_analysis == "indep":
-                    x_pass = ws.var(f"x_pass_{bin_key}")
-                    x_fail = ws.var(f"x_fail_{bin_key}")
-                    axis = (x_fail, x_pass)
-                elif type_analysis == "sim":
-                    x_sim = ws.var(f"x_sim_{bin_key}")
-                    axis = (x_sim, x_sim)
+            if import_existing_ws is False:
+                axis = ROOT.RooRealVar(f"x_{flag}_{bin_key}", "TP M_inv", bins_mass[0], bins_mass[-1], unit="GeV/c^2")
+                axis.setBinning(x_binning)
             else:
-                if type_analysis == 'indep':
-                    x_pass = ROOT.RooRealVar(f"x_pass_{bin_key}", "TP M_inv", 
-                                            bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-                    x_pass.setBinning(x_binning)
-                    x_fail = ROOT.RooRealVar(f"x_fail_{bin_key}", "TP M_inv",
-                                            bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-                    x_fail.setBinning(x_binning)
-                    axis = (x_fail, x_pass)
-                elif type_analysis == 'sim':
-                    x_sim = ROOT.RooRealVar(f"x_sim_{bin_key}", "TP M_inv",
-                                            bins_mass[0], bins_mass[-1], unit="GeV/c^2")
-                    x_sim.setBinning(x_binning)
-                    axis = (x_sim, x_sim)
+                axis = ws.var(f"x_{flag}_{bin_key}")
 
-            if dataset_type == "data":
-                histo_pass = get_roohist(file, dataset_type, "pass", axis[1], bin_key, bin_pt, bin_eta)
-                histo_fail = get_roohist(file, dataset_type, "fail", axis[0], bin_key, bin_pt, bin_eta)
-                ws.Import(histo_pass)
-                ws.Import(histo_fail)
-                global_counter += 2
+            # Importing the datasets
+            for dset_name, dset_obj in import_datasets.items():
 
-            if dataset_type == "mc":
-                print(sig_lumi_scale)
-                histo_pass = get_roohist(file, dataset_type, "pass", axis[1], 
-                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
-                histo_fail = get_roohist(file, dataset_type, "fail", axis[0], 
-                                         bin_key, bin_pt, bin_eta, global_scale=sig_lumi_scale)
-                ws.Import(histo_pass)
-                ws.Import(histo_fail)
-                global_counter += 2
+                files, lumi_scale = dset_obj["filenames"], dset_obj["lumi_scale"]
 
-            elif dataset_type == "bkg":
-                if altBinning_bkg is True:
-                    gl_idx_key = str(gl_idx)
-                    bin_pt, bin_eta = bin_idx_dict[gl_idx_key]
-                for cat in bkg_lumi_scales:
-                    dset_type = "data_SC" if cat == "SameCharge" else "bkg"
-                    histo_pass = get_roohist(file_set[cat], dset_type, "pass", axis[1], 
-                                            bin_key, bin_pt, bin_eta, global_scale=bkg_lumi_scales[cat])
-                    histo_pass.SetName(f"{histo_pass.GetName()}_{cat}")
-                    histo_fail = get_roohist(file_set[cat], dset_type, "fail", axis[0], 
-                                            bin_key, bin_pt, bin_eta, global_scale=bkg_lumi_scales[cat])
-                    histo_fail.SetName(f"{histo_fail.GetName()}_{cat}")
-                    ws.Import(histo_pass)
-                    ws.Import(histo_fail)
-                    global_counter += 2
-            else:
-                pass
+                if "bkg" in dset_name:
+                    dset_type = "bkg" if not "SameCharge" in dset_name else "data_SC"
+                    dset_subs = dset_name.replace("bkg", "")
+                    if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
+                elif "SS" in dset_name:
+                    dset_type = dset_name.replace("_SS", "")
+                    dset_subs = "_SS"
+                else:
+                    dset_type = dset_name
+                    dset_subs = ""
 
-    print(global_counter)
+                print(dset_name, dset_type, dset_subs)  
+
+                histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, global_scale=lumi_scale)
+                histo.SetName(f"{histo.GetName()}{dset_subs}")
+                ws.Import(histo)
             
+            # Importing the total background histogram if light mode is called (only for OS)
+            if lightMode_bkg is True:
+                bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", f"Minv_bkg_{flag}_{bin_key}_total", 
+                                                   ROOT.RooArgSet(axis), "x_binning")
+                print(bkg_merging_dict.keys())
+                for bkg_cat, bkg_obj in bkg_merging_dict.items():
+                    print(bkg_cat)
+                    if "SS" not in bkg_cat and bool(bkg_sum_selector[bkg_cat.replace("bkg_","")]) is True:
+                        files = bkg_obj["filenames"]
+                        print(files)
+                        lumi_scale = bkg_obj["lumi_scale"]
+                        if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
+                        dset_type = "bkg" if not "SameCharge" in bkg_cat else "data_SC"
+                        histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, global_scale=lumi_scale)
+                        bkg_total_histo.add(histo)
+                    else:
+                        pass
+                ws.Import(bkg_total_histo)
+
     return ws
 
-
-###############################################################################
-
-
-'''
-# NOT USED ANYWHERE. Probably created to add the bkg datasets in merged bins to a workspace with data in
-# reco ones, but evidently it couldn't perform well. This feature is now implemented as an accessory path
-# in ws_init.
-
-def extend_merged_datasets(ws, merged_bin_key, bkg_categories):
-    """
-    """
-    bin_dict = bin_dictionary("pt", "eta")
-
-    bkg_datasets = {}
-    for flag in ["pass", "fail"]:
-        [bkg_datasets.update({f"{cat}_{flag}" : ws.data(f"Minv_bkg_{flag}_{merged_bin_key}_{cat}")}) for cat in bkg_categories]
-        bkg_datasets.update({f"axis_{flag}" : ws.var(f"x_{flag}_{merged_bin_key}")})
-
-    string_pt, string_eta = merged_bin_key.split("][")
-    pt_min, pt_max = string_pt[1:].split("to")
-    eta_min, eta_max = string_eta[:-1].split("to")
-
-    pt_min, pt_max = float(pt_min), float(pt_max)
-    eta_min, eta_max = float(eta_min), float(eta_max)
-
-    global_merged_bins, _, _ = get_idx_from_bounds([pt_min, pt_max], [eta_min, eta_max])
-
-    for bin_key in bin_dict.keys():
-
-        gl_bin, _, _ = bin_dict[bin_key]
-
-        if gl_bin in global_merged_bins:
-
-            for flag in ["pass", "fail"]:
-                new_axis = bkg_datasets[f"axis_{flag}"].Clone(f"x_{flag}_{bin_key}")
-                ws.Import(new_axis)
-                for cat in bkg_categories:
-                    new_data = bkg_datasets[f"{cat}_{flag}"].Clone(f"Minv_bkg_{flag}_{bin_key}_{cat}")
-                    ws.Import(new_data)
-'''
 
       
 ###############################################################################     
@@ -277,43 +316,16 @@ def extend_merged_datasets(ws, merged_bin_key, bkg_categories):
 
 if __name__ == '__main__':
 
-    bkg_categories = ["WW", "WZ", "ZZ", "TTSemileptonic", "Ztautau"]
-    # bkg_categories = ["Ztautau"]
+    type_eff = "tracking"
 
-    type_eff = ("sa", "global", "ID", "iso", "trigger", "veto")
-    t = type_eff[3]
+    base_folder = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023"
 
-    types_analysis = ["indep", "sim"]
-    an = types_analysis[0]
-
-
-    filename_data = "root_files/datasets/tnp_iso_data_vertexWeights1_oscharge1.root"
-    filename_mc = "root_files/datasets/tnp_iso_mc_vertexWeights1_oscharge1.root"
-    dirname_bkg = "root_files/datasets"
-    
-    
-    bkg_filenames = {}
-    [bkg_filenames.update({cat : 
-        f"{dirname_bkg}/tnp_{t}_{cat}_vertexWeights1_oscharge1.root"}) for cat in bkg_categories]
-    
-    print(bkg_filenames)
+    d = gen_import_dictionary(base_folder, type_eff, ["data", "mc", "bkg_WW", "bkg_WZ", "bkg_SameCharge"], 
+                              ch_set=["plus", "minus"], scale_MC=True, add_SS_mc=False, add_SS_bkg=False)
     
 
-    lumi_scales = lumi_factors(t, bkg_categories)
+    ws= ws_init(d, "indep", "pt_singlebin", "eta_singlebin", "mass_50_130", lightMode_bkg=True)
 
-    print(lumi_scales)
+    ws.Print()
 
 
-    lumi_scale_signal = lumi_scales.pop("Zmumu")
-
-    import_dictionary = {
-        "data" : filename_data,
-        "mc" : {
-            "filename": filename_mc,
-            "lumi_scale" : lumi_scale_signal
-        },
-        "bkg" : {
-            "filenames" : bkg_filenames,
-            "lumi_scales" : lumi_scales
-        } 
-    }

@@ -159,7 +159,7 @@ results_master_thesis/*/ws_*.root
 stuff/old_results_involving_bkg/
 stuff/other_results
 stuff/figs/
-stuff/logbook.txt
+stuff/logbook_tesi.txt
 
 
 prova_*.py
