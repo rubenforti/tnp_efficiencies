@@ -4,7 +4,7 @@ import ROOT
 import time
 from copy import copy
 from utilities.base_library import lumi_factors, binning, bin_dictionary
-from utilities.dataset_utils import ws_init
+from utilities.dataset_utils import ws_init, gen_import_dictionary
 from utilities.bkg_utils import gen_bkg_2d_distrib, bkg_mass_distribution, show_negweighted_bins
 
 t0 = time.time()
@@ -16,7 +16,7 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 #  GENERAL SETTINGS
 # ------------------
 
-type_eff = "trackingplus"
+type_eff = "tracking"
 type_analysis = "indep"
 bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau", "SameCharge"]
 
@@ -26,12 +26,12 @@ binning_eta = "eta"
 binning_mass = "mass_50_130"
 
 
-ws_filename = "root_files/ws_trackingplus.root"
-generate_datasets = False       
+ws_filename = "root_files/ws_tracking.root"
+generate_datasets = True       
 local_datasets = False
 
-figpath = "trackingplus_figs"
-filepath = "trackingplus_figs"
+figpath = "tracking_figs"
+filepath = "tracking_figs"
 
 negweights_eval = False
 binnings_list = [["pt", "eta"]]
@@ -42,15 +42,15 @@ binnings_list = [["pt", "eta"]]
                  ["pt_12bins", "eta_16bins"], ["pt_9bins", "eta_24bins"]] '''
 
 minv_plots = {
-    "flag" : False,
-    "plot_on_data" : True,
+    "flag" : True,
+    "plot_on_data" : False,
     "plot_fit_bkgpdf" : False,
     "plot_on_sig" : True,
     "compare_bkgfrac" : False,
     "logscale" : True,
 }
 plot_bkg_distrib = {
-    "flag" : True,
+    "flag" : False,
     "norm_on_data" : False,
     "norm_on_sig" : False,
     "norm_tot_bkg" : True,
@@ -65,42 +65,20 @@ for tp in ["data", "sig"]:
 # -----------------------------------------------------------------------------------------------------------
 #  DATASET GENERATION
 # --------------------
+
 if generate_datasets is True:
 
-    if local_datasets:
-        filename_data = f"root_files/datasets/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
-        filename_mc = f"root_files/datasets/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
-        dirname_bkg = "root_files/datasets/bkg"
-    else:
-        filename_data = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS/tnp_{type_eff}_data_vertexWeights1_oscharge1.root"
-        filename_mc = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS/tnp_{type_eff}_mc_vertexWeights1_oscharge1.root"
-        dirname_bkg = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/OS"
-    
-    # dirname_bkg = "root_files/datasets/bkg"
+    base_folder = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023"
 
-    lumi_scales = lumi_factors(type_eff, bkg_categories)
-    sig_lumi_scale = lumi_scales.pop("Zmumu")
-
-    bkg_filenames = {}
-    load_bkgCat = copy(bkg_categories)
-    if "SameCharge" in bkg_categories:
-        load_bkgCat.remove("SameCharge")
-        bkg_filenames.update({"SameCharge" : 
-            f"{dirname_bkg}/../SS/tnp_{type_eff}_data_vertexWeights1_oscharge0.root"})
-    [bkg_filenames.update({cat : 
-        f"{dirname_bkg}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge1.root"}) for cat in load_bkgCat]
+    import_categories = ["data", "mc"]
+    import_categories += [f"bkg_{cat}" for cat in bkg_categories]
     
-    
-    import_dictionary = {"bkg" : {"filenames":bkg_filenames, "lumi_scales":lumi_scales} }
-    if minv_plots["plot_on_data"] or plot_bkg_distrib["norm_on_data"]:
-        import_dictionary.update({"data" : filename_data})
-    if minv_plots["plot_on_sig"] or plot_bkg_distrib["norm_on_sig"]:
-        import_dictionary.update({"mc" : {"filename":filename_mc, "lumi_scale":sig_lumi_scale}})
-
-    bin_dict = bin_dictionary(binning_pt, binning_eta)
+    import_dictionary = gen_import_dictionary(base_folder, type_eff, import_categories,
+                                              ch_set=["plus", "minus"], scale_MC=True, add_SS_mc=True, add_SS_bkg=False)
     
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass)
     ws.writeToFile(ws_filename)
+    
 
 
 # -----------------------------------------------------------------------------------------------------------
