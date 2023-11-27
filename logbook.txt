@@ -12,8 +12,8 @@ Legend:
 The dates reported are referred to specific commits to the repository
 
 
-06-13/11/2023
--------------
+13/11/2023
+----------
 
 First glance on the tracking(plus) data, early evaluations are repoted below;
 the starting point for this analysis is the software version inherited from 
@@ -56,3 +56,19 @@ samples are needed:
     - TTSemileptonic -> requested via CRAB
     - Signal MC low mass -> requested via CRAB
     - Data (OS and SS) -> mass range has to be expanded in Steve
+
+
+
+24/11/2023
+----------
+
+Restyling in the procedure of dataset generation: 
+  - a function manages the import dictionary
+  - possibility of explicitly import the mc_SS and bkg_SS datasets
+  - possibility of import only the total background
+
+The base settings are tested and the funcions work as expected. Need to put an
+eye on adapting conveniently the other functions, especially regarding plots
+and corrections to the total background.
+
+Evaluation of backgrounds on all the bins, stored in the "tracking_figs" folder
