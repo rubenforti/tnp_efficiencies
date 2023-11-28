@@ -43,11 +43,6 @@ def generate_th1_from_randgen(name, weight=1):
     axis.setBins(NBINS)
     axis.setRange(50, 130)
 
-    '''
-    mu = ROOT.RooRealVar("mu", "mu", 90, 85.0, 97.0)  # 91
-    sigma = ROOT.RooRealVar("sigma", "sigma", 4, 0.5, 10.0)  # 4
-    gaus_pdf = ROOT.RooGaussian("gaus", "gaus", axis, mu, sigma)
-    '''
     unif_pdf = ROOT.RooUniform("unif", "unif", axis)
 
     histo = ROOT.TH1D(name, "histo", NBINS, 50, 130)
@@ -61,6 +56,36 @@ def generate_th1_from_randgen(name, weight=1):
         histo.Fill(val_set.find("x").getVal(), weight)
 
     return histo
+
+
+def generate_roodatahist():
+    
+    axis = ROOT.RooRealVar("x", "x", 50, 130)
+    axis.setBins(NBINS)
+    axis.setRange(50, 130)
+
+    mu = ROOT.RooRealVar("mu", "mu", 90, 85.0, 97.0)  # 91
+    sigma = ROOT.RooRealVar("sigma", "sigma", 4, 0.5, 10.0)  # 4
+    gaus_pdf = ROOT.RooGaussian("gaus", "gaus", axis, mu, sigma)
+
+    data_gaus = gaus_pdf.generateBinned(ROOT.RooArgSet(axis), NDATA)
+
+    unif_pdf = ROOT.RooUniform("unif", "unif", axis)
+    data_unif = unif_pdf.generateBinned(ROOT.RooArgSet(axis), 2*NDATA)
+
+    th1_gaus = data_gaus.createHistogram("th1_gaus", axis)
+    th1_gaus.Scale(1.573)
+
+    th1_unif = data_unif.createHistogram("th1_unif", axis)
+    th1_unif.Scale(1.234)
+
+    tot_roohisto = ROOT.RooDataHist("tot_roohisto", "tot_roohisto", ROOT.RooArgList(axis))
+    tot_roohisto.add(ROOT.RooDataHist("roohisto_gaus", "roohisto_gaus", ROOT.RooArgList(axis), th1_gaus))
+    tot_roohisto.add(ROOT.RooDataHist("roohisto_unif", "roohisto_unif", ROOT.RooArgList(axis), th1_unif))
+
+
+    return tot_roohisto, axis
+
 
 ###############################################################################
 
@@ -109,8 +134,46 @@ class TestHistoErrors(unittest.TestCase):
             self.assertAlmostEqual(histo_sumw2.GetBinContent(i), histo_weighted.GetBinContent(i))
             self.assertAlmostEqual(histo_sumw2.GetBinError(i), histo_weighted.GetBinError(i))
 
-        print(histo_pois.GetBinError(43), histo_pois.GetBinContent(43)**0.5)
-        print(histo_pois.GetBinContent(43), histo_sumw2.GetBinContent(43))
+    
+    def test_errors_summed_weighted_roohisto(self):
+        """
+        Check that the bin errors in a Roodatahist produced by subtracting two other
+        RooDataHists are the sqrt(sum of the errors squared)
+        """
+
+        roohisto_in, axis = generate_roodatahist()
+
+        mu_s = ROOT.RooRealVar("mu_s", "mu_s", 90, 85.0, 97.0)  # 91
+        sigma_s = ROOT.RooRealVar("sigma_s", "sigma_s", 10, 0.5, 10.0)  # 4
+        gaus_pdf_s = ROOT.RooGaussian("gaus_s", "gaus_s", axis, mu_s, sigma_s)
+
+        subt_histo = gaus_pdf_s.generateBinned(ROOT.RooArgSet(axis), int(NDATA/2.))
+        print(type(subt_histo))
+        roohisto_out = roohisto_in.Clone("roohisto_out")
+
+        for i in range(0, NBINS):
+            subt_histo.get(i)
+            wsquared_in = subt_histo.weightSquared(i)
+            w_in = subt_histo.weight(i)
+            weight, weight_error = subt_histo.weight(i), subt_histo.weightError(ROOT.RooAbsData.SumW2)
+            subt_histo.set(i, -1*weight, weight_error)
+            # print(w_in, wsquared_in, subt_histo.weight(i), subt_histo.weightSquared(i))
+
+
+        roohisto_out.add(subt_histo)
+
+        for i in range(0, NBINS):
+            roohisto_out.get(i)
+            roohisto_in.get(i)
+            subt_histo.get(i)
+
+            err_tot = roohisto_out.weightError(ROOT.RooAbsData.SumW2)
+            err_exp = (roohisto_in.weightError(ROOT.RooAbsData.SumW2)**2 + subt_histo.weightError(ROOT.RooAbsData.SumW2)**2)**0.5
+            self.assertAlmostEqual(err_tot, err_exp)
+            self.assertAlmostEqual(roohisto_out.weight(i), roohisto_in.weight(i)+subt_histo.weight(i))
+            self.assertAlmostEqual(roohisto_out.weightSquared(i), roohisto_in.weightSquared(i)+subt_histo.weightSquared(i))
+            self.assertAlmostEqual(roohisto_out.weightSquared(i), roohisto_out.weightError(ROOT.RooAbsData.SumW2)**2)
+
 
 
 ###############################################################################
