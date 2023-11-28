@@ -12,16 +12,18 @@ from utilities.CMS_lumi import CMS_lumi
 bkg_categories= ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau", "SameCharge"]
 
 colors = { 
-    "WW_bkg" : ROOT.kOrange+1,
-    "WZ_bkg" : ROOT.kYellow+3,
-    "ZZ_bkg" : ROOT.kGreen+1,
-    "TTFullyleptonic_bkg" : ROOT.kCyan+1,
-    "Ztautau_bkg" : ROOT.kMagenta+1,
-    "SameCharge_bkg" : ROOT.kOrange+6,
-    "total_bkg" : ROOT.kRed,
+    "bkg_WW" : ROOT.kOrange+1,
+    "bkg_WZ" : ROOT.kYellow+3,
+    "bkg_ZZ" : ROOT.kGreen+1,
+    "bkg_TTFullyleptonic" : ROOT.kCyan+1,
+    "bkg_Ztautau" : ROOT.kMagenta+1,
+    "bkg_SameCharge" : ROOT.kOrange+6,
+    "bkg_total" : ROOT.kRed,
+    "mc" : ROOT.kBlue,
+    "mc_SS" : ROOT.kBlue,
     "pdf_bkg_fit" : ROOT.kRed,
-    "signal" : ROOT.kBlue
 }
+
 
 def style_settings():
     """
@@ -31,6 +33,7 @@ def style_settings():
     ROOT.gStyle.SetStatBorderSize(0)
     ROOT.gStyle.SetStatX(1.)
     ROOT.gStyle.SetStatY(1.)
+
 
 ###############################################################################
 

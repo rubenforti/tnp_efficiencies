@@ -10,31 +10,27 @@ from copy import copy
 binnings = {
     "pt": array('d', [24., 26., 28., 30., 32., 34., 36., 38., 40., 42., 44., 47., 50., 55., 60., 65.]),
     "eta" : array('d', [round(-2.4 + i*0.1, 2) for i in range(49)]),
-    "mass_50_130" : array('d', [50 + i for i in range(81)]),
     "mass_60_120" : array('d', [60 + i for i in range(61)]),
+    "mass_50_130" : array('d', [50 + i for i in range(81)]),
+    "pt_tracking" : array('d', [24., 35., 45., 55., 65.]),
+
+    "pt_singlebin" : array('d', [24., 65.]),
+    "eta_singlebin" : array('d', [round(-2.4 + i*4.8, 2) for i in range(2)]),
+
+    "mass_2GeV" : array('d', [60 + 2*i for i in range(31)]),
+    "mass_3GeV" : array('d', [60 + 3*i for i in range(21)]),
+    "mass_4GeV" : array('d', [60 + 4*i for i in range(16)]),
     "pt_12bins" : array('d', [24., 28., 30., 32., 34., 36., 38., 40., 44., 50., 55., 60., 65.]),
     "pt_9bins" : array('d', [24., 28., 32., 36., 40., 44., 50., 55., 60., 65.]),
     "pt_6bins" : array('d', [24., 30., 36., 42., 50., 55., 65.]),
-    "pt_tracking" : array('d', [24., 35., 45., 55., 65.]),
-    "pt_singlebin" : array('d', [24., 65.]),
+
     "eta_24bins" : array('d', [round(-2.4 + i*0.2, 2) for i in range(25)]),
     "eta_16bins" : array('d', [round(-2.4 + i*0.3, 2) for i in range(17)]),
     "eta_8bins" : array('d', [round(-2.4 + i*0.6, 2) for i in range(9)]),
     "eta_4bins" : array('d', [round(-2.4 + i*1.2, 2) for i in range(5)]),
-    "eta_singlebin" : array('d', [round(-2.4 + i*4.8, 2) for i in range(2)]),
-    "mass_2GeV" : array('d', [60 + 2*i for i in range(31)]),
-    "mass_3GeV" : array('d', [60 + 3*i for i in range(21)]),
-    "mass_4GeV" : array('d', [60 + 4*i for i in range(16)]),
     }
 
 lumi_data = 16.8  # fb^-1
-
-
-CHECK_SAMECHARGE = True
-sc_id = ["OS", 1] if CHECK_SAMECHARGE is True else ["SS", 0]
-
-sig_mc_repo = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/{sc_id[0]}"
-bkg_repo = f"/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023/{sc_id[0]}"
 
 # sig_mc_repo = "root_files/datasets"
 # bkg_repo = "root_files/datasets/bkg"
@@ -55,6 +51,7 @@ xsec_bkg = {
 
 ###############################################################################
 
+
 def binning(type):
     """
     Returns the binning array for the given type of variable.
@@ -63,6 +60,7 @@ def binning(type):
 
 ###############################################################################
 
+
 def get_idx_from_bounds(bounds_pt, bounds_eta):
     """
     Function that, given the bin bounds (that have to be present in the binning
@@ -70,15 +68,11 @@ def get_idx_from_bounds(bounds_pt, bounds_eta):
     are given as list of global indexes and as bounds on pt/eta indexes (max 
     and min, since the region is rectangular)
     """
-    initial_dict = bin_dictionary("pt", "eta")
+    initial_dict = bin_dictionary()
     global_bins = []
+    bounds_pt_idx, bounds_eta_idx = [], []
 
-    bounds_pt_idx = []
-    bounds_eta_idx = []
-
-    for el in initial_dict:
-
-        gl_idx, idx_pt, idx_eta = initial_dict[el]
+    for el, [gl_idx, idx_pt, idx_eta] in initial_dict.items():
 
         string_pt, string_eta = el.split("][")
         pt_min, pt_max = string_pt[1:].split("to")
@@ -87,8 +81,7 @@ def get_idx_from_bounds(bounds_pt, bounds_eta):
         pt_min, pt_max = float(pt_min), float(pt_max)
         eta_min, eta_max = float(eta_min), float(eta_max)
 
-        if(pt_min>=bounds_pt[0]) and (pt_max<=bounds_pt[1]) and \
-          (eta_min>=bounds_eta[0]) and (eta_max<=bounds_eta[1]):
+        if(pt_min>=bounds_pt[0]) and (pt_max<=bounds_pt[1]) and (eta_min>=bounds_eta[0]) and (eta_max<=bounds_eta[1]):
             global_bins.append(gl_idx)
             bounds_pt_idx.append(idx_pt)
             bounds_eta_idx.append(idx_eta)
@@ -97,17 +90,30 @@ def get_idx_from_bounds(bounds_pt, bounds_eta):
 
 ###############################################################################
 
-def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
+
+def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta", get_mergedbins_bounds=False):
     """
-    Creates a dictionary that relates the bounds of every bin (keys) to the 
-    indexes useful for the bin selection. The indexes are returned in a 
+    Creates a dictionary that relates the physical bounds of every bin (keys)
+    to the indexes useful for the bin selection. The indexes are returned in a 
     3-element list containing the global index, the pt index and the eta index
-    in this order.
+    in this order. If the bins are not merged (w.r.t. the original binning of a
+    given step) these objects are integers i; otherwise, two cases can be chosen
+    by the "get_mergedbins_bounds" flag:
+      - get_mergedbins_bounds=True: the pt and eta indexes are returned as
+        lists, containing the indexes of bins in the original binning that are
+        merged in the given bin;
+      - get_mergedbins_bounds=False: the pt and eta indexes are returned as
+        integers, containing the index referred to the actual grid pt-eta.
     """
     index_dictionary = {}
     global_idx = 1
 
     binning_pt, binning_eta = binnings[binning_pt_name], binnings[binning_eta_name]
+
+    if "tracking" in binning_pt_name: binning_pt_name = "pt"
+
+    cnt_mergedpt = 0
+    nbins_eta = len(binning_eta)-1
 
     for idx_pt in range(1, len(binning_pt)):
         for idx_eta in range(1, len(binning_eta)):
@@ -115,37 +121,43 @@ def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta"):
             bin_key = f"[{binning_pt[idx_pt-1]}to{binning_pt[idx_pt]}][{binning_eta[idx_eta-1]}to{binning_eta[idx_eta]}]"
 
             if binning_pt_name == "pt" and binning_eta_name == "eta":
-                index_dictionary.update({bin_key : [global_idx, idx_pt, idx_eta]})
-                global_idx +=1
-            elif "tracking" in binning_pt_name:
-                index_dictionary.update({bin_key : [global_idx, idx_pt, idx_eta]})
+                index_dictionary[bin_key] = [global_idx, idx_pt, idx_eta]
                 global_idx +=1
             else:
-                global_idx, bounds_idx_pt, bounds_idx_eta = get_idx_from_bounds(
-                    [binning_pt[idx_pt-1], binning_pt[idx_pt]], [binning_eta[idx_eta-1], binning_eta[idx_eta]])
-                index_dictionary.update({bin_key : [global_idx, bounds_idx_pt, bounds_idx_eta]})
+                global_idx, bounds_idx_pt, bounds_idx_eta = get_idx_from_bounds([binning_pt[idx_pt-1], binning_pt[idx_pt]],
+                                                                                [binning_eta[idx_eta-1], binning_eta[idx_eta]])
+                if get_mergedbins_bounds is False:
+                    eta_idx = int(1+(nbins_eta*(bounds_idx_eta[0]-1)/48.))
+                    pt_idx = int(bounds_idx_pt[0] - cnt_mergedpt)
+                    cnt_mergedpt += bounds_idx_pt[-1]-bounds_idx_pt[0] if eta_idx==nbins_eta else 0
+                    index_dictionary[bin_key] = [global_idx, pt_idx, eta_idx]
+                else:
+                    index_dictionary[bin_key] = [global_idx, bounds_idx_pt, bounds_idx_eta]
 
     return index_dictionary
 
 ###############################################################################
 
+
 def bin_global_idx_dict(binning_pt, binning_eta):
     """
+    Returns a dictionary that relates every global index to the pt-eta indexes
+    in the given binning.
     """
-    bin_dict = bin_dictionary(binning_pt, binning_eta)
+    bin_dict = bin_dictionary(binning_pt, binning_eta, get_mergedbins_bounds=True)
 
     bin_idx_dict = {}
 
-    for bin_key in bin_dict.keys():
-        gl_idx, pt, eta = bin_dict[bin_key]
+    for bin_key, [gl_idx, pt_idx, eta_idx] in bin_dict.items():
         if type(gl_idx) is list:
-            [bin_idx_dict.update({str(gl) : [pt, eta]}) for gl in gl_idx]
+            [bin_idx_dict.update({str(gl) : [pt_idx, eta_idx]}) for gl in gl_idx]
         else:
-            bin_idx_dict.update({str(gl_idx) : [pt, eta]})
+            bin_idx_dict.update({str(gl_idx) : [pt_idx, eta_idx]})
             
     return bin_idx_dict
 
 ###############################################################################
+
 
 def cross_section_bkg(bkg_process):
     """
@@ -154,6 +166,7 @@ def cross_section_bkg(bkg_process):
     return xsec_bkg[bkg_process]
 
 ###############################################################################
+
 
 def lumi_factors(type_eff, bkg_categories):
     """
@@ -192,8 +205,8 @@ def lumi_factors(type_eff, bkg_categories):
     
     return lumi_scales
 
-
 ###############################################################################
+
 
 def lumi_factor(filepath, process):
     """
@@ -214,9 +227,8 @@ def lumi_factor(filepath, process):
 
     return scale
 
-
-
 ###############################################################################
+
 
 def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
     """
@@ -229,6 +241,7 @@ def eval_efficiency(npass, nfail, sigma_npass, sigma_nfail):
     return eff, sigma_eff
 
 ###############################################################################
+
 
 def sumw2_error(histo):
     """

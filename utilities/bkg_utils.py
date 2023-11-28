@@ -2,10 +2,10 @@
 """
 import ROOT
 import sys
-from utilities.base_library import lumi_factors, binning, bin_dictionary, sumw2_error
+from utilities.base_library import binning, bin_dictionary, bin_global_idx_dict, sumw2_error
 from utilities.base_library import eval_efficiency as eval_bkgfrac  #La formula è la stessa
 from utilities.results_utils import init_pass_fail_histos
-from utilities.dataset_utils import import_totbkg_hist
+from utilities.dataset_utils import get_totbkg_roohist
 from utilities.plot_utils import plot_bkg, plot_2d_bkg_distrib, plot_projected_bkg
 from array import array
 
@@ -35,28 +35,12 @@ def show_negweighted_bins(ws_filename, bkg_categories, binning_pt, binning_eta, 
                                       nbins_pt, bins_pt, nbins_eta, bins_eta)
     neg_sumEntries_total = ROOT.TH2D("neg_sumEntries_total", "neg_sumEntries_total", 
                                      nbins_pt, bins_pt, nbins_eta, bins_eta)
-    
-    print(type(neg_weight_single))
-    
-    cnt_mergedpt=0
-    for bin_key in bin_dict.keys():
+
+    for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
         print(bin_key)
 
-        _, bin_pt, bin_eta = bin_dict[bin_key]
-
-        # Bin transformation needed in case the bins are merged
-        if type(bin_eta) is list:
-            bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
-        if type(bin_pt) is list:
-            bin_pt_list = bin_pt
-            bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
-            cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
-
-        cnt_sum_total = 0
-        cnt_sum_single = 0
-        cnt_weight_total = 0
-        cnt_weight_single = 0
+        cnt_sum_total, cnt_sum_single, cnt_weight_total, cnt_weight_single = 0, 0, 0, 0
 
         for flag in ["pass", "fail"]:
             axis = ws.var(f"x_{flag}_{bin_key}")
@@ -92,8 +76,7 @@ def show_negweighted_bins(ws_filename, bkg_categories, binning_pt, binning_eta, 
 
 ###############################################################################
 
-def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
-                        import_data=False, import_mc_signal=False, 
+def make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta,
                         import_fit_pars=False, import_fit_pdf_bkg=False, pdf_bkg_shape="expo"):
     """
     Creates a dictionary containing the bkg MC datasets and the useful information related to them.
@@ -108,56 +91,35 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
     datasets = {}
     datasets.update({"axis" : axis})
 
-    for bkg_cat in bkg_categories:
+    type_dataset, subs = "", ""
 
-        bkg_histo = ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
+    for cat in import_categories:
+        if "bkg" in cat: 
+            cat.replace("_SS", "")
+            type_dataset, subs = cat.split("_")
+            subs = f"_{subs}"
+        elif cat=="data": 
+            type_dataset = "data"
+        elif "mc" in cat: 
+            type_dataset = "mc"
+        else:
+            sys.exit("ERROR: wrong category name")
 
-        datasets.update({f"{bkg_cat}_bkg" : {
-            "roohisto" : bkg_histo,
-            "histo_pdf" : ROOT.RooHistPdf(f"{bkg_cat}_bkg_pdf", f"{bkg_cat}_bkg_pdf", ROOT.RooArgSet(axis), bkg_histo, 0),
-            "integral" : bkg_histo.sumEntries()
-            }
-        })
+        datasets[cat] = ws.data(f"Minv_{type_dataset}_{flag}_{bin_key}{subs}")
 
-    bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo", 
-                                       ROOT.RooArgSet(axis), "plot_binning")
+    datasets["bkg_total"] = get_totbkg_roohist([ws, import_categories], axis, bin_key,)
 
-    for bkg_cat in bkg_categories:
-        bkg_total_histo.add(datasets[f"{bkg_cat}_bkg"]["roohisto"])
-
-    datasets.update({"total_bkg" : {
-        "roohisto": bkg_total_histo,
-        "integral" : bkg_total_histo.sumEntries()
-        }
-    })
-
-    if import_data:
-        histo_data = ws.data(f"Minv_data_{flag}_{bin_key}")
-        datasets.update({"data" : histo_data})
-    
-    if import_mc_signal:
-        histo_mc = ws.data(f"Minv_mc_{flag}_{bin_key}")
-        datasets.update({"MC_signal" : {
-            "roohisto" : histo_mc,
-            "histo_pdf" : ROOT.RooHistPdf(f"MC_signal_pdf", f"MC_signal_pdf", ROOT.RooArgSet(axis), histo_mc, 0),
-            "integral" : histo_mc.sumEntries()
-            }
-        })
-    
     if import_fit_pars:
         res_obj = ws.obj(f"results_{flag}_{bin_key}")
         pars = res_obj.floatParsFinal()
-        datasets.update({"fit_pars" : {
-            "nsig" : pars.find(f"nsig_{flag}_{bin_key}"),
-            "nbkg" : pars.find(f"nbkg_{flag}_{bin_key}"),
-            }
-        })
+        datasets["fit_pars"] = {"nsig" : pars.find(f"nsig_{flag}_{bin_key}"),
+                                "nbkg" : pars.find(f"nbkg_{flag}_{bin_key}")}
 
+    '''
     if import_fit_pdf_bkg:
         pdf_bkg_fit = ws.pdf(f"{pdf_bkg_shape}_bkg_{flag}_{bin_key}")
         if type(pdf_bkg_fit) is ROOT.TObject:
-            print(f"ERROR: bkg pdf not found at bin {bin_key}")
-            sys.exit()
+            sys.exit(f"ERROR: bkg pdf not found at bin {bin_key}")
 
         res_obj = ws.obj(f"results_{flag}_{bin_key}")
         pars = res_obj.floatParsFinal()
@@ -168,9 +130,9 @@ def make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories,
 
         datasets.update({"pdf_bkg_fit" : {
             "pdf" : pdf_bkg_fit,
-            "norm" : norm_bkg
-            }
-        })
+            "norm" : norm_bkg}
+            })
+    '''
 
     return datasets
 
@@ -195,10 +157,8 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
     ws = file.Get("w")
 
     bins_pt, bins_pt = binning(binning_pt), binning(binning_eta)
-    nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_pt)-1
     bin_dict = bin_dictionary(binning_pt, binning_eta)
     
-
     bins_ratio = [round(0.0 + 0.2*i, 2) for i in range(6)] + \
                     [round(1.0 + i, 2) for i in range(1, 10)] + \
                     [round(10.0 + 20*i, 2) for i in range(1, 10)] + [200.0]
@@ -217,18 +177,10 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
         histos.update(init_pass_fail_histos("h_bkgfrac_ratio", "Bkg fraction mc/fit ratio", 
                                             array('d', bins_ratio), bins_pt, bins_pt))
 
-    for bin_key in bin_dict.keys():
+
+    for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
         # if bin_key != "[24.0to26.0][-2.4to-2.3]": continue
-
-        _, bin_pt, bin_eta = bin_dict[bin_key]
-
-        # Bin transformation needed in case the bins are merged
-        if type(bin_pt) is list:
-            bin_pt = int(1+(nbins_pt*(bin_pt[0]-1)/15.))
-        if type(bin_eta) is list:
-            bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
-    
 
         for flag in ["pass", "fail"]:
             
@@ -241,7 +193,6 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                 
                 plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=f"{figpath}/minv_plots_w_data")
 
-         
                 if plot_fit_bkgpdf and 1==0:
                     integral_histo_bkg = datasets["total_bkg"]["integral"]
                     norm_bkg = datasets["pdf_bkg_fit"]["norm"]
@@ -343,9 +294,6 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
     bin_dict = bin_dictionary(binning_pt, binning_eta)    
 
-    nbins_pt = len(bins_pt) - 1
-    nbins_eta = len(bins_eta) - 1
-
     
     histos = {}
 
@@ -361,23 +309,9 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
         del histos[f"{bkg_cat}_pass"]
         del histos[f"{bkg_cat}_fail"]
 
-        cnt_mergedpt = 0
-
-        isTotBkgImported = False
-
-        for bin_key in bin_dict:
+        for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
             # if bin_key != "[24.0to26.0][-2.4to-2.3]": sys.exit()
-
-            _, bin_pt, bin_eta = bin_dict[bin_key]
-
-            # Bin transformation needed in case the bins are merged
-            if type(bin_eta) is list:
-                bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
-            if type(bin_pt) is list:
-                bin_pt_list = bin_pt
-                bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
-                cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
 
             num_events = {}
 
@@ -390,11 +324,14 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
                 if norm_data: h_norm = ws.data(f"Minv_data_{flag}_{bin_key}")
                 elif norm_sig: h_norm = ws.data(f"Minv_mc_{flag}_{bin_key}")
                 elif norm_tot_bkg:
-                    if isTotBkgImported is False: 
-                        import_totbkg_hist(ws, bin_key, bkg_categories)
-                        isTotBkgImported = True
-                    h_norm = ws.data(f"Minv_bkg_{flag}_{bin_key}_total")
-                
+                        axis = ws.var(f"x_{flag}_{bin_key}")
+                        if binning_pt!="pt" or binning_eta!="eta":
+                            extended_bin_dict = bin_global_idx_dict(binning_pt, binning_eta)
+                            bin_pt_ext, bin_eta_ext = extended_bin_dict[str(gl_idx[0])]
+                        else:
+                            bin_pt_ext, bin_eta_ext = bin_pt, bin_eta
+                        h_norm = get_totbkg_roohist([ws, bkg_categories], axis, bin_key, bin_pt_ext, bin_eta_ext)
+
                 if h_norm.sumEntries() > 0 and num_events[flag] > 0:
                     if h_norm.sumEntries() < num_events[flag]:
                         print(num_events[flag], h_norm.sumEntries())
@@ -409,13 +346,9 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
             histos[f"{bkg_cat}_fail_2d"].SetBinContent(bin_pt, bin_eta, num_events["fail"])
             histos[f"{bkg_cat}_fail_2d"].SetBinError(bin_pt, bin_eta, num_events["error fail"])
 
-            isTotBkgImported = False
-
         hist_dict_bkgcat = {"pass" : histos[f"{bkg_cat}_pass_2d"], "fail" : histos[f"{bkg_cat}_fail_2d"]}
         plot_2d_bkg_distrib(hist_dict_bkgcat, bkg_cat, figpath=f"{filepath}/bkg_2d_distrib")
 
-        isTotBkgImported = True
-    
 
     rootfile_distrib = ROOT.TFile(f"{filepath}/bkg_2d_distrib.root", "RECREATE")
     rootfile_distrib.cd()

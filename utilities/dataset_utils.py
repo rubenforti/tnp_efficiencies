@@ -5,7 +5,8 @@ import sys
 import os
 import ROOT
 from copy import deepcopy
-from utilities.base_library import binning, bin_dictionary, lumi_factors, lumi_factor, get_idx_from_bounds, bin_global_idx_dict
+from itertools import repeat
+from utilities.base_library import binning, bin_dictionary, lumi_factor, bin_global_idx_dict
 
 
 bkg_sum_selector = {
@@ -20,12 +21,17 @@ bkg_sum_selector = {
     "signalMC_SS" : -1.
 }
 
+###############################################################################
+
 def gen_import_dictionary(base_folder, type_eff, dset_names,
                           ch_set = [""],
                           scale_MC = False,
                           add_SS_mc = False,
                           add_SS_bkg = False):
     """
+    Generates a dictionary that contains the information about the datasets
+    to be imported. The keys are the names of the datasets, the values are
+    dictionaries that contain the filepath(s) and the luminosity scale factor
     """
     import_dictionary = {}
 
@@ -45,7 +51,6 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
             S_sel, c_sel = "SS", "0"
 
         for ch in ch_set:
-                
                 filename = f"{base_folder}/{S_sel}/tnp_{type_eff}{ch}_{flag_set}_vertexWeights1_oscharge{c_sel}.root"
                 import_dictionary[dset_name]["filenames"].append(filename)
         
@@ -69,6 +74,7 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
 
     return import_dictionary
                 
+###############################################################################
 
 
 def import_pdf_library(*functions):
@@ -89,38 +95,8 @@ def import_pdf_library(*functions):
             print("ERROR in sourcefile compiling and loading")
             sys.exit()
 
-
 ###############################################################################
 
-def import_totbkg_hist(ws, bin_key, bkg_categories, bkg_selector=bkg_sum_selector):
-    """
-    Imports into a workspace a RooDataHist that represents the total 
-    background, for a given pt-eta bin. The background sources need to be 
-    correctly normalized before calling this function, and their impact in 
-    the total bkg histogram is managed by the "bkg_selector" dictionary.
-    """
-    for flag in ["pass", "fail"]:
-        axis = ws.var(f"x_{flag}_{bin_key}")
-        bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", "bkg_total_histo", 
-                                       ROOT.RooArgSet(axis), "x_binning")
-
-        for bkg_cat in bkg_categories:
-            bkg_dataset = ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
-            if bkg_selector[bkg_cat] == 1: 
-                bkg_total_histo.add(bkg_dataset)
-            elif bkg_selector[bkg_cat] == -1:
-                bkg_dataset_copy = bkg_dataset.Clone(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_copy")
-                for i in range(axis.getBinning("x_binning").numBins()):
-                    bkg_dataset_copy.get(i)
-                    bkg_dataset_copy.set(i, -1*bkg_dataset_copy.weight(i), bkg_dataset_copy.weightError(ROOT.RooAbsData.SumW2))
-                bkg_total_histo.add(bkg_dataset_copy)
-            else:
-                pass
-
-        ws.Import(bkg_total_histo)
-
-
-###############################################################################
 
 def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta, 
                 global_scale=-1.):
@@ -161,14 +137,12 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
         print(f"{flag}_mu_{type_suffix}")
         histo3d = file.Get(f"{flag}_mu_{type_suffix}")
 
-        # In the projection, option "e" is specified to calculate the bin 
-        # content errors in the new histogram for generic selection of bin_pt
-        # and bin_eta. Without it, all works as expected ONLY IF the projection
-        # is done on a single bin of pt-eta
+        # In the projection, option "e" is specified to calculate the bin content errors in the new histogram for 
+        # generic selection of bin_pt and bin_eta. Without it, all works as expected ONLY IF the projection is done 
+        # on a single bin of pt-eta
         th1_histo = histo3d.ProjectionX(f"Histo_{type_set}_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")
 
         if global_scale > 0: th1_histo.Scale(global_scale)
-
 
         if th1_histo.Integral() < 0:
             print(f"ERROR: negative entries in TH1 in bin {bin_pt}-{bin_eta}")
@@ -201,6 +175,54 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
             
     return roohisto
 
+###############################################################################
+
+
+def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, bkg_selector=bkg_sum_selector):
+    """
+    Returns a RooDataHist that represents the total background, for a given
+    pt-eta bin. The background sources are stored in the "dataset_dict" object
+    and are normalized in this function.Their impact in the total bkg histogram
+    is managed by the "bkg_selector" dictionary.
+    """
+    if type(import_obj) is list and type(import_obj[0]) is ROOT.RooWorkspace:  # First position has to be occupied by the workspace, the second by the list of the processes to be summed
+        ws = import_obj[0]
+        if type(ws.data(f"Minv_bkg_{flag}_{bin_key}")) is ROOT.RooDataHist:
+            return ws.data(f"Minv_bkg_{flag}_{bin_key}")
+        else:
+            iter_object = zip(import_obj[1], repeat(import_obj[0]))
+    if type(import_obj) is dict:
+        iter_object = import_obj.items()
+    else:
+        sys.exit("ERROR: invalid object type given")
+    
+    bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", f"Minv_bkg_{flag}_{bin_key}_total", 
+                                       ROOT.RooArgSet(axis), "x_binning")
+
+    # Loop over the background categories                
+    for bkg_cat, bkg_obj in import_obj.items():
+            
+        if ("SS" in bkg_cat) or (bkg_sum_selector[bkg_cat.replace("bkg_","")]==0): continue
+        
+        if type(bkg_obj) is not ROOT.RooWorkspace:
+            files, lumi_scale = bkg_obj["filenames"], bkg_obj["lumi_scale"]
+            dset_type = "bkg" if not "SameCharge" in bkg_cat else "data_SC"
+            
+            bkg_histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, global_scale=lumi_scale)
+        else:
+            bkg_histo = bkg_obj.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
+        
+        bkg_histo_copy = bkg_histo.Clone(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_copy")  # idk if is strictly necessary, but it's safer
+
+        coeff_sum = bkg_selector[bkg_cat]
+        for i in range(axis.getBinning("x_binning").numBins()):
+            bkg_histo_copy.get(i)
+            bkg_histo_copy.set(i, coeff_sum*bkg_histo.weight(i), abs(coeff_sum)*bkg_histo.weightError(ROOT.RooAbsData.SumW2))
+
+        bkg_total_histo.add(bkg_histo_copy)
+
+    return bkg_total_histo
+
 
 ###############################################################################
 
@@ -225,7 +247,7 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
     """
 
     if altBinning_bkg is False:
-        bins = bin_dictionary(binning_pt, binning_eta)
+        bins = bin_dictionary(binning_pt, binning_eta, get_mergedbins_bounds=True)
     else:
         bin_idx_dict = bin_global_idx_dict(binning_pt, binning_eta)
         bins = bin_dictionary()
@@ -251,10 +273,9 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
 
     
     # Loop over the pt-eta bins
-    for bin_key in bins.keys():
+    for bin_key, [gl_idx, bin_pt, bin_eta] in bins.items():
 
         print(f"\n\n### Importing datasets in bin {bin_key} ###\n")
-        gl_idx, bin_pt, bin_eta = bins[bin_key]
 
         flags = ["pass", "fail"] if type_analysis == "indep" else ["sim"]
         for flag in flags:
@@ -289,26 +310,11 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
             
             # Importing the total background histogram if light mode is called (only for OS)
             if lightMode_bkg is True:
-                bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", f"Minv_bkg_{flag}_{bin_key}_total", 
-                                                   ROOT.RooArgSet(axis), "x_binning")
-                print(bkg_merging_dict.keys())
-                for bkg_cat, bkg_obj in bkg_merging_dict.items():
-                    print(bkg_cat)
-                    if "SS" not in bkg_cat and bool(bkg_sum_selector[bkg_cat.replace("bkg_","")]) is True:
-                        files = bkg_obj["filenames"]
-                        print(files)
-                        lumi_scale = bkg_obj["lumi_scale"]
-                        if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
-                        dset_type = "bkg" if not "SameCharge" in bkg_cat else "data_SC"
-                        histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, global_scale=lumi_scale)
-                        bkg_total_histo.add(histo)
-                    else:
-                        pass
+                if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
+                bkg_total_histo = get_totbkg_roohist(bkg_merging_dict, flag, axis, bin_key, bin_pt, bin_eta)
                 ws.Import(bkg_total_histo)
 
     return ws
-
-
       
 ###############################################################################     
 ###############################################################################

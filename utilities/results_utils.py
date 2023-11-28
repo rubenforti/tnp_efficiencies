@@ -27,6 +27,7 @@ def efficiency_from_res(res_pass, res_fail):
 
 ###############################################################################
 
+
 class results_manager:
     """
     """
@@ -40,10 +41,11 @@ class results_manager:
             print("ERROR: analysis type not recognized")
             return None
         
-        if type(import_ws) is ROOT.RooWorkspace:
-            bin_dict = bin_dictionary(binning_pt, binning_eta)
-            for bin_key in bin_dict.keys():
-
+        bin_dict = bin_dictionary(binning_pt, binning_eta)
+        
+        for bin_key in bin_dict.keys():
+        
+            if type(import_ws) is ROOT.RooWorkspace:
                 if self._analysis == 'indep':
                     res_pass = import_ws.obj(f"results_pass_{bin_key}")
                     res_fail = import_ws.obj(f"results_fail_{bin_key}")
@@ -53,14 +55,12 @@ class results_manager:
                 else:
                     print("ERROR: analysis type not recognized")
         
-        elif type(import_txt) is list:
-            idx_list = 3
-            print(import_txt[0])
-            print(import_txt[1])
-            print(import_txt[2])
-            print(import_txt[3])
-            bin_dict = bin_dictionary(binning_pt, binning_eta)
-            for bin_key in bin_dict.keys():
+            elif type(import_txt) is list:
+                idx_list = 3
+                print(import_txt[0])
+                print(import_txt[1])
+                print(import_txt[2])
+                print(import_txt[3])
                 if altSig_check is False:
                     self.add_result_from_txt(import_txt, idx_list, bin_key)
                 else:
@@ -94,17 +94,13 @@ class results_manager:
                 self._dict_results.update(new_res)
 
         elif self._analysis == 'sim':
-            # res = ws.obj(f"results_({bin_pt}|{bin_eta})")
             results = res["sim"]
             if type(results) is not ROOT.RooFitResult:
                 print("ERROR: result object not recognized")
                 print(bin_key)
                 sys.exit()
             pars = results.floatParsFinal()
-            #new_res = {f"{bin_pt},{bin_eta}": {
             new_res = {f"{bin_key}": {
-                # "efficiency" : (res.floatParsFinal().find(f"efficiency_({bin_pt}|{bin_eta})").getVal(),
-                #                 res.floatParsFinal().find(f"efficiency_({bin_pt}|{bin_eta})").getError()),
                 "efficiency" : (pars.find(f"efficiency_{bin_key}").getVal(),
                                 pars.find(f"efficiency_{bin_key}").getError()),
                 "pars_sim": results.floatParsFinal(),
@@ -223,6 +219,7 @@ class results_manager:
 
 ###############################################################################
 
+
 def init_pass_fail_histos(histo_name, histo_title, bins_var, bins_pt, bins_eta):
 
     histos = {}
@@ -239,6 +236,7 @@ def init_pass_fail_histos(histo_name, histo_title, bins_var, bins_pt, bins_eta):
     
 ###############################################################################
 
+
 def init_results_histos(histo_name, histo_title, bins_var, bins_pt, bins_eta):
 
     histos = {}
@@ -253,24 +251,14 @@ def init_results_histos(histo_name, histo_title, bins_var, bins_pt, bins_eta):
 
 ###############################################################################
 
-def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict, nbins_eta):
+
+def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict):
     """
     """
+    for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
-    # Counter used in case pt bins are merged
-    cnt_mergedpt = 0
-
-    for bin_key in bin_dict.keys():
-
-        _, bin_pt, bin_eta = bin_dict[bin_key]
-
-        # Bin transformation needed in case the bins are merged
-        if type(bin_eta) is list:
-                bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
-        if type(bin_pt) is list:
-            bin_pt_list = bin_pt
-            bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
-            cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
+        if type(bin_eta) is list or type(bin_eta) is list:
+            sys.exit("ERROR: binning not correcty defined, use get_mergedbins_bounds=False in dictionary generation")
 
         eff_1, deff_1 = res_bmark.getEff(bin_key)
         eff_2, deff_2 = res_new.getEff(bin_key)
