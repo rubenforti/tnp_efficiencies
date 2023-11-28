@@ -90,7 +90,7 @@ if generate_datasets:
         
         ws_bkg = ws_init(import_dict_bkg, type_analysis, binning_pt_bkg, binning_eta_bkg, 
                              binning_mass, import_existing_ws=True, existing_ws_filename=ws_filename, 
-                             altBinning_bkg=mergedbins_bkg)
+                             lightMode_bkg=True, altBinning_bkg=mergedbins_bkg)
         ws_bkg.writeToFile(ws_filename)
 
 # -----------------------------------------------------------------------------------------------------------
@@ -114,13 +114,16 @@ elif "custom" in fit_settings:
 else:
     sys.exit("ERROR: wrong fit settings indicated")
 
-fit_settings.update({"type_analysis" : type_analysis})
-fit_settings.update({"refit_nobkg" : refit_nobkg})
-fit_settings.update({"fit_on_pseudodata" : fit_on_pseudodata})
-fit_settings.update({"fit_verb" : fit_verb})
-fit_settings.update({"useMinos" : useMinos})
+fit_settings["type_analysis"] = type_analysis
+fit_settings["refit_nobkg"] = refit_nobkg
+fit_settings["fit_on_pseudodata"] = fit_on_pseudodata
+fit_settings["import_mc_samesign"] = import_mc_samesign
+fit_settings["fit_verb"] = fit_verb
+fit_settings["useMinos"] = useMinos
 
-if load_bkg_datasets or fit_on_pseudodata: fit_settings.update({"bkg_categories" : bkg_categories})
+if load_bkg_datasets or fit_on_pseudodata: 
+    fit_settings["bkg_categories"] = bkg_categories
+    fit_settings["import_bkg_samesign"] = import_bkg_samesign
 
 
 # -----------------------------------------------------------------------------------------------------------

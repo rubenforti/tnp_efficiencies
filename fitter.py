@@ -3,6 +3,7 @@
 import ROOT
 import sys
 import copy
+from utilities.dataset_utils import get_totbkg_roohist
 from utilities.results_utils import efficiency_from_res
 from utilities.plot_utils import plot_fitted_pass_fail
 from utilities.base_library import eval_efficiency, sumw2_error
@@ -101,18 +102,14 @@ class AbsFitter():
                                         self.axis[flag], self.pars["alpha"][flag], self.pars["beta"][flag],
                                         self.pars["gamma"][flag], self.pars["peak"][flag])
                 })
-            self.pdfs["bkg_pdf"][flag].Print("v")
         
-        elif bkg_model == "mc_raw":
-            # histo_binning = axis.getBinning()
-            self.bkg_tothist[flag] = ROOT.RooDataHist(f"Minv_bkg_{flag}_{self.bin_key}_total", "Bkh total histogram",
-                                                      ROOT.RooArgSet(self.axis[flag]), "x_binning")
-
-            for cat in self.bkg_categories: self.bkg_tothist[flag].add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_{cat}")) 
-    
-            self.pdfs["bkg_pdf"].update({ flag : ROOT.RooHistPdf(
-                f"mcbkg_{flag}_{self.bin_key}", "MC-driven background", 
-                ROOT.RooArgSet(self.axis[flag]), self.bkg_tothist[flag]) })
+        elif bkg_model.startswith("mc_raw"):
+            self.pdfs["bkg_pdf"].update({ 
+                flag : ROOT.RooHistPdf(f"mcbkg_{flag}_{self.bin_key}_total", "MC-driven background", 
+                                       ROOT.RooArgSet(self.axis[flag]),  ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total"))
+                })
+            
+            
     
         elif bkg_model == "mc_BBlight":
             # pdf created via barlow beeston strategy

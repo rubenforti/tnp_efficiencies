@@ -18,7 +18,7 @@ bkg_sum_selector = {
     "Ztautau" : 1,
     "SameCharge" : 1,
     "WJets" : 0,
-    "signalMC_SS" : -1.
+    "mc_SS" : -1.
 }
 
 ###############################################################################
@@ -228,7 +228,8 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, bkg_sel
 
 def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mass, 
             import_existing_ws = False, 
-            existing_ws_filename = "", 
+            existing_ws_filename = "",
+            create_totbkg = False,
             lightMode_bkg = False, 
             altBinning_bkg = False):
     """
@@ -266,10 +267,12 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
     for dataset_obj in import_datasets.values():
         dataset_obj["filenames"] = [ROOT.TFile(v, "READ") for v in dataset_obj["filenames"]]
 
-    if lightMode_bkg is True:
-        # Importing only the total background histogram
-        bkg_merging_dict = {k : v for k, v in import_datasets.items() if k.startswith("bkg_")}
-        import_datasets  = {k : v for k, v in import_datasets.items() if not k.startswith("bkg_")}
+
+            
+    bkg_merging_dict = {k : v for k, v in import_datasets.items() if k in bkg_sum_selector.keys()}
+
+    if lightMode_bkg is True:  # Not importing the single histograms used for the total background
+        import_datasets  = {k : v for k, v in import_datasets.items() if not k in bkg_sum_selector.keys()}
 
     
     # Loop over the pt-eta bins
