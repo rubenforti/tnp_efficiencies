@@ -113,6 +113,14 @@ class AbsFitter():
             self.pdfs["bkg_pdf"].update({ flag : ROOT.RooHistPdf(
                 f"mcbkg_{flag}_{self.bin_key}", "MC-driven background", 
                 ROOT.RooArgSet(self.axis[flag]), self.bkg_tothist[flag]) })
+    
+        elif bkg_model == "mc_BBlight":
+            # pdf created via barlow beeston strategy
+            pass
+        
+        else:
+            print("ERROR: background model not recognized")
+            sys.exit()
             
 
     def _createPseudodata(self, flag, ws):
@@ -211,7 +219,7 @@ class AbsFitter():
                 if import_mc is True: self.histo_data.update({f"mc_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}")})
             else:
                 self._createPseudodata(flag, ws)
-        print(self.histo_data["pass"].sumEntries(), self.histo_data["fail"].sumEntries())
+        # print(self.histo_data["pass"].sumEntries(), self.histo_data["fail"].sumEntries())
 
 
     def initNorm(self):
@@ -266,7 +274,7 @@ class AbsFitter():
             par_minos_set.add(self.pdfs["fit_model"][flag].getParameters(self.histo_data[flag]))
 
         if "constr" in self.settings.keys(): self._setConstraints(flag)
-        print(self.constr_set)
+        # print(self.constr_set)
         self.pdfs["fit_model"][flag].Print("v")
         
         res = self.pdfs["fit_model"][flag].fitTo(self.histo_data[flag],
@@ -322,7 +330,7 @@ class AbsFitter():
                             "efficiency_mc" : [eff_mc, deff_mc],
                             "scale_factor" : [scale_factor, d_scale_factor]})
         
-        plot_fitted_pass_fail(self.settings["type_analysis"], plot_objects, self.bin_key, pull=False, figpath=fig_folder)
+        plot_fitted_pass_fail(self.settings["type_analysis"], plot_objects, self.bin_key, figpath=fig_folder)
 
 
 ###############################################################################

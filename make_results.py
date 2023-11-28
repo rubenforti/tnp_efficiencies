@@ -74,10 +74,8 @@ def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
                                           res_var_dict[res_key]["array"], bins_pt, bins_eta))
 
     
-    for bin_key in bin_dict.keys():
-        
-        _, bin_pt, bin_eta = bin_dict[bin_key]
-    
+    for bin_key, [_, bin_pt, bin_eta] in bin_dict.items():
+
         eff, d_eff = results.getEff(bin_key)
         eff_mc, d_eff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
                                            ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
@@ -98,6 +96,7 @@ def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
     file_out.Close()
 
 ###############################################################################
+
 
 def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binning_eta, res_list,
                        eval_nobkg_effect=False):
@@ -139,12 +138,11 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
                 if pars_pass.getSize() == 5 or pars_fail.getSize() == 5:
                     bin_dict.pop(b_key)
         elif t_an == "sim":
-            print("A")
             for b_key in bin_dict_original.keys():
                 pars_sim = res_new.getPars("sim", b_key)
                 if pars_sim.getSize() == 10:
                     bin_dict.pop(b_key)
-        
+
         NBINS = len(bin_dict.keys())
     
  
@@ -153,7 +151,7 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
                                        resCmp_var_dict[res_key]["array"], bins_pt, bins_eta)) 
      for res_key in res_list]
 
-    fill_res_histograms(res_benchmark, res_new, histos, bin_dict, len(bins_eta)-1) 
+    fill_res_histograms(res_benchmark, res_new, histos, bin_dict) 
 
     '''
     histos_copy = histos.copy()
@@ -198,22 +196,8 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list):
      for res_key in res_list]
 
     results = results_manager("indep", binning_pt, binning_eta, import_ws=ws)
-
-    cnt_mergedpt = 0
-
-    print(histos.keys())
     
-    for bin_key in bin_dict.keys():
-
-        _, bin_pt, bin_eta = bin_dict[bin_key]
-
-       # Bin transformation needed in case the bins are merged
-        if type(bin_eta) is list:
-            bin_eta = int(1+(nbins_eta*(bin_eta[0]-1)/48.))
-        if type(bin_pt) is list:
-            bin_pt_list = bin_pt
-            bin_pt = int(bin_pt_list[0] - cnt_mergedpt)
-            cnt_mergedpt += bin_pt_list[-1]-bin_pt_list[0] if bin_eta==nbins_eta else 0
+    for bin_key, [_, bin_pt, bin_eta] in bin_dict.items():
         
         eff, d_eff = results.getEff(bin_key)
 
@@ -269,9 +253,7 @@ def eval_minos(ws_hesse_filename, ws_filename, binning_pt, binning_eta):
                                       ratio_errors_binning, bins_pt, bins_eta))
     
 
-    for bin_key in bin_dict.keys():
-
-        _, bin_pt, bin_eta = bin_dict[bin_key]
+    for bin_key, [_, bin_pt, bin_eta] in bin_dict.items():
 
         res, res_hesse = ws.obj(f"results_sim_{bin_key}"), ws_hesse.obj(f"results_sim_{bin_key}")
         
@@ -297,12 +279,6 @@ def eval_minos(ws_hesse_filename, ws_filename, binning_pt, binning_eta):
     file_out.Close()
 
 
-    
-    
-
-
-
-
 
 ###############################################################################
 ###############################################################################
@@ -314,14 +290,17 @@ if __name__ == '__main__':
 
     import_pdf_library("RooCMSShape")
 
-    benchmark_res_iso = "trackingplus_res/old_results.txt"
+    base_folder = "/scratchnvme/rforti/tnp_efficiencies_results"
+
+
+    benchmark_res = base_folder+"/results_tracking/benchmark_tracking/old_results.txt"
 
     bmark_fit_filename = "results/benchmark_iso_r628/ws_iso_indep_bmark.root"
     
     #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
     # ws_filename = "results/pseudodata_iso/ws_iso_pseudodata.root"
 
-    ws_filename = "trackingplus_res/ws_trackingplus_indep.root"
+    ws_filename =  base_folder+"/results_tracking/benchmark_tracking/ws_tracking_indep_benchmark.root"
 
     # ws_filename = "results/pseudodata_iso/ws_iso_indep_pseudodata_new.root"
 
@@ -330,7 +309,7 @@ if __name__ == '__main__':
 
 
     # save_eff_results(bmark_fit_filename, "indep", "pt", "eta")
-    compare_efficiency(benchmark_res_iso, ws_filename, "pt_tracking", "eta", resCmp_list)
+    compare_efficiency(benchmark_res, ws_filename, "pt_tracking", "eta", resCmp_list)
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 

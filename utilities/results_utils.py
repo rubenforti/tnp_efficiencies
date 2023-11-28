@@ -43,6 +43,8 @@ class results_manager:
         
         bin_dict = bin_dictionary(binning_pt, binning_eta)
         
+        idx_list = 3  # Number of first useful row in the txt file (first 3 are comments) 
+
         for bin_key in bin_dict.keys():
         
             if type(import_ws) is ROOT.RooWorkspace:
@@ -56,11 +58,6 @@ class results_manager:
                     print("ERROR: analysis type not recognized")
         
             elif type(import_txt) is list:
-                idx_list = 3
-                print(import_txt[0])
-                print(import_txt[1])
-                print(import_txt[2])
-                print(import_txt[3])
                 if altSig_check is False:
                     self.add_result_from_txt(import_txt, idx_list, bin_key)
                 else:
@@ -116,7 +113,8 @@ class results_manager:
         elements = row_list[idx_list].split('\t')
         eff, deff = float(elements[4]), float(elements[5])
         self._dict_results.update({bin_key : {"efficiency" : (eff, deff)}})
-    
+        print(idx_list, bin_key, elements[0], elements[1], elements[2], elements[3])
+
     def add_result_from_txt_altSig(self, row_list, idx_list, bin_key):
         elements = row_list[idx_list].split('\t')
         eff, deff = float(elements[8]), float(elements[9])

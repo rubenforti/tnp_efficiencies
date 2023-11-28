@@ -92,7 +92,7 @@ def plot_minv_distrib_with_fit(pad, axis, data, pdf_fit):
 
 ###############################################################################
 
-def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, pull=False, figpath=""): 
+def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, figpath=""): 
     """
     Function that creates and saves the plot containing the passing and failing
     probes histograms, together with the post-fit pdfs and the efficiency 

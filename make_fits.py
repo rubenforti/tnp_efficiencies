@@ -75,7 +75,7 @@ def doSingleFit(fitter, ws, flags, savefigs, figpath=None):
 ###############################################################################
 
 
-def runFits(ws_name, bins_dict, fit_settings, parallelize=True, import_pdfs=False,  
+def runFits(ws_name, bin_dict, fit_settings, parallelize=True, import_pdfs=False,  
             savefigs=False, figpath={"good":"figs/stuff", "check":"figs/check/stuff"}):
     """
     """
@@ -90,7 +90,7 @@ def runFits(ws_name, bins_dict, fit_settings, parallelize=True, import_pdfs=Fals
     prob_bins = []
 
 
-    for bin_key in bins_dict.keys():
+    for bin_key in bin_dict.keys():
         
         # if bin_key != "[24.0to35.0][-0.1to0.0]": continue
         # if bin_key != "[24.0to26.0][-0.1to0.0]": continue
