@@ -257,6 +257,20 @@ def sumw2_error(histo):
 
     return sum_error
 
+###############################################################################
+
+
+def eval_norm_corrected(Ndata, Nbkg_raw, f, df):
+    """
+    """
+    Nsig_corr = (Ndata - Nbkg_raw)/(1-f)
+    sigma_Nsig_corr = ROOT.TMath.Sqrt(Ndata + Nbkg_raw + (Nsig_corr*df)**2)/(1-f)
+    
+    Nbkg_corr = Nbkg_raw - (f*Nsig_corr)
+    sigma_Nbkg_corr = ROOT.TMath.Sqrt(Nbkg_raw + (Nsig_corr*df)**2 + (f*sigma_Nsig_corr)**2)
+
+    return Nsig_corr, sigma_Nsig_corr, Nbkg_corr, sigma_Nbkg_corr
+
 
 ###############################################################################
 ###############################################################################
