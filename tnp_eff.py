@@ -26,21 +26,22 @@ type_eff = "tracking"
 type_analysis = "indep"
 charge_selection = ["plus", "minus"]
 
-folder = gen_res_folder+"/results_tracking/benchmark_tracking"
-ws_filename = folder+"/ws_tracking_indep_benchmark.root"
+#folder = gen_res_folder+"/results_tracking/benchmark_tracking"
+folder = gen_res_folder
+ws_filename = folder+"/ws_tracking_prova.root"
 
-generate_datasets = False
+generate_datasets = True
 
-fit_settings = "custom_run3"
+fit_settings = "custom_run1"
 
 binning_pt, binning_eta, binning_mass = "pt_tracking", "eta", "mass_50_130"
 
 mergedbins_bkg, binning_pt_bkg, binning_eta_bkg = False, "pt_12bins", "eta_16bins"
 
-load_bkg_datasets = False
+load_bkg_datasets = True
 bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau", "bkg_SameCharge"]
 import_bkg_samesign = False
-import_mc_samesign = False
+import_mc_samesign = True
 
 fit_on_pseudodata = False
 
@@ -52,7 +53,7 @@ refit_nobkg = True
 
 useMinos = False
 
-import_pdfs = True
+import_pdfs = False
 
 savefigs = True
 
@@ -61,6 +62,8 @@ figpath = {"good": f"{folder}/fit_plots",
 
 if mergedbins_bkg and (binning_pt != "pt" or binning_eta != "eta"):
     sys.exit("ERROR: Evaluation of background in merged bins for its comparison on data is allowed only wrt reco-bins of pt and eta for data")
+
+if fit_on_pseudodata: load_bkg_datasets = True
 
 
 # -----------------------------------------------------------------------------------------------------------
@@ -71,16 +74,22 @@ if generate_datasets:
     datasets_folder = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023"
 
     import_categories = ["data", "mc"]
-    scale_MC= True if bool(load_bkg_datasets or fit_on_pseudodata) else False
+
+    if load_bkg_datasets: 
+        scale_MC = True,
+        if not mergedbins_bkg: import_categories += bkg_categories
+    else:
+        scale_MC = False
 
     import_dictionary = gen_import_dictionary(datasets_folder, type_eff, import_categories,
                                               ch_set=charge_selection, scale_MC=scale_MC, 
-                                              add_SS_mc=import_mc_samesign)
+                                              add_SS_mc=import_mc_samesign, add_SS_bkg=import_bkg_samesign)
 
-    ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass)
+    ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass, lightMode_bkg=True)
     ws.writeToFile(ws_filename)
 
-    if load_bkg_datasets or fit_on_pseudodata: 
+
+    if load_bkg_datasets and mergedbins_bkg: 
 
         import_dict_bkg = gen_import_dictionary(datasets_folder, type_eff, bkg_categories,
                                                 ch_set=charge_selection, add_SS_bkg=import_bkg_samesign)
@@ -88,10 +97,10 @@ if generate_datasets:
         if mergedbins_bkg is False:
             binning_pt_bkg, binning_eta_bkg = binning_pt, binning_eta
         
-        ws_bkg = ws_init(import_dict_bkg, type_analysis, binning_pt_bkg, binning_eta_bkg, 
+        ws = ws_init(import_dict_bkg, type_analysis, binning_pt_bkg, binning_eta_bkg, 
                              binning_mass, import_existing_ws=True, existing_ws_filename=ws_filename, 
                              lightMode_bkg=True, altBinning_bkg=mergedbins_bkg)
-        ws_bkg.writeToFile(ws_filename)
+        ws.writeToFile(ws_filename)
 
 # -----------------------------------------------------------------------------------------------------------
 # FIT SETTINGS

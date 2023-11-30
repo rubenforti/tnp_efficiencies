@@ -34,8 +34,7 @@ def check_existing_fit(type_analysis, ws, bin_key):
 def pearson_chi2_eval(histo, pdf, axis):
     """
     """
-
-    binning = axis.getBinning()
+    binning = axis.getBinning("x_binning")
     NBINS = binning.numBins()   
     # EVTS = histo.sumEntries()
     BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
@@ -49,6 +48,7 @@ def pearson_chi2_eval(histo, pdf, axis):
 
     chi2_val =0
     used_bins = 0
+
 
     for i in range(NBINS):
     
@@ -132,7 +132,7 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
     if ("pass" in res.GetName()) or ("fail" in res.GetName()):
         flag = "pass" if "pass" in res.GetName() else "fail"
         chi2val, used_bins = llr_eval(histo, pdf, axis) \
-            if type_chi2=="llr" else pearson_chi2_eval(histo, pdf, axis)
+            if type_chi2 == "llr" else pearson_chi2_eval(histo, pdf, axis)
         ndof = used_bins - res.floatParsFinal().getSize()
         res.SetTitle(str(chi2val))
     

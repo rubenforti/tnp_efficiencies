@@ -12,7 +12,7 @@
         },
         "bkg_model" : {
             "pass" : "expo",
-            "fail" : "cmsshape"
+            "fail" : "num_estimation"
         },
         "pars" : {
             "mu" : {
