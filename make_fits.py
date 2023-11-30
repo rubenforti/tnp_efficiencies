@@ -109,7 +109,7 @@ def runFits(ws_name, bin_dict, fit_settings, parallelize=True, import_pdfs=False
 
         if import_pdfs: fitter.importFitObjects(ws)
 
-        printFitStatus(fit_settings["type_analysis"], bin_key, res, status, prob_bins)
+        # printFitStatus(fit_settings["type_analysis"], bin_key, res, status, prob_bins)
 
     print(f"NUM of problematic bins = {len(prob_bins)}")
     print(prob_bins)

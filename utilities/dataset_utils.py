@@ -4,21 +4,21 @@
 import sys
 import os
 import ROOT
-from copy import deepcopy
+from copy import copy, deepcopy
 from itertools import repeat
 from utilities.base_library import binning, bin_dictionary, lumi_factor, bin_global_idx_dict
 
 
 bkg_sum_selector = {
-    "WW" : 1,
-    "WZ" : 1,
-    "ZZ" : 1,
-    "TTFullyleptonic" : 1,
-    "TTSemileptonic" : 0,
-    "Ztautau" : 1,
-    "SameCharge" : 1,
-    "WJets" : 0,
-    "signalMC_SS" : -1.
+    "bkg_WW" : 1,
+    "bkg_WZ" : 1,
+    "bkg_ZZ" : 1,
+    "bkg_TTFullyleptonic" : 1,
+    "bkg_TTSemileptonic" : 0,
+    "bkg_Ztautau" : 1,
+    "bkg_SameCharge" : 1,
+    "bkg_WJets" : 0,
+    "mc_SS" : 0.
 }
 
 ###############################################################################
@@ -54,7 +54,6 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
                 filename = f"{base_folder}/{S_sel}/tnp_{type_eff}{ch}_{flag_set}_vertexWeights1_oscharge{c_sel}.root"
                 import_dictionary[dset_name]["filenames"].append(filename)
         
-        print(dset_name)
         if (dset_name=="mc" and scale_MC is True) or ("bkg" in dset_name and "SameCharge" not in dset_name): 
             lumi_scale = lumi_factor(filename, flag_set)
         
@@ -124,8 +123,6 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
     roohisto = ROOT.RooDataHist(f"Minv_{type_set}_{flag}_{bin_key}", f"Minv_{type_set}_{flag}_{bin_key}",
                                 ROOT.RooArgSet(axis), "x_binning")
     
-    print(type_suffix)
-
     tmp_histos, tmp_roohistos = [], []
 
     print(f"\nImporting histograms in bin {bin_key}")
@@ -134,7 +131,6 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
         
         file = files[it_file] if n_files > 1 else files
 
-        print(f"{flag}_mu_{type_suffix}")
         histo3d = file.Get(f"{flag}_mu_{type_suffix}")
 
         # In the projection, option "e" is specified to calculate the bin content errors in the new histogram for 
@@ -198,11 +194,14 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, bkg_sel
     
     bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", f"Minv_bkg_{flag}_{bin_key}_total", 
                                        ROOT.RooArgSet(axis), "x_binning")
+    
+    bkg_flags = []
+    n_events_bkg = []
 
     # Loop over the background categories                
-    for bkg_cat, bkg_obj in import_obj.items():
-            
-        if ("SS" in bkg_cat) or (bkg_sum_selector[bkg_cat.replace("bkg_","")]==0): continue
+    for bkg_cat, bkg_obj in iter_object:
+
+        if (("SS" in bkg_cat) and ("bkg" in bkg_cat)) or (bkg_sum_selector[bkg_cat]==0): continue
         
         if type(bkg_obj) is not ROOT.RooWorkspace:
             files, lumi_scale = bkg_obj["filenames"], bkg_obj["lumi_scale"]
@@ -211,13 +210,16 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, bkg_sel
             bkg_histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, global_scale=lumi_scale)
         else:
             bkg_histo = bkg_obj.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
-        
+      
         bkg_histo_copy = bkg_histo.Clone(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_copy")  # idk if is strictly necessary, but it's safer
 
         coeff_sum = bkg_selector[bkg_cat]
         for i in range(axis.getBinning("x_binning").numBins()):
-            bkg_histo_copy.get(i)
+            bkg_histo.get(i)
             bkg_histo_copy.set(i, coeff_sum*bkg_histo.weight(i), abs(coeff_sum)*bkg_histo.weightError(ROOT.RooAbsData.SumW2))
+        
+        bkg_flags.append(bkg_cat)
+        n_events_bkg .append(bkg_histo_copy.sumEntries())
 
         bkg_total_histo.add(bkg_histo_copy)
 
@@ -228,7 +230,8 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, bkg_sel
 
 def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mass, 
             import_existing_ws = False, 
-            existing_ws_filename = "", 
+            existing_ws_filename = "",
+            create_totbkg = False,
             lightMode_bkg = False, 
             altBinning_bkg = False):
     """
@@ -265,12 +268,8 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
 
     for dataset_obj in import_datasets.values():
         dataset_obj["filenames"] = [ROOT.TFile(v, "READ") for v in dataset_obj["filenames"]]
-
-    if lightMode_bkg is True:
-        # Importing only the total background histogram
-        bkg_merging_dict = {k : v for k, v in import_datasets.items() if k.startswith("bkg_")}
-        import_datasets  = {k : v for k, v in import_datasets.items() if not k.startswith("bkg_")}
-
+   
+    merging_dict = {k : v for k, v in import_datasets.items() if k in bkg_sum_selector.keys()}
     
     # Loop over the pt-eta bins
     for bin_key, [gl_idx, bin_pt, bin_eta] in bins.items():
@@ -292,6 +291,7 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                 files, lumi_scale = dset_obj["filenames"], dset_obj["lumi_scale"]
 
                 if "bkg" in dset_name:
+                    if lightMode_bkg is True: continue
                     dset_type = "bkg" if not "SameCharge" in dset_name else "data_SC"
                     dset_subs = dset_name.replace("bkg", "")
                     if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
@@ -302,18 +302,16 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                     dset_type = dset_name
                     dset_subs = ""
 
-                print(dset_name, dset_type, dset_subs)  
-
                 histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, global_scale=lumi_scale)
                 histo.SetName(f"{histo.GetName()}{dset_subs}")
                 ws.Import(histo)
             
             # Importing the total background histogram if light mode is called (only for OS)
-            if lightMode_bkg is True:
+            if lightMode_bkg is True and len(merging_dict)>0:
                 if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
-                bkg_total_histo = get_totbkg_roohist(bkg_merging_dict, flag, axis, bin_key, bin_pt, bin_eta)
+                bkg_total_histo = get_totbkg_roohist(merging_dict, flag, axis, bin_key, bin_pt, bin_eta)
                 ws.Import(bkg_total_histo)
-
+    
     return ws
       
 ###############################################################################     
