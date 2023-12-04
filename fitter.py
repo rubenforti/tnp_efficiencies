@@ -28,7 +28,9 @@ class AbsFitter():
         self.norm = settings_obj.pop("norm")
         self.settings = settings_obj
         
-        self.histo_data, self.axis, self.constr_set, self.results = {}, {}, {}, {}
+        self.histo_data, self.axis, self.constr_set, self.res_obj  = {}, {}, {}, {}
+        self.status = {"pass" : True, "fail" : True}
+
         self.pdfs = { "smearing" : {}, "mc_pdf" : {}, "conv_pdf" : {}, 
                       "bkg_pdf" : {}, "sum_pdf" : {}, "fit_model" : {} }
 
@@ -80,7 +82,6 @@ class AbsFitter():
                                       self.axis[flag], self.pdfs["mc_pdf"][flag], self.pdfs["smearing"][flag])
             })
         self.pdfs["conv_pdf"][flag].setBufferFraction(self.settings["bufFraction"][flag])
-        self.pdfs["conv_pdf"][flag].setNormRange("fitRange")
 
     
     def _createFixedPdfs(self, flag, ws):
@@ -116,13 +117,11 @@ class AbsFitter():
             flag : ROOT.RooHistPdf(f"conv_{flag}_{self.bin_key}", "Convolution pdf", 
                                    self.axis[flag], ws.data(f"Minv_mc_{flag}_{self.bin_key}"), 0)
             })
-        self.pdfs["conv_pdf"][flag].setNormRange("fitRange")
 
         self.pdfs["bkg_pdf"].update({
             flag : ROOT.RooHistPdf(f"bkg_{flag}_{self.bin_key}", "Background pdf", 
                                    self.axis[flag], ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total"), 0)
             })
-        self.pdfs["bkg_pdf"][flag].setNormRange("fitRange")
 
 
     def _createBkgPdf(self, flag, ws):
@@ -211,9 +210,9 @@ class AbsFitter():
             isFittedPass = type(ws.obj(f'fitPDF_pass_{self.bin_key}')) is ROOT.RooAddPdf
             isFittedFail = type(ws.obj(f'fitPDF_fail_{self.bin_key}')) is ROOT.RooAddPdf
             if isFittedPass and isFittedFail:
-                self.results = {
-                    "pass": {"res_obj": ws.obj(f'results_pass_{self.bin_key}'), "status" : True},
-                    "fail": {"res_obj": ws.obj(f'results_fail_{self.bin_key}'), "status" : True}
+                self.res_obj = {
+                    "pass": ws.obj(f'results_pass_{self.bin_key}'),
+                    "fail": ws.obj(f'results_fail_{self.bin_key}')
                 }
                 self.existingFit = True
                 self.bin_status = True
@@ -222,7 +221,7 @@ class AbsFitter():
     
         elif self.settings["type_analysis"] == 'sim':
             if type(ws.obj(f'fitPDF_sim_{self.bin_key}')) is ROOT.RooSimultaneous:
-                self.results = { "sim" : { "res_obj" : ws.obj(f'results_sim_{self.bin_key}'), "status" : True } }
+                self.res_obj["sim"] = ws.obj(f'results_sim_{self.bin_key}')
                 self.existingFit = True
                 self.bin_status = True
             else:
@@ -246,13 +245,16 @@ class AbsFitter():
                                                            self.settings["Nbins"][flag]), "cache" )
 
 
-    def initDatasets(self, ws, import_mc=False):
+    def initDatasets(self, ws, import_mc=False, import_bkgSS=False):
         """
         """
         for flag in ["pass", "fail"]:
             if self.settings["fit_on_pseudodata"] is False:
                 self.histo_data.update({flag : ws.data(f"Minv_data_{flag}_{self.bin_key}")})
-                if import_mc is True: self.histo_data.update({f"mc_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}")})
+                if import_mc is True: 
+                    self.histo_data.update({f"mc_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}")})
+                if import_bkgSS is True: 
+                    self.histo_data.update({f"bkgSS_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_SameCharge")})
             else:
                 self._createPseudodata(flag, ws)
         # print(self.histo_data["pass"].sumEntries(), self.histo_data["fail"].sumEntries())
@@ -293,16 +295,14 @@ class AbsFitter():
                                       ROOT.RooArgList(self.pdfs["conv_pdf"][flag], self.pdfs["bkg_pdf"][flag]), 
                                       ROOT.RooArgList(self.norm["nsig"][flag], self.norm["nbkg"][flag]))
                 })
-            self.pdfs["sum_pdf"][flag].setNormRange("fitRange")
 
             # Creating a new pdf for plotting purposes, I guess there are other ways but this is the simplest
             self.pdfs["fit_model"].update({
                 flag : ROOT.RooAddPdf(self.pdfs["sum_pdf"][flag], f'fitPDF_{flag}_{self.bin_key}')
                 })
-            self.pdfs["fit_model"][flag].setNormRange("fitRange")
 
 
-    def doFit(self, flag):
+    def doFit(self, flag, fit_bkgSS=False, sidebands_lims=[80,100]):
         """
         """
         par_minos_set = ROOT.RooArgSet()
@@ -312,60 +312,63 @@ class AbsFitter():
             par_minos_set.add(self.pdfs["fit_model"][flag].getParameters(self.histo_data[flag]))
 
         if "constr" in self.settings.keys(): self._setConstraints(flag)
-        # print(self.constr_set)
-        #self.pdfs["fit_model"][flag].Print("v")
         
-        res = self.pdfs["fit_model"][flag].fitTo(self.histo_data[flag],
-                                                 ROOT.RooFit.ExternalConstraints(self.constr_set[flag]),
-                                                 ROOT.RooFit.Minimizer("Minuit2", "Migrad"),
-                                                 # ROOT.RooFit.Minos(par_minos_set),
-                                                 ROOT.RooFit.Strategy(2),
-                                                 ROOT.RooFit.SumW2Error(False),
-                                                 ROOT.RooFit.Save(1), 
-                                                 ROOT.RooFit.PrintLevel(self.settings["fit_verb"]))
+        if not fit_bkgSS:
+            pdf_fit = self.pdfs["fit_model"][flag]
+            data_fit = self.histo_data[flag]
+            range_fit = ""
+        else:
+            pdf_fit = self.pdfs["bkg_pdf"][flag]
+            data_fit = self.histo_data[f"bkgSS_{flag}"]
+            self.axis[flag].setRange("sideband_under", self.axis[flag].getMin(), sidebands_lims[0])
+            self.axis[flag].setRange("sideband_over", sidebands_lims[1], self.axis[flag].getMax())
+            range_fit = "sideband_under,sideband_over"
+
+        res = pdf_fit.fitTo(data_fit,
+                            ROOT.RooFit.Range(range_fit),
+                            ROOT.RooFit.Minimizer("Minuit2", "Migrad"),
+                            # ROOT.RooFit.Minos(par_minos_set),
+                            ROOT.RooFit.Strategy(2),
+                            ROOT.RooFit.SumW2Error(False),
+                            ROOT.RooFit.ExternalConstraints(self.constr_set[flag]),
+                            ROOT.RooFit.Save(1), 
+                            ROOT.RooFit.PrintLevel(self.settings["fit_verb"]))
         res.SetName(f"results_{flag}_{self.bin_key}")
+
+        checks = self.settings["fit_checks"] if not fit_bkgSS else "pseudodata"  # Don't do the chi2 check
 
         fit_obj = { "axis" : self.axis[flag], "histo" : self.histo_data[flag], 
                     "pdf" : self.pdfs["fit_model"][flag], "res" : res }
-    
-        self.results.update({ flag : {
-            "res_obj" : res, "status" : fit_quality(fit_obj, type_checks=self.settings["fit_checks"])
-            }})
+        
+        self.res_obj.update({ flag : res }) 
+        self.status.update({ flag : fit_quality(fit_obj, type_checks=checks) }) 
+
+        if fit_bkgSS and self.status[flag]:
+            for par in pdf_fit: par.setConstant()
 
         
     def createAnalogFitObj(self, flag):
         """
         """
-        self.results.update({ flag : {
-            "res_obj" : ROOT.RooFitResult(f"results_{flag}_{self.bin_key}", f"results_{flag}_{self.bin_key}"), 
-            "status" : True}
-            })
-        self.results[flag]["res_obj"].setStatus(0)
-        self.results[flag]["res_obj"].setCovQual(3)
-        self.results[flag]["res_obj"].setEDM(0)
-        self.results[flag]["res_obj"].setFinalParList(
+        self.res_obj[flag] = ROOT.RooFitResult(f"results_{flag}_{self.bin_key}", f"results_{flag}_{self.bin_key}")
+        self.res_obj[flag].setStatus(0)
+        self.res_obj[flag].setCovQual(3)
+        self.res_obj[flag].setEDM(0)
+        self.res_obj[flag].setFinalParList(
             ROOT.RooArgList(self.pars["f_ch_assign"][flag], self.norm["nbkg"][flag], self.norm["nsig"][flag]))
-
-        '''
-        fit_obj = { "axis" : self.axis[flag], "histo" : self.histo_data[flag], 
-                    "pdf" : self.pdfs["fit_model"][flag], "res" : self.results[flag]["res_obj"] }
-    
-        self.results[flag]["status"] = fit_quality(fit_obj, type_checks=self.settings["fit_checks"])
-        '''
 
 
     def saveFig(self, ws, figpath):
         """
         """
         if self.settings["type_analysis"] == "indep":
-            eff, d_eff = efficiency_from_res(self.results["pass"]["res_obj"], self.results["fail"]["res_obj"])
-            fig_status = bool(self.results["pass"]["status"]*self.results["fail"]["status"])
+            eff, d_eff = efficiency_from_res(self.res_obj["pass"], self.res_obj["fail"])
+            fig_status = self.bin_status
         if self.settings["type_analysis"] == "sim":
             eff, d_eff = self.efficiency.getVal(), self.efficiency.getError()
-            fig_status = bool(self.results["sim"]["status"])
-            self.results.update({"pass" : {"res_obj" : self.results["sim"]["res_obj"]}, 
-                                 "fail" : {"res_obj" : self.results["sim"]["res_obj"]},
-                                 "sim" : self.results["sim"]["res_obj"]})
+            fig_status = bool(self.status["sim"])
+            self.res_obj.update({
+                "pass" : self.res_obj["sim"], "fail" : self.res_obj["sim"]["res_obj"]})
         else:
             pass
         # ATTENZIONE: CONTROLLARE CHE SUCCEDE SE SI FA IL FIT CON L'OPZIONE "SIM_SF"
@@ -383,7 +386,7 @@ class AbsFitter():
         for flag in ["pass", "fail"]:
             plot_objects.update({ 
                 flag : {"axis":self.axis[flag], "data":self.histo_data[flag],
-                        "model":self.pdfs["fit_model"][flag], "res":self.results[flag]["res_obj"]}
+                        "model":self.pdfs["fit_model"][flag], "res":self.res_obj[flag]}
                 })
 
         plot_objects.update({"efficiency" : [eff, d_eff],
@@ -436,7 +439,7 @@ class IndepFitter(AbsFitter):
     def manageFit(self, ws):
         """
         """
-        self.checkExistingFit(ws)
+        self.checkExistingFit(ws)  
 
         if self.existingFit is False:
             [self.importAxis(flag, ws) for flag in ["pass", "fail"]], print("Imported axis")
@@ -445,14 +448,21 @@ class IndepFitter(AbsFitter):
             self.initFitPdfs(ws),  print("Imported fit pdfs")
             
             for flag in ["pass", "fail"]: 
+
                 if self.settings["bkg_model"][flag] == "num_estimation": 
                    self.createAnalogFitObj(flag)
+
                 else:
-                    print(f"Starting fit for {flag} category")
-                    self.doFit(flag)
-                    if self.results[flag]["status"] is False and self.settings["refit_nobkg"] is True:
-                        self.attempt_noBkgFit(flag)
-            self.bin_status = bool(self.results["pass"]["status"]*self.results["fail"]["status"])
+                    if self.settings["bkg_model"][flag] == "prefit_SS":
+                        print("Fixing bkg parameters by operating a fit on SS data with CMSShape")
+                        self.doFit(flag, use_SS=True) 
+                    if self.status[flag] is True: 
+                        print(f"Starting fit for {flag} category")
+                        self.doFit(flag)
+                        if self.status[flag] is False and self.settings["refit_nobkg"]:
+                            self.attempt_noBkgFit(flag)
+
+            self.bin_status = bool(self.status["pass"]*self.status["fail"])
             print(f"Fitted bin {self.bin_key} with status {self.bin_status}\n")
         else:
             print("Not possible to refit an existing PDF! \nUsing the results obtained previously")
@@ -461,10 +471,9 @@ class IndepFitter(AbsFitter):
     def importFitObjects(self, ws):
         """
         """
-        status = bool(self.results["pass"]["status"]*self.results["fail"]["status"])
-        if status and (self.existingFit is False):
+        if self.binstatus and (self.existingFit is False):
             ws.Import(self.pdfs["fit_model"]["pass"]), ws.Import(self.pdfs["fit_model"]["fail"])
-            ws.Import(self.results["pass"]["res_obj"]), ws.Import(self.results["fail"]["res_obj"])
+            ws.Import(self.res_obj["pass"]), ws.Import(self.res_obj["fail"])
 
 
 ###############################################################################
@@ -598,8 +607,10 @@ class SimFitter(AbsFitter):
 
             self.doFit("sim")
 
-            if self.results["sim"]["status"] is False and self.settings["refit_nobkg"] is True: 
+            if self.status["sim"] is False and self.settings["refit_nobkg"]: 
                 self.attempt_noBkgFit(ws)
+
+            print(f"Fitted bin {self.bin_key} with status {self.status['sim']}\n")
         else:
             print("Not possible to refit an existing PDF! \nUsing the results obtained previously")
 
@@ -607,9 +618,8 @@ class SimFitter(AbsFitter):
     def importFitObjects(self, ws):
         """
         """
-        status = bool(self.results["sim"]["status"])
-        if status and (self.existingFit is False):
-            ws.Import(self.pdfs["fit_model"]["sim"]), ws.Import(self.results["sim"]["res_obj"])
+        if self.status["sim"] and (self.existingFit is False):
+            ws.Import(self.pdfs["fit_model"]["sim"]), ws.Import(self.res_obj["sim"])
 
 
 
