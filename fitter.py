@@ -138,7 +138,7 @@ class AbsFitter():
                                            self.axis[flag], self.pars["tau"][flag])
                 })            
 
-        elif bkg_model == "cmsshape":
+        elif "cmsshape" in bkg_model:
             self.pdfs["bkg_pdf"].update({
                 flag : ROOT.RooCMSShape(f"cmsshape_bkg_{flag}_{self.bin_key}", "CMSShape background",
                                         self.axis[flag], self.pars["alpha"][flag], self.pars["beta"][flag],
@@ -173,7 +173,7 @@ class AbsFitter():
 
         self.histo_data.update({flag : roohist_pseudodata})
 
-    def _setConstraints(self, flag):
+    def setConstraints(self, flag):
         """
         """
         constr_dict = self.settings["constr"]
@@ -252,7 +252,7 @@ class AbsFitter():
         for flag in ["pass", "fail"]:
 
             import_MC = True if self.settings["type_analysis"] == "sim_sf" else False
-            import_bkgSS = True if self.settings["bkg_model"][flag] == "num_estimation" else False
+            import_bkgSS = True if self.settings["bkg_model"][flag] in ["num_estimation", "cmsshape_w_prefitSS"] else False
 
             if self.settings["fit_on_pseudodata"] is False:
 
@@ -310,7 +310,7 @@ class AbsFitter():
                 })
 
 
-    def doFit(self, flag, fit_bkgSS=False, sidebands_lims=[80,100]):
+    def doFit(self, flag, fit_bkgSS=False, sidebands_lims=[75,105]):
         """
         """
         par_minos_set = ROOT.RooArgSet()
@@ -318,9 +318,6 @@ class AbsFitter():
             par_minos_set.add(self.efficiency)
         elif self.settings["type_analysis"] == "sim" and self.settings["useMinos"] == "all": 
             par_minos_set.add(self.pdfs["fit_model"][flag].getParameters(self.histo_data[flag]))
-
-        if "constr" in self.settings.keys(): 
-            self._setConstraints(flag)
 
         doRegularFit = not (self.settings["bkg_model"][flag]=="num_estimation" or fit_bkgSS)
         
@@ -372,7 +369,7 @@ class AbsFitter():
         self.status.update({ flag : fit_quality(fit_obj, type_checks=checks) }) 
 
         if fit_bkgSS and self.status[flag]:
-            for par in pdf_fit.floatParsFinal():
+            for par in self.pdfs["bkg_pdf"][flag].getParameters(data_fit):
                 par.setConstant()
 
         
@@ -447,20 +444,17 @@ class IndepFitter(AbsFitter):
             nsig_fitted, nbkg_fitted = self.norm["nsig"][flag], self.norm["nbkg"][flag]
             refit_ctrl = nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal()
         elif self.settings["type_refit"] == "llr":
-            refit_ctrl = llr_test_bkg(self.histo_data[flag], self.pdfs["fit_model"][flag], alpha=0.05)
+            # NOT TESTED YET
+            # refit_ctrl = llr_test_bkg(self.histo_data[flag], self.pdfs["fit_model"][flag], alpha=0.05)
+            pass
         else:
             sys.exit("ERROR: refit type not recognized")
 
         if refit_ctrl is True:
-            if self.settings["bkg_model"][flag] == "expo":
-                self.pars["tau"][flag].setVal(1)
-                self.pars["tau"][flag].setConstant()
-                self.norm["nbkg"][flag].setVal(0)
-                self.norm["nbkg"][flag].setConstant()
-                self.doFit(flag)
-            else:
-                pass
-                # Need to be implemented for, e.g., cmsshape
+            self.norm["nbkg"][flag].setVal(0)
+            self.norm["nbkg"][flag].setConstant()
+            for par in self.pdfs["bkg_pdf"][flag].getParameters(self.histo_data[flag]): par.setConstant()
+            self.doFit(flag)
         else: 
             print("Refit not triggered\n")
 
@@ -479,15 +473,17 @@ class IndepFitter(AbsFitter):
             
             for flag in ["pass", "fail"]: 
 
-                if self.settings["bkg_model"][flag] == "prefit_SS":
+                if "constr" in self.settings.keys(): self.setConstraints(flag)
+
+                if self.settings["bkg_model"][flag] == "cmsshape_w_prefitSS":
                     print("Fixing bkg parameters by operating a fit on SS data with CMSShape")
-                    self.doFit(flag, use_SS=True) 
+                    self.doFit(flag, fit_bkgSS=True) 
         
                 if self.status[flag] is True: 
                     print(f"Starting fit for {flag} category")
                     self.doFit(flag)
-                    if self.status[flag] is False and self.settings["refit_nobkg"]:
-                        self.attempt_noBkgFit(flag)
+                    # if self.status[flag] is False and self.settings["refit_nobkg"]:
+                    self.attempt_noBkgFit(flag)
 
             self.bin_status = bool(self.status["pass"]*self.status["fail"])
             print(f"Fitted bin {self.bin_key} with status {self.bin_status}\n")
