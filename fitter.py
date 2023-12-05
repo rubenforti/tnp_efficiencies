@@ -7,7 +7,7 @@ from utilities.dataset_utils import get_totbkg_roohist
 from utilities.results_utils import efficiency_from_res
 from utilities.plot_utils import plot_fitted_pass_fail
 from utilities.base_library import eval_efficiency, sumw2_error, eval_norm_corrected
-from utilities.fit_utils import fit_quality, llr_test_bkg
+from utilities.fit_utils import getSidebands, fit_quality, llr_test_bkg
 
 
 class AbsFitter():
@@ -251,15 +251,19 @@ class AbsFitter():
         """
         for flag in ["pass", "fail"]:
 
-            import_MC = True if self.settings["type_analysis"] == "sim_sf" else False
+            import_mc = True if self.settings["type_analysis"] == "sim_sf" else False
             import_bkgSS = True if self.settings["bkg_model"][flag] in ["num_estimation", "cmsshape_w_prefitSS"] else False
+            import_mcSS = True if self.settings["bkg_model"][flag] == "cmsshape_w_prefitSS" else False
 
             if self.settings["fit_on_pseudodata"] is False:
 
                 self.histo_data.update({flag : ws.data(f"Minv_data_{flag}_{self.bin_key}")})
 
-                if import_MC is True: 
+                if import_mc is True: 
                     self.histo_data.update({f"mc_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}")})
+                
+                if import_mcSS is True:
+                    self.histo_data.update({f"mcSS_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}_SS")})
 
                 if import_bkgSS is True: 
                     self.histo_data.update({f"bkgSS_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
@@ -331,6 +335,7 @@ class AbsFitter():
         elif fit_bkgSS:
             pdf_fit = self.pdfs["bkg_pdf"][flag]
             data_fit = self.histo_data[f"bkgSS_{flag}"]
+            sidebands_lims = getSidebands(self.histo_data[f"mcSS_{flag}"], self.axis[flag])
             self.axis[flag].setRange("sideband_under", self.axis[flag].getMin(), sidebands_lims[0])
             self.axis[flag].setRange("sideband_over", sidebands_lims[1], self.axis[flag].getMax())
             range_fit = "sideband_under,sideband_over"
@@ -346,6 +351,14 @@ class AbsFitter():
         
         else: 
             sys.exit("ERROR: Control applied on fit setting is not consistent!")
+
+        print("")
+        print("Data fit", data_fit.GetName())
+        print("Pdf fit", pdf_fit.GetName())
+        print("Range fit", range_fit)
+        print("Subs res", subs_res)
+        print("Checks", checks)
+        print("")
 
         res = pdf_fit.fitTo(data_fit,
                             ROOT.RooFit.Range(range_fit),
@@ -363,14 +376,21 @@ class AbsFitter():
 
         if self.settings["bkg_model"][flag] == "num_estimation": self.fixFitObj(flag)
 
-        fit_obj = { "axis" : self.axis[flag], "histo" : self.histo_data[flag], 
-                    "pdf" : self.pdfs["fit_model"][flag], "res" : res }
+        fit_obj = { "axis" : self.axis[flag], "histo" : data_fit, 
+                    "pdf" : pdf_fit, "res" : res }
         
         self.status.update({ flag : fit_quality(fit_obj, type_checks=checks) }) 
+        print(res.status(), res.covQual(), res.edm())
+        print(f"Fit status for {flag} category: {self.status[flag]}")
 
-        if fit_bkgSS and self.status[flag]:
-            for par in self.pdfs["bkg_pdf"][flag].getParameters(data_fit):
-                par.setConstant()
+        if fit_bkgSS:
+            if self.status[flag]:
+                for par in self.pdfs["bkg_pdf"][flag].getParameters(data_fit): par.setConstant()
+            else:
+                print(f"WARNING: fit on SS data failed, the reported efficiency value is calculated using the number of events in the {flag} category")
+                self.norm["nsig"][flag].setVal(self.histo_data[flag].sumEntries())
+                self.norm["nsig"][flag].setError(self.histo_data[flag].sumEntries()**0.5)
+                self.res_obj[flag].setFinalParList(ROOT.RooArgList(self.norm["nsig"][flag]))
 
         
     def fixFitObj(self, flag):
@@ -478,12 +498,14 @@ class IndepFitter(AbsFitter):
                 if self.settings["bkg_model"][flag] == "cmsshape_w_prefitSS":
                     print("Fixing bkg parameters by operating a fit on SS data with CMSShape")
                     self.doFit(flag, fit_bkgSS=True) 
+                    for par in self.pdfs["bkg_pdf"][flag].getParameters(self.histo_data[flag]):
+                        par.Print()
         
                 if self.status[flag] is True: 
                     print(f"Starting fit for {flag} category")
                     self.doFit(flag)
-                    # if self.status[flag] is False and self.settings["refit_nobkg"]:
-                    self.attempt_noBkgFit(flag)
+                    if self.status[flag] is False and self.settings["refit_nobkg"]:
+                        self.attempt_noBkgFit(flag)
 
             self.bin_status = bool(self.status["pass"]*self.status["fail"])
             print(f"Fitted bin {self.bin_key} with status {self.bin_status}\n")

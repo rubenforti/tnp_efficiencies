@@ -26,13 +26,13 @@ type_eff = "tracking"
 type_analysis = "indep"
 charge_selection = ["plus", "minus"]
 
-folder = gen_res_folder+"/tracking"
+folder = gen_res_folder+"/tracking/prefit_SS_fail"
 # folder = gen_res_folder
-ws_filename = folder+"/ws_tracking_prova_prefit.root"
+ws_filename = folder+"/ws_tracking_indep_prefitSS_fail.root"
 
 generate_datasets = False
 
-fit_settings = "custom_run1"
+fit_settings = "custom_run4"
 
 binning_pt, binning_eta, binning_mass = "pt_tracking", "eta", "mass_50_130"
 
@@ -53,12 +53,12 @@ refit_nobkg = True
 
 useMinos = False
 
-import_pdfs = False
+import_pdfs = True
 
 savefigs = True
 
-figpath = {"good": f"{folder}", #/fit_plots", 
-           "check": f"{folder}"} #/fit_plots/check"} 
+figpath = {"good": f"{folder}/fit_plots", 
+           "check": f"{folder}/fit_plots/check"} 
 
 if mergedbins_bkg and (binning_pt != "pt" or binning_eta != "eta"):
     sys.exit("ERROR: Evaluation of background in merged bins for its comparison on data is allowed only wrt reco-bins of pt and eta for data")

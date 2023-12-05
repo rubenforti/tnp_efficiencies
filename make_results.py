@@ -300,7 +300,7 @@ if __name__ == '__main__':
     #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
     # ws_filename = "results/pseudodata_iso/ws_iso_pseudodata.root"
 
-    ws_filename =  base_folder+"/tracking/numEst_fail/ws_tracking_indep_numEstF.root"
+    ws_filename =  base_folder+"/tracking/prefit_SS_fail/ws_tracking_indep_prefitSS_fail.root"
 
     # ws_filename = "results/pseudodata_iso/ws_iso_indep_pseudodata_new.root"
 

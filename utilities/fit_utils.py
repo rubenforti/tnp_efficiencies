@@ -28,6 +28,35 @@ def check_existing_fit(type_analysis, ws, bin_key):
             return res
         else:
             return 0
+        
+###############################################################################
+
+
+def getSidebands(histo, axis, cut=0.6):
+    """
+    """
+    binning = axis.getBinning()
+    NBINS = binning.numBins()
+
+    print(binning)
+    
+    if NBINS%2 !=0:
+        print("ERROR: number of bins must be even")
+        sys.exit()
+
+    ntot = histo.sumEntries()
+
+    for i in range(int(NBINS/2)):
+
+        idx_left, idx_right = int(NBINS/2-1-i), int(NBINS/2+i)
+
+        lowLim, upLim = binning.binLow(idx_left), binning.binHigh(idx_right)
+        ntot_sel = histo.sumEntries(f"x>{lowLim} && x<{upLim}")
+
+        if ntot_sel/ntot > cut:
+            break
+
+    return lowLim, upLim
 
 ###############################################################################
 
