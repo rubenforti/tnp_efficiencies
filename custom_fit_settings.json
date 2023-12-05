@@ -64,11 +64,11 @@
 
     "run2" : {
         "Nbins" : {
-            "pass" : 12000,
+            "pass" : 3421,
             "fail" : 2000
         },
         "bufFraction" : {
-            "pass" : 0.4,
+            "pass" : 0.2,
             "fail" : 0.5
         }
     },

@@ -74,7 +74,6 @@ class results_manager:
         if self._analysis == 'indep':
         
             res_pass, res_fail = res["pass"], res["fail"]
-
             if type(res_pass) is ROOT.RooFitResult and type(res_fail) is ROOT.RooFitResult:
 
                 new_res = {
