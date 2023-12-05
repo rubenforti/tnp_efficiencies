@@ -187,9 +187,9 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, figpath=""):
         stats_pass.AddText(f"Status = {pass_obj['res'].status()}")
         stats_pass.AddText(f"Cov quality = {pass_obj['res'].covQual()}")
         stats_pass.AddText(f"Edm = {pass_obj['res'].edm():.5f}")
-        ndof = pass_obj["data"].numEntries() - pass_obj["res"].floatParsFinal().getSize()
         try:
-            chi2 = float(pass_obj["res"].GetTitle())
+            chi2 = float(pass_obj["res"].GetTitle().split("_")[0])
+            ndof = int(pass_obj["res"].GetTitle().split("_")[1])
             stats_pass.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
         except:
             print("Chi2/ndof not available")
@@ -203,16 +203,16 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, figpath=""):
         stats_fail.AddText(f"Status = {fail_obj['res'].status()}")
         stats_fail.AddText(f"Cov quality = {fail_obj['res'].covQual()}")
         stats_fail.AddText(f"Edm = {fail_obj['res'].edm():.5f}")
-        ndof = fail_obj["data"].numEntries() - fail_obj["res"].floatParsFinal().getSize()
         try:
-            chi2 = float(fail_obj["res"].GetTitle())
+            chi2 = float(fail_obj["res"].GetTitle().split("_")[0])
+            ndof = int(fail_obj["res"].GetTitle().split("_")[1])
             stats_fail.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
         except:
             print("Chi2/ndof not available")
         stats_fail.Draw()
         c.Update()
 
-    else:
+    elif "sim" in type_analysis:
         for par in pass_obj["res"].floatParsFinal():
             if "pass" in par.GetName():
                 stats_pass.AddText(f"{par.GetTitle()} = {par.getVal():.2f} #pm {par.getError():.2f}")
@@ -228,15 +228,17 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, figpath=""):
         stats_gen.AddText(f"Status = {pass_obj['res'].status()}")
         stats_gen.AddText(f"Cov quality = {pass_obj['res'].covQual()}")
         stats_gen.AddText(f"Edm = {pass_obj['res'].edm():.5f}")
-        ndof = pass_obj["data"].numEntries() + fail_obj["data"].numEntries() - \
-            pass_obj["res"].floatParsFinal().getSize()
         try:
-            chi2 = float(pass_obj["res"].GetTitle())
+            chi2 = float(pass_obj["res"].GetTitle().split("_")[0])
+            ndof = int(pass_obj["res"].GetTitle().split("_")[1])
             stats_gen.AddText(f"Chi2/ndof = {chi2:.1f} / {ndof}")
         except:
             print("Chi2/ndof not available")
         stats_pass.Draw(), stats_fail.Draw(), stats_gen.Draw()
         c.Update()
+
+    else:
+        sys.exit("ERROR: type_analysis not recognized")
 
     c.SaveAs(f"{figpath}/fit_pf_{type_analysis}_{bin_key}.pdf")
 

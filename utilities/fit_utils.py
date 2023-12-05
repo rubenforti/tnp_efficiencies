@@ -31,6 +31,7 @@ def check_existing_fit(type_analysis, ws, bin_key):
 
 ###############################################################################
 
+
 def pearson_chi2_eval(histo, pdf, axis):
     """
     """
@@ -38,7 +39,6 @@ def pearson_chi2_eval(histo, pdf, axis):
     NBINS = binning.numBins()   
     # EVTS = histo.sumEntries()
     BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
-
     PRECISION = 1
 
     n_fitted_events=0
@@ -48,7 +48,6 @@ def pearson_chi2_eval(histo, pdf, axis):
 
     chi2_val =0
     used_bins = 0
-
 
     for i in range(NBINS):
     
@@ -63,7 +62,6 @@ def pearson_chi2_eval(histo, pdf, axis):
             chi2_val += (weight - mu)**2/mu
             used_bins += 1
 
-
     '''
     # Old version: can be problematic if the pdf assumes values near 0 but not exactly 0
     chi2_obj = ROOT.RooChi2Var("chi2", "chi2", pdf, histo,
@@ -71,9 +69,11 @@ def pearson_chi2_eval(histo, pdf, axis):
                                 ROOT.RooFit.DataError(ROOT.RooAbsData.Expected))
     chi2_val = chi2_obj.getVal() 
     '''
+
     return chi2_val, used_bins
 
 ###############################################################################
+
 
 def llr_eval(histo, pdf, axis):
     """
@@ -122,8 +122,8 @@ def llr_eval(histo, pdf, axis):
 
     return llr, used_bins
 
-
 ###############################################################################
+
 
 def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
     """
@@ -134,7 +134,7 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
         chi2val, used_bins = llr_eval(histo, pdf, axis) \
             if type_chi2 == "llr" else pearson_chi2_eval(histo, pdf, axis)
         ndof = used_bins - res.floatParsFinal().getSize()
-        res.SetTitle(str(chi2val))
+        res.SetTitle(f"{chi2val}_{ndof}")
     
     elif "sim" in res.GetName():
         chi2val = 0
@@ -147,7 +147,7 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
                 chi2val += pearson_chi2_eval(histo[flag], pdf[flag], axis[flag])[0]
                 used_bins += pearson_chi2_eval(histo[flag], pdf[flag], axis[flag])[1]
         ndof = used_bins - res.floatParsFinal().getSize()
-        res.SetTitle(str(chi2val))
+        res.SetTitle(f"{chi2val}_{ndof}")
 
     else:
         print("ERROR: status_chi2() function is not implemented for this type of fit")
@@ -157,8 +157,8 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
     print(chi2val, ndof, chi2_status) 
     return chi2_status
     
-
 ###############################################################################
+
 
 def fit_quality(fit_obj, type_checks="benchmark"):
     """
@@ -173,28 +173,34 @@ def fit_quality(fit_obj, type_checks="benchmark"):
         check_covm = (fit_obj["res"].covQual() == 3)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
                                  fit_obj["res"], type_chi2="pearson", nsigma=15)
+    
     elif type_checks == "new":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 1e-3)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
                                  fit_obj["res"], type_chi2="llr", nsigma=5)
+    
     elif type_checks == "pseudodata":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 1e-3)
+    
+    else:
+        sys.exit("ERROR: wrong type of fit quality check indicated")
+    
     '''
     # Not used, could be useful if Sumw2Error turns out to be needed
     elif type_checks == "pseudodata_sumw2":
         check_migrad = fit_obj["res"].status()==0
         check_covm = (fit_obj["res"].covQual()==2 or fit_obj["res"].covQual()==3)
         return bool(check_migrad*check_covm)
-    '''    
+    '''  
+
     return bool(check_migrad*check_covm*check_edm*check_chi2)
-
-
-    
+ 
 ###############################################################################
+
 
 def llr_test_bkg(histo, pdf, alpha=0.05):
     """
@@ -235,6 +241,8 @@ def llr_test_bkg(histo, pdf, alpha=0.05):
 
     return null
 
+###############################################################################
+###############################################################################
 
 
 if __name__ == "__main__":
