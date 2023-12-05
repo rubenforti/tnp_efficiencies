@@ -311,18 +311,21 @@ class AbsFitter():
         elif self.settings["type_analysis"] == "sim" and self.settings["useMinos"] == "all": 
             par_minos_set.add(self.pdfs["fit_model"][flag].getParameters(self.histo_data[flag]))
 
-        if "constr" in self.settings.keys(): self._setConstraints(flag)
+        if "constr" in self.settings.keys(): 
+            self._setConstraints(flag)
         
         if not fit_bkgSS:
             pdf_fit = self.pdfs["fit_model"][flag]
             data_fit = self.histo_data[flag]
             range_fit = ""
+            subs_res = ""
         else:
             pdf_fit = self.pdfs["bkg_pdf"][flag]
             data_fit = self.histo_data[f"bkgSS_{flag}"]
             self.axis[flag].setRange("sideband_under", self.axis[flag].getMin(), sidebands_lims[0])
             self.axis[flag].setRange("sideband_over", sidebands_lims[1], self.axis[flag].getMax())
             range_fit = "sideband_under,sideband_over"
+            subs_res = "_SS"
 
         res = pdf_fit.fitTo(data_fit,
                             ROOT.RooFit.Range(range_fit),
@@ -333,9 +336,10 @@ class AbsFitter():
                             ROOT.RooFit.ExternalConstraints(self.constr_set[flag]),
                             ROOT.RooFit.Save(1), 
                             ROOT.RooFit.PrintLevel(self.settings["fit_verb"]))
-        res.SetName(f"results_{flag}_{self.bin_key}")
+        
+        res.SetName(f"results_{flag}_{self.bin_key}{subs_res}")
 
-        checks = self.settings["fit_checks"] if not fit_bkgSS else "pseudodata"  # Don't do the chi2 check
+        checks = self.settings["fit_checks"] if not fit_bkgSS else "pseudodata"  # Don't do the chi2 check if it is a prefit on SS data
 
         fit_obj = { "axis" : self.axis[flag], "histo" : self.histo_data[flag], 
                     "pdf" : self.pdfs["fit_model"][flag], "res" : res }
