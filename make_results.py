@@ -293,14 +293,14 @@ if __name__ == '__main__':
     base_folder = "/scratchnvme/rforti/tnp_efficiencies_results"
 
 
-    benchmark_res = base_folder+"/results_tracking/benchmark_tracking/old_results.txt"
+    benchmark_res = base_folder+"/tracking/benchmark_tracking/old_results.txt"
 
-    bmark_fit_filename = "results/benchmark_iso_r628/ws_iso_indep_bmark.root"
+    bmark_fit_filename = base_folder+"/tracking/benchmark/ws_tracking_indep_benchmark.root"
     
     #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
     # ws_filename = "results/pseudodata_iso/ws_iso_pseudodata.root"
 
-    ws_filename =  base_folder+"/results_tracking/benchmark_tracking/ws_tracking_indep_benchmark.root"
+    ws_filename =  base_folder+"/tracking/prefit_SS_fail/ws_tracking_indep_prefitSS_fail.root"
 
     # ws_filename = "results/pseudodata_iso/ws_iso_indep_pseudodata_new.root"
 
@@ -309,7 +309,7 @@ if __name__ == '__main__':
 
 
     # save_eff_results(bmark_fit_filename, "indep", "pt", "eta")
-    compare_efficiency(benchmark_res, ws_filename, "pt_tracking", "eta", resCmp_list)
+    compare_efficiency(bmark_fit_filename, ws_filename, "pt_tracking", "eta", resCmp_list)
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 

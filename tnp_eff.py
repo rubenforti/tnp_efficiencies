@@ -26,13 +26,13 @@ type_eff = "tracking"
 type_analysis = "indep"
 charge_selection = ["plus", "minus"]
 
-#folder = gen_res_folder+"/results_tracking/benchmark_tracking"
-folder = gen_res_folder
-ws_filename = folder+"/ws_tracking_prova.root"
+folder = gen_res_folder+"/tracking/prefit_SS_fail"
+# folder = gen_res_folder
+ws_filename = folder+"/ws_tracking_indep_prefitSS_fail.root"
 
-generate_datasets = True
+generate_datasets = False
 
-fit_settings = "custom_run1"
+fit_settings = "custom_run4"
 
 binning_pt, binning_eta, binning_mass = "pt_tracking", "eta", "mass_50_130"
 
@@ -53,7 +53,7 @@ refit_nobkg = True
 
 useMinos = False
 
-import_pdfs = False
+import_pdfs = True
 
 savefigs = True
 

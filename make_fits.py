@@ -48,6 +48,7 @@ def checkImportCustomPdfs(bkg_models):
     """
     dict_classes = {
         "cmsshape" : "RooCMSShape",
+        "cmsshape_w_prefitSS" : "RooCMSShape",
         "cmsshape_new" : "RooCMSShape_mod",
         "CB" : "my_double_CB"
     }
@@ -65,7 +66,7 @@ def doSingleFit(fitter, ws, flags, savefigs, figpath=None):
     fitter.manageFit(ws)
 
     res = {}
-    for flag in flags: res.update({flag : fitter.results[flag]["res_obj"]})
+    for flag in flags: res.update({flag : fitter.res_obj[flag]})
 
     if savefigs is True and fitter.existingFit is False: fitter.saveFig(ws, figpath)
     bin_key = fitter.bin_key
@@ -92,7 +93,7 @@ def runFits(ws_name, bin_dict, fit_settings, parallelize=True, import_pdfs=False
 
     for bin_key in bin_dict.keys():
         
-        # if bin_key != "[24.0to35.0][-0.1to0.0]": continue
+        # if bin_key != "[45.0to55.0][0.7to0.8]": continue
         # if bin_key != "[24.0to26.0][-0.1to0.0]": continue
 
         if fit_settings["type_analysis"] == "indep":
@@ -109,7 +110,8 @@ def runFits(ws_name, bin_dict, fit_settings, parallelize=True, import_pdfs=False
 
         if import_pdfs: fitter.importFitObjects(ws)
 
-        # printFitStatus(fit_settings["type_analysis"], bin_key, res, status, prob_bins)
+        printFitStatus(fit_settings["type_analysis"], bin_key, res, status, prob_bins)
+        # if status is False: prob_bins.append(bin_key)
 
     print(f"NUM of problematic bins = {len(prob_bins)}")
     print(prob_bins)
