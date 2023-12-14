@@ -12,40 +12,42 @@ t0 = time.time()
 ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
+gen_res_folder = "/scratchnvme/rforti/tnp_efficiencies_results"
+
+
 # -----------------------------------------------------------------------------
 #  GENERAL SETTINGS
 # ------------------
 
 type_eff = "tracking"
 type_analysis = "indep"
-bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau", "SameCharge"]
+bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau", "bkg_SameCharge", "mc"]
 
 
 binning_pt = "pt_tracking"
 binning_eta = "eta"
 binning_mass = "mass_50_130"
 
+study_SS_bkg = True
 
-ws_filename = "root_files/ws_tracking.root"
-generate_datasets = True       
-local_datasets = False
+folder = gen_res_folder+"/tracking/bkg_SS_figs"
 
-figpath = "tracking_figs"
-filepath = "tracking_figs"
+ws_filename = folder+"/ws_tracking_bkg_SS.root"
+
+generate_datasets = False       
+
+figpath = folder
+filepath = folder
 
 negweights_eval = False
 binnings_list = [["pt", "eta"]]
                  
-''' ["pt", "eta_24bins"], ["pt", "eta_16bins"], 
-                 ["pt", "eta_8bins"], ["pt_12bins", "eta"], ["pt_9bins", "eta"],
-                 ["pt_6bins", "eta"], ["pt_12bins", "eta_24bins"], ["pt_9bins", "eta_16bins"],
-                 ["pt_12bins", "eta_16bins"], ["pt_9bins", "eta_24bins"]] '''
 
 minv_plots = {
     "flag" : True,
-    "plot_on_data" : False,
+    "plot_on_data" : True,
     "plot_fit_bkgpdf" : False,
-    "plot_on_sig" : True,
+    "plot_on_sig" : False,
     "compare_bkgfrac" : False,
     "logscale" : True,
 }
@@ -70,11 +72,10 @@ if generate_datasets is True:
 
     base_folder = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023"
 
-    import_categories = ["data", "mc"]
-    import_categories += [f"bkg_{cat}" for cat in bkg_categories]
+    import_categories = ["data", "mc"] + bkg_categories
     
     import_dictionary = gen_import_dictionary(base_folder, type_eff, import_categories,
-                                              ch_set=["plus", "minus"], scale_MC=True, add_SS_mc=True, add_SS_bkg=False)
+                                              ch_set=["plus", "minus"], scale_MC=True, add_SS_mc=True, add_SS_bkg=study_SS_bkg)
     
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass)
     ws.writeToFile(ws_filename)
@@ -91,17 +92,19 @@ if negweights_eval:
 
 if minv_plots["flag"]: 
     print("Plotting minv distributions")
-    print(minv_plots["plot_on_data"], minv_plots["plot_fit_bkgpdf"], minv_plots["plot_on_sig"])
     bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, binning_eta,
+                          study_SS_bkg=study_SS_bkg,
                           plot_on_data=minv_plots["plot_on_data"], 
                           plot_fit_bkgpdf=minv_plots["plot_fit_bkgpdf"],
                           plot_on_signal=minv_plots["plot_on_sig"], 
                           compare_bkgfrac=minv_plots["compare_bkgfrac"],
-                          logscale=minv_plots["logscale"], 
+                          logscale=minv_plots["logscale"],
                           figpath=figpath)
 
 if plot_bkg_distrib["flag"]:
-    gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta, 
+    print("Plotting bkg 2D distributions")
+    gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
+                       study_SS_bkg=study_SS_bkg,
                        norm_data=plot_bkg_distrib["norm_on_data"],
                        norm_sig=plot_bkg_distrib["norm_on_sig"],
                        norm_tot_bkg=plot_bkg_distrib["norm_tot_bkg"], 

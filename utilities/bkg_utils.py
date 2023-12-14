@@ -10,7 +10,7 @@ from utilities.plot_utils import plot_bkg, plot_2d_bkg_distrib, plot_projected_b
 from array import array
 
 
-bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau"]
+# bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau"]
 
 ###############################################################################
 
@@ -91,23 +91,18 @@ def make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta,
     datasets = {}
     datasets.update({"axis" : axis})
 
-    type_dataset, subs = "", ""
-
     for cat in import_categories:
-        if "bkg" in cat: 
-            cat.replace("_SS", "")
-            type_dataset, subs = cat.split("_")
+        try:
+            type_dataset, subs = cat.split("_", 1)
             subs = f"_{subs}"
-        elif cat=="data": 
-            type_dataset = "data"
-        elif "mc" in cat: 
-            type_dataset = "mc"
-        else:
-            sys.exit("ERROR: wrong category name")
+        except:
+            type_dataset, subs = cat, ""
 
         datasets[cat] = ws.data(f"Minv_{type_dataset}_{flag}_{bin_key}{subs}")
 
-    datasets["bkg_total"] = get_totbkg_roohist([ws, import_categories], axis, bin_key,)
+        print(cat, datasets[cat].sumEntries())
+
+    datasets["bkg_total"] = get_totbkg_roohist([ws, import_categories], flag, axis, bin_key, bin_pt, bin_eta)
 
     if import_fit_pars:
         res_obj = ws.obj(f"results_{flag}_{bin_key}")
@@ -139,9 +134,10 @@ def make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta,
 ###############################################################################
 
 def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, binning_eta, 
-                           plot_on_data=False, plot_fit_bkgpdf=False,
-                           plot_on_signal=False, compare_bkgfrac=False,
-                           logscale=True, figpath='figs/bkg_and_sig_mc'):
+                          study_SS_bkg=False,                            
+                          plot_on_data=False, plot_fit_bkgpdf=False,
+                          plot_on_signal=False, compare_bkgfrac=False,
+                          logscale=True, figpath='figs/bkg_and_sig_mc'):
     """
     Plots the M_inv distribution of the total bkg and the various background samples, for each (pt,eta) bin.
     These bkg distributions can be compared to the MC signal or the data distributions.
@@ -176,11 +172,14 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                                             array('d', bins_pull), bins_pt, bins_pt))
         histos.update(init_pass_fail_histos("h_bkgfrac_ratio", "Bkg fraction mc/fit ratio", 
                                             array('d', bins_ratio), bins_pt, bins_pt))
+        
+    if study_SS_bkg: bkg_categories = [cat+"_SS" if cat != "bkg_SameCharge" else cat for cat in bkg_categories]
 
+    print(bkg_categories)
 
     for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
-        # if bin_key != "[24.0to26.0][-2.4to-2.3]": continue
+        # if bin_key != "[24.0to35.0][-2.4to-2.3]": continue
 
         for flag in ["pass", "fail"]:
             
@@ -188,8 +187,9 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
             if plot_on_data:
 
-                datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
-                                               import_data=True, import_fit_pdf_bkg=plot_fit_bkgpdf)
+                import_categories = ["data"] + bkg_categories
+
+                datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
                 
                 plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=f"{figpath}/minv_plots_w_data")
 
@@ -204,9 +204,10 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
 
             if plot_on_signal:
+
+                import_categories = ["mc"] + bkg_categories
         
-                datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
-                                               import_mc_signal=True, import_fit_pars=compare_bkgfrac)
+                datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
                 
                 plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=f"{figpath}/minv_plots_w_sig")
                 

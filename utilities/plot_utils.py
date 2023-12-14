@@ -9,7 +9,6 @@ from array import array
 from utilities.base_library import lumi_factors, binning, sumw2_error
 from utilities.CMS_lumi import CMS_lumi
 
-bkg_categories= ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau", "SameCharge"]
 
 colors = { 
     "bkg_WW" : ROOT.kOrange+1,
@@ -253,17 +252,14 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     distribution) are plotted as RooHistPdf.
     The objects to be plotted are contained in the dictionary "plot_objects", 
     which must be structured as follows:
-        plot_objects = { 
-            "axis" : RooRealVar,
-            "total_bkg" : { "roohisto":RooDataHist, "lumi_scale":float, "integral":float},
-            "bkg_{process}" : { "roohisto":RooDataHist, "histo_pdf":RooHistPdf,
-                                    "lumi_scale":float, "integral":float},
-            "MC_signal (optional)" : as above,
-            "data (optional)" : RooDataHist,
-            "fit_pars (optional)" : { "nsig":RooRealVar, "nbkg":RooRealVar },
-            "pdf_bkg_fit (optional)" : {"pdf":RooAbsPdf, "norm":RooRealVar}
-            }
-        }
+        plot_objects = { "axis" : RooRealVar,
+                         "total_bkg" : RooDataHist,
+                         "bkg_{process}" : RooDataHist, 
+                         "mc (optional)" : RooDataHist,
+                         "data (optional)" : RooDataHist,
+                         "fit_pars (optional)" : { "nsig":RooRealVar, "nbkg":RooRealVar },
+                         "pdf_bkg_fit (optional)" : {"pdf":RooAbsPdf, "norm":RooRealVar}
+                        }
     """
 
     imported_data, imported_mc_sig, imported_pdf_bkg = False, False, False
@@ -326,9 +322,9 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
             if datahist.weight(bin_idx) > ctrl_plot_max:
                 ctrl_plot_max = datahist.weight(bin_idx)
     
-    if "MC_signal" in plot_objects.keys():
+    if "mc" in plot_objects.keys():
         imported_mc_sig = True
-        mc_sig_dict = plot_objects.pop("MC_signal")
+        mc_sig_dict = plot_objects.pop("mc")
         mc_sig_dict["histo_pdf"].plotOn(frame,
                                         ROOT.RooFit.Name("MC signal"),
                                         ROOT.RooFit.LineColor(colors["signal"]),
@@ -346,7 +342,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
                                 ROOT.RooFit.Normalization(pdf_bkg_obj["norm"].getVal(), ROOT.RooAbsReal.NumEvent))
 
 
-    total_bkg = plot_objects.pop("total_bkg")
+    total_bkg = plot_objects.pop("bkg_total")
 
     binning_plot = axis.getBinning("plot_binning")
     nbins_plot_max = binning_plot.numBins()
@@ -362,30 +358,30 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
             
             ctrl_plot_binning = 0
             axis.setBins(nbins_total_bkg, f"plot_binning_total_bkg")
-            tmp_histo = ROOT.RooDataHist(total_bkg["roohisto"].GetName(), total_bkg["roohisto"].GetTitle(), 
+            tmp_histo = ROOT.RooDataHist(total_bkg.GetName(), total_bkg.GetTitle(), 
                                             ROOT.RooArgSet(axis), f"plot_binning_total_bkg")
-            tmp_histo.add(total_bkg["roohisto"])
+            tmp_histo.add(total_bkg)
 
             for i in range(tmp_histo.numEntries()):
-                if tmp_histo.weight(i)<=0:
+                if tmp_histo.weight(i) < 0:
                     ctrl_plot_binning += 1
                     
             if ctrl_plot_binning==0 or nbins_total_bkg==20:
-                total_bkg.update({"roohisto" : tmp_histo})
+                total_bkg = tmp_histo
                 break
-    
-    for bin_idx in range(total_bkg["roohisto"].numEntries()):
-        if total_bkg["roohisto"].weight(bin_idx) > ctrl_plot_max:
-            ctrl_plot_max = total_bkg["roohisto"].weight(bin_idx)
+            
+    for bin_idx in range(total_bkg.numEntries()):
+        if total_bkg.weight(bin_idx) > ctrl_plot_max:
+            ctrl_plot_max = total_bkg.weight(bin_idx)
 
-    total_bkg["roohisto"].plotOn(frame,
-                                 ROOT.RooFit.Name("Total bkg"),
-                                 ROOT.RooFit.Binning("plot_binning_total_bkg"),
-                                 ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2),
-                                 # ROOT.RooFit.Invisible(),
-                                 ROOT.RooFit.LineColor(colors["total_bkg"]),
-                                 ROOT.RooFit.MarkerColor(colors["total_bkg"])
-                                 )
+    total_bkg.plotOn(frame,
+                     ROOT.RooFit.Name("Total bkg"),
+                     ROOT.RooFit.Binning("plot_binning_total_bkg"),
+                     ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2),
+                     # ROOT.RooFit.Invisible(),
+                     ROOT.RooFit.LineColor(colors["bkg_total"]),
+                     ROOT.RooFit.MarkerColor(colors["bkg_total"])
+                     )
     
     pad_info.cd()
     textbox = ROOT.TPaveText(0, 0., 0.9, 0.55, "NDC NB")
@@ -418,12 +414,12 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     legend.AddEntry("Total bkg", "Total bkg", "lp")
     legend_obj = legend.GetListOfPrimitives().Last()
     legend_obj.SetMarkerStyle(ROOT.kFullCircle)
-    legend_obj.SetMarkerColor(colors["total_bkg"])
+    legend_obj.SetMarkerColor(colors["bkg_total"])
     legend_obj.SetMarkerSize(2)
-    legend_obj.SetLineColor(colors["total_bkg"])
+    legend_obj.SetLineColor(colors["bkg_total"])
     legend_obj.SetLineWidth(2)
 
-    sigma_histo_bkg = sumw2_error(total_bkg['roohisto'])
+    sigma_histo_bkg = sumw2_error(total_bkg)
     if imported_data:
         textbox.AddText(f"Data entries: {datahist.sumEntries()}")
     if imported_mc_sig:
@@ -434,10 +430,10 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
         textbox.AddText(
             f"Nbkg from fit: {pdf_bkg_obj['norm'].getVal():.2f} #pm {pdf_bkg_obj['norm'].getError():.2f}")
 
-    textbox.AddText(f"Nbkg from MC: {total_bkg['integral']:.2f} #pm {sigma_histo_bkg:.2f}")
+    textbox.AddText(f"Nbkg from MC: {total_bkg.sumEntries():.2f} #pm {sigma_histo_bkg:.2f}")
         
     if imported_pdf_bkg:
-        delta_bkg = total_bkg['integral'] - pdf_bkg_obj['norm'].getVal()
+        delta_bkg = total_bkg.sumEntries() - pdf_bkg_obj['norm'].getVal()
         sigma_on_delta_bkg = (sigma_histo_bkg**2 + pdf_bkg_obj['norm'].getError()**2)**0.5
         nsigma = delta_bkg/sigma_on_delta_bkg
         textbox.AddText(f"Distance in #sigma = {nsigma:.2f}")
@@ -447,49 +443,45 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     c.Update()
 
     
-    for bkg_key in plot_objects.keys():
+    for bkg_key, bkg_obj in plot_objects.items():
         
-        if bkg_key != "TTFullyleptonic_bkg":
-            bkg_key_print = copy(bkg_key).replace("_bkg", "") 
-        else:
-            bkg_key_print = "TTLeptonic"
-    
-        
-        bkg_obj = plot_objects[bkg_key]
-        
+        bkg_key_print = copy(bkg_key).replace("bkg_", "")
+
+        bkg_obj_plot = ROOT.RooHistPdf(f"{bkg_key}_pdf", f"{bkg_key}_pdf", ROOT.RooArgSet(axis),bkg_obj)
+
         for nbins_bkg in list_nbins_plot:
             ctrl_plot_binning = 0
             axis.setBins(nbins_bkg, f"plot_binning_{bkg_key}")
-            tmp_histo = ROOT.RooDataHist(bkg_obj["roohisto"].GetName(), bkg_obj["roohisto"].GetTitle(), 
-                                            ROOT.RooArgSet(axis), f"plot_binning_{bkg_key}")
+            tmp_histo = ROOT.RooDataHist(bkg_obj.GetName(), bkg_obj.GetTitle(), 
+                                         ROOT.RooArgSet(axis), f"plot_binning_{bkg_key}")
 
-            tmp_histo.add(bkg_obj["roohisto"])
+            tmp_histo.add(bkg_obj)
             for i in range(tmp_histo.numEntries()):
                 tmp_histo.get(i)
-                if tmp_histo.weight(i) <= 0.01:
+                if tmp_histo.weight(i) < 0:
                     ctrl_plot_binning += 1
 
             if ctrl_plot_binning==0 or nbins_bkg==10:
                 axis.setBins(nbins_bkg)
                 tmp_histpdf = ROOT.RooHistPdf(f"{bkg_key}_pdf", f"{bkg_key}_pdf", 
                                               ROOT.RooArgSet(axis), tmp_histo)
-                bkg_obj.update({"histo_pdf" : tmp_histpdf})
+                bkg_obj_plot = tmp_histpdf
                 break
 
         pad_plot.cd()
-        bkg_obj["histo_pdf"].plotOn(frame, 
-                         ROOT.RooFit.Name(bkg_key_print),
-                         ROOT.RooFit.LineColor(colors[bkg_key]),
-                         ROOT.RooFit.LineStyle(1),
-                         ROOT.RooFit.Normalization(bkg_obj["integral"], ROOT.RooAbsReal.NumEvent))
+        bkg_obj_plot.plotOn(frame, 
+                            ROOT.RooFit.Name(bkg_key_print),
+                            ROOT.RooFit.LineColor(colors[bkg_key.replace("_SS", "")]),
+                            ROOT.RooFit.LineStyle(1),
+                            ROOT.RooFit.Normalization(bkg_obj.sumEntries(), ROOT.RooAbsReal.NumEvent))
 
         pad_info.cd()
-        bkg_error = sumw2_error(bkg_obj["roohisto"])
+        bkg_error = sumw2_error(bkg_obj)
         textbox.AddText(
-            f"  {bkg_key_print} = {bkg_obj['integral']:.2f} #pm {bkg_error:.2f}")
+            f"  {bkg_key_print} = {bkg_obj.sumEntries():.2f} #pm {bkg_error:.2f}")
         legend.AddEntry(bkg_key_print, bkg_key_print, "l")
         legend_obj = legend.GetListOfPrimitives().Last()
-        legend_obj.SetLineColor(colors[bkg_key])
+        legend_obj.SetLineColor(colors[bkg_key.replace("_SS", "")])
         legend_obj.SetLineWidth(3)
 
     
