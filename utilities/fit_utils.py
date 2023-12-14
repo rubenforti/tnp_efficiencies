@@ -32,7 +32,7 @@ def check_existing_fit(type_analysis, ws, bin_key):
 ###############################################################################
 
 
-def getSidebands(histo, axis, cut=0.6):
+def getSidebands(histo, axis, cut=0.68):
     """
     """
     binning = axis.getBinning()

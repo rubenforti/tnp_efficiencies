@@ -112,7 +112,7 @@ class results_manager:
         elements = row_list[idx_list].split('\t')
         eff, deff = float(elements[4]), float(elements[5])
         self._dict_results.update({bin_key : {"efficiency" : (eff, deff)}})
-        print(idx_list, bin_key, elements[0], elements[1], elements[2], elements[3])
+
 
     def add_result_from_txt_altSig(self, row_list, idx_list, bin_key):
         elements = row_list[idx_list].split('\t')
@@ -260,6 +260,8 @@ def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict):
         eff_1, deff_1 = res_bmark.getEff(bin_key)
         eff_2, deff_2 = res_new.getEff(bin_key)
 
+        print(gl_idx, bin_key, round(eff_2,4), round(eff_1,4), round(deff_1,4), (eff_2-eff_1)/deff_2)
+
         if "delta" in hist_dict.keys():
             hist_dict["delta"].Fill(eff_2-eff_1)
             hist_dict["delta_2d"].SetBinContent(bin_pt, bin_eta, eff_2-eff_1)
@@ -267,8 +269,8 @@ def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict):
             hist_dict["delta_error"].Fill(deff_2-deff_1)
             hist_dict["delta_error_2d"].SetBinContent(bin_pt, bin_eta, deff_2-deff_1)
         if "pull" in hist_dict.keys():
-            hist_dict["pull"].Fill((eff_2-eff_1)/deff_2)
-            hist_dict["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff_2-eff_1)/deff_2)
+            hist_dict["pull"].Fill((eff_2-eff_1)/deff_1)
+            hist_dict["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff_2-eff_1)/deff_1)
         if "rm1" in hist_dict.keys():
             hist_dict["rm1"].Fill((eff_2/eff_1)-1)
             hist_dict["rm1_2d"].SetBinContent(bin_pt, bin_eta, (eff_2/eff_1)-1)
@@ -279,13 +281,3 @@ def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict):
         
 ###############################################################################
 ###############################################################################
-
-if __name__ == '__main__':
-
-    from fit_utils import fit_quality, pearson_chi2_eval
-    from base_library import eval_efficiency, binning, bin_dictionary
-
-    ws_name = "../results/benchmark_iso/ws_iso_indep_benchmark.root"
-    
-    save_eff_results(ws_name, "indep", "pt", "eta")
-    

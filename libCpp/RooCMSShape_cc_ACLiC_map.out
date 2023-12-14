@@ -1,0 +1,3 @@
+ libCore.so  libRooFitCore.so  libRIO.so  libTree.so  libMatrix.so  libHist.so  libGraf.so
+# Now the list of classes
+RooCMSShape

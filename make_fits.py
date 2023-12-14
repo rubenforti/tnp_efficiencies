@@ -47,7 +47,7 @@ def checkImportCustomPdfs(bkg_models):
     """
     """
     dict_classes = {
-        "cmsshape" : "RooCMSShape",
+        "cmsshape" : "RooCMSShape_old",
         "cmsshape_w_prefitSS" : "RooCMSShape",
         "cmsshape_new" : "RooCMSShape_mod",
         "CB" : "my_double_CB"
@@ -94,7 +94,7 @@ def runFits(ws_name, bin_dict, fit_settings, parallelize=True, import_pdfs=False
     for bin_key in bin_dict.keys():
         
         # if bin_key != "[45.0to55.0][0.7to0.8]": continue
-        # if bin_key != "[24.0to26.0][-0.1to0.0]": continue
+        # if bin_key != "[35.0to45.0][0.7to0.8]": continue
 
         if fit_settings["type_analysis"] == "indep":
             dict_flags = ["pass", "fail"]
