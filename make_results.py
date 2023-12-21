@@ -124,7 +124,6 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
     for t_an in ["indep", "sim"]:
         if t_an in ws_new_filename:
             res_new = results_manager(t_an, binning_pt, binning_eta, import_ws=ws_new)
-            print(res_new)
 
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
     bin_dict = bin_dictionary(binning_pt, binning_eta)
@@ -296,10 +295,12 @@ if __name__ == '__main__':
     benchmark_res = base_folder+"/benchmark_plus/old_results.txt"
 
     # bmark_fit_filename = base_folder+"/benchmark_opt/ws_tracking_indep_benchmark.root"
-    bmark_fit_filename =  base_folder+"/benchmark_plus/ws_trackingplus_indep_benchmark.root"
+    bmark_fit_filename =  base_folder+"/benchmark_opt/ws_tracking_indep_benchmark.root"
     
     #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
     # ws_filename = "results/pseudodata_iso/ws_iso_pseudodata.root"
+
+    ws_filename_1 =  base_folder+"/prefit_bkg_fail_80_100/ws_tracking_indep_prefit_bkg_fail.root"
 
     ws_filename =  base_folder+"/prefit_bkg_fail_75_105/ws_tracking_indep_prefit_bkg_fail.root"
 
@@ -310,7 +311,7 @@ if __name__ == '__main__':
 
 
     # save_eff_results(bmark_fit_filename, "indep", "pt", "eta")
-    compare_efficiency(benchmark_res, bmark_fit_filename, "pt_tracking", "eta", resCmp_list)
+    compare_efficiency(ws_filename_1, ws_filename, "pt_tracking", "eta", resCmp_list)
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 
