@@ -45,7 +45,8 @@ xsec_bkg = {
     "WW" : 12.6,
     "WZ" : 5.4341,
     "ZZ" : 0.60,
-    "TTFullyleptonic" : 88.29, 
+    "TTFullyleptonic" : 88.29,
+    "TTSemileptonic" : 366.34,
     "Ztautau" : xsec_ZmmPostVFP*Z_TAU_TO_LEP_RATIO
 }
 
@@ -222,6 +223,8 @@ def lumi_factor(filepath, process):
         xsection = cross_section_bkg(process)*1000
         
     lumi_process = num_init/xsection
+
+    print(lumi_process)
 
     scale = lumi_data/lumi_process
 

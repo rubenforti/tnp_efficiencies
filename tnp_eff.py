@@ -26,13 +26,12 @@ type_eff = "tracking"
 type_analysis = "indep"
 charge_selection = ["plus", "minus"]
 
-folder = gen_res_folder+"/tracking/prefit_SS_fail"
-# folder = gen_res_folder
-ws_filename = folder+"/ws_tracking_indep_prefitSS_fail.root"
+folder = gen_res_folder+f"/tracking/bb_light"
+ws_filename = folder+f"/ws_tracking_indep_barlowbeeston.root"
 
 generate_datasets = False
 
-fit_settings = "custom_run4"
+fit_settings = "custom_run2"
 
 binning_pt, binning_eta, binning_mass = "pt_tracking", "eta", "mass_50_130"
 
@@ -41,7 +40,7 @@ mergedbins_bkg, binning_pt_bkg, binning_eta_bkg = False, "pt_12bins", "eta_16bin
 load_bkg_datasets = True
 bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau", "bkg_SameCharge"]
 import_bkg_samesign = False
-import_mc_samesign = True
+import_mc_samesign = False
 
 fit_on_pseudodata = False
 
@@ -84,8 +83,12 @@ if generate_datasets:
     import_dictionary = gen_import_dictionary(datasets_folder, type_eff, import_categories,
                                               ch_set=charge_selection, scale_MC=scale_MC, 
                                               add_SS_mc=import_mc_samesign, add_SS_bkg=import_bkg_samesign)
+    
+    print(import_dictionary)
+
 
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass, lightMode_bkg=True)
+
     ws.writeToFile(ws_filename)
 
 
@@ -133,6 +136,7 @@ fit_settings["useMinos"] = useMinos
 if load_bkg_datasets or fit_on_pseudodata: 
     fit_settings["bkg_categories"] = bkg_categories
     fit_settings["import_bkg_samesign"] = import_bkg_samesign
+
 
 
 # -----------------------------------------------------------------------------------------------------------

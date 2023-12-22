@@ -32,7 +32,7 @@ def check_existing_fit(type_analysis, ws, bin_key):
 ###############################################################################
 
 
-def getSidebands(histo, axis, cut=0.6):
+def getSidebands(histo, axis, cut=0.68):
     """
     """
     binning = axis.getBinning()
@@ -162,8 +162,6 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
         flag = "pass" if "pass" in res.GetName() else "fail"
         chi2val, used_bins = llr_eval(histo, pdf, axis) \
             if type_chi2 == "llr" else pearson_chi2_eval(histo, pdf, axis)
-        ndof = used_bins - res.floatParsFinal().getSize()
-        res.SetTitle(f"{chi2val}_{ndof}")
     
     elif "sim" in res.GetName():
         chi2val = 0
@@ -175,13 +173,16 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
             else: 
                 chi2val += pearson_chi2_eval(histo[flag], pdf[flag], axis[flag])[0]
                 used_bins += pearson_chi2_eval(histo[flag], pdf[flag], axis[flag])[1]
-        ndof = used_bins - res.floatParsFinal().getSize()
-        res.SetTitle(f"{chi2val}_{ndof}")
 
     else:
-        print("ERROR: status_chi2() function is not implemented for this type of fit")
-        sys.exit()
-     
+        sys.exit("ERROR: status_chi2() function is not implemented for this type of fit")
+
+    ndof = used_bins
+    for par in res.floatParsFinal():
+        if not ("_gamma_bin_" in par.GetName()): ndof -= 1  #To not count the gamma parameters in the BB method
+    res.SetTitle(f"{chi2val}_{ndof}")
+
+
     chi2_status = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
     print(chi2val, ndof, chi2_status) 
     return chi2_status
@@ -213,7 +214,7 @@ def fit_quality(fit_obj, type_checks="benchmark"):
     elif type_checks == "pseudodata":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
-        check_edm = (fit_obj["res"].edm() < 1e-3)
+        check_edm = (fit_obj["res"].edm() < 9e-3)
     
     else:
         sys.exit("ERROR: wrong type of fit quality check indicated")

@@ -28,17 +28,26 @@ class AbsFitter():
         self.norm = settings_obj.pop("norm")
         self.settings = settings_obj
         
-        self.histo_data, self.axis, self.constr_set, self.res_obj  = {}, {}, {}, {}
+        self.histo_data, self.axis, self.res_obj  = {}, {}, {}
         self.status = {"pass" : True, "fail" : True}
         self.bin_status = False
 
         self.pdfs = { "smearing" : {}, "mc_pdf" : {}, "conv_pdf" : {}, 
                       "bkg_pdf" : {}, "sum_pdf" : {}, "fit_model" : {} }
+        self.constr_set = {"pass" : "", "fail" : ""}
+        # self.mc_template = {}
 
+        if "BB" in self.settings["bkg_model"]["pass"] or "BB" in self.settings["bkg_model"]["fail"]:
+            self.bkg_paramHist, self.bkg_histConstr = {}, {}
+            self._one = ROOT.RooRealVar("one", "one", 1.0)
+            self._one.setConstant() 
+
+        '''
+        # Not used anymore since the totkbg hist is generated (when needed) in the initial setup of the workspace
         if self.settings["bkg_model"]["pass"] == "mc_raw" or self.settings["bkg_model"]["fail"] == "mc_raw":
             self.bkg_categories = self.settings["bkg_categories"]
             self.bkg_tothist = {}
-
+        '''
 
     def _initParams(self, flag):
         """
@@ -66,6 +75,19 @@ class AbsFitter():
             flag : ROOT.RooGaussian(f"smearing_{flag}_{self.bin_key}", "Gaussian smearing", 
                                     self.axis[flag], self.pars["mu"][flag], self.pars["sigma"][flag]) 
             })
+
+        '''
+        # WARNING: feature adopted JUS TO CKECK THE RESULTS WITH EGM_TNP_ANALYSIS'S ONES
+        if flag == "fail":
+            self.mc_template["fail"] = ROOT.RooDataHist(
+                f"mc_template_fail_{self.bin_key}", "mc template_hist", ROOT.RooArgList(self.axis[flag]), "x_binning")
+            self.mc_template["fail"].add(ws.data(f"Minv_mc_pass_{self.bin_key}"))
+            self.mc_template["fail"].add(ws.data(f"Minv_mc_fail_{self.bin_key}"))
+        elif flag == "pass":
+            self.mc_template["pass"] = ws.data(f"Minv_mc_pass_{self.bin_key}")
+        else:
+            sys.exit("ERROR: flag not recognized")
+        '''
 
         self.pdfs["mc_pdf"].update({
             flag : ROOT.RooHistPdf(f"mc_pdf_{flag}_{self.bin_key}", "MC pdf",
@@ -151,10 +173,22 @@ class AbsFitter():
                                        ROOT.RooArgSet(self.axis[flag]),  ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total"))
                 })
     
-        elif bkg_model == "mc_BBlight":
-            # pdf created via barlow beeston strategy
-            pass
-        
+        elif bkg_model == "BB_light":
+            self.bkg_paramHist.update({ 
+                flag : ROOT.RooParamHistFunc(f"bkg_paramHist_{flag}_{self.bin_key}", "bkg parametrized histogram", 
+                                             ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")) })
+            self.bkg_histConstr.update({
+                flag : ROOT.RooHistConstraint(f"bkg_histConstr_{flag}_{self.bin_key}", "bkg histogram constraints", 
+                                              self.bkg_paramHist[flag]) })
+            
+            if type(self.constr_set[flag]) is not ROOT.RooArgSet: self.constr_set[flag] = ROOT.RooArgSet()
+
+            self.constr_set[flag].add( self.bkg_histConstr[flag] )
+
+            self.pdfs["bkg_pdf"].update({
+                flag : ROOT.RooRealSumPdf(f"BBbkg_{flag}_{self.bin_key}", "Barlow-Beeston background", 
+                                          ROOT.RooArgList(self.bkg_paramHist[flag]), ROOT.RooArgList(self._one)) })
+ 
         else:
             sys.exit("ERROR: background model not recognized")
             
@@ -267,7 +301,7 @@ class AbsFitter():
 
                 if import_bkgSS is True: 
                     self.histo_data.update({f"bkgSS_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
-                    self.histo_data[f"bkgSS_{flag}"].Print("v")
+                    # self.histo_data[f"bkgSS_{flag}"].Print("v")
             else:
                 self._createPseudodata(flag, ws)
 
@@ -317,11 +351,12 @@ class AbsFitter():
     def doFit(self, flag, fit_bkgSS=False, sidebands_lims=[75,105]):
         """
         """
-        par_minos_set = ROOT.RooArgSet()
-        if self.settings["type_analysis"] == "sim" and self.settings["useMinos"] == "eff":
-            par_minos_set.add(self.efficiency)
-        elif self.settings["type_analysis"] == "sim" and self.settings["useMinos"] == "all": 
-            par_minos_set.add(self.pdfs["fit_model"][flag].getParameters(self.histo_data[flag]))
+        if self.settings["useMinos"] == "all": 
+            self.minos_pars[flag] = ROOT.RooArgSet(self.pdfs["fit_model"][flag].getParameters(self.histo_data[flag]))
+        elif flag == "sim" and self.settings["useMinos"] == "eff":
+            self.minos_pars[flag] = ROOT.RooArgSet(self.efficiency)
+        else:
+            pass
 
         doRegularFit = not (self.settings["bkg_model"][flag]=="num_estimation" or fit_bkgSS)
         
@@ -335,7 +370,7 @@ class AbsFitter():
         elif fit_bkgSS:
             pdf_fit = self.pdfs["bkg_pdf"][flag]
             data_fit = self.histo_data[f"bkgSS_{flag}"]
-            sidebands_lims = getSidebands(self.histo_data[f"mcSS_{flag}"], self.axis[flag])
+            sidebands_lims = getSidebands(self.histo_data[f"mcSS_{flag}"], self.axis[flag]) 
             self.axis[flag].setRange("sideband_under", self.axis[flag].getMin(), sidebands_lims[0])
             self.axis[flag].setRange("sideband_over", sidebands_lims[1], self.axis[flag].getMax())
             range_fit = "sideband_under,sideband_over"
@@ -352,18 +387,21 @@ class AbsFitter():
         else: 
             sys.exit("ERROR: Control applied on fit setting is not consistent!")
 
-        print("")
+        '''print("")
         print("Data fit", data_fit.GetName())
         print("Pdf fit", pdf_fit.GetName())
         print("Range fit", range_fit)
         print("Subs res", subs_res)
         print("Checks", checks)
-        print("")
+        print("")'''
+
+        if flag == "sim" : 
+            self.constr_set[flag] = ROOT.RooArgSet(self.constr_set["pass"], self.constr_set["fail"])
 
         res = pdf_fit.fitTo(data_fit,
                             ROOT.RooFit.Range(range_fit),
                             ROOT.RooFit.Minimizer("Minuit2", "Migrad"),
-                            # ROOT.RooFit.Minos(par_minos_set),
+                            ROOT.RooFit.Minos(self.minos_pars[flag]),
                             ROOT.RooFit.Strategy(2),
                             ROOT.RooFit.SumW2Error(False),
                             ROOT.RooFit.ExternalConstraints(self.constr_set[flag]),
@@ -429,11 +467,24 @@ class AbsFitter():
 
         plot_objects={}
         fig_folder = figpath["good"] if fig_status is True else figpath["check"]
+        
         for flag in ["pass", "fail"]:
+            
+            finalPars = ROOT.RooArgList(self.norm["nsig"][flag], self.norm["nbkg"][flag])
+
+            for par in self.pars.values():
+                try:
+                    if par[flag].isConstant(): par[flag].SetTitle(f"{par[flag].GetTitle()} (fixed)")
+                    finalPars.add(par[flag])
+                except:
+                    continue
+
+            self.res_obj[flag].setFinalParList(finalPars)
+
             plot_objects.update({ 
                 flag : {"axis":self.axis[flag], "data":self.histo_data[flag],
-                        "model":self.pdfs["fit_model"][flag], "res":self.res_obj[flag]}
-                })
+                        "model":self.pdfs["fit_model"][flag], "res":self.res_obj[flag] }
+                })            
 
         plot_objects.update({"efficiency" : [eff, d_eff],
                              "efficiency_mc" : [eff_mc, deff_mc],
@@ -453,6 +504,8 @@ class IndepFitter(AbsFitter):
         """
         """
         AbsFitter.__init__(self, bin_key, settings)
+        self.minos_pars = { fl: "" for fl in ["pass", "fail"]}
+        
 
 
     def attempt_noBkgFit(self, flag):
@@ -533,12 +586,13 @@ class SimFitter(AbsFitter):
         """
         AbsFitter.__init__(self, bin_key, settings)
         self.efficiency = ROOT.RooRealVar(f"efficiency_{bin_key}", "Efficiency", 0.9, 0, 1)
-        self.__one = ROOT.RooRealVar("one", "one", 1.0)
-        self.__one.setConstant()
-        self.__minus_one = ROOT.RooRealVar("minus_one", "minus one", -1.0)
-        self.__minus_one.setConstant()
+        self._one = ROOT.RooRealVar("one", "one", 1.0)
+        self._one.setConstant()
+        self._minus_one = ROOT.RooRealVar("minus_one", "minus one", -1.0)
+        self._minus_one.setConstant()
         self.one_minus_eff = ROOT.RooPolyVar(f"one_minus_eff_{self.bin_key}", "1 - efficiency", 
-                                             self.efficiency, ROOT.RooArgList(self.__one, self.__minus_one))
+                                             self.efficiency, ROOT.RooArgList(self._one, self._minus_one))
+        self.minos_pars = {"sim" : ""}
 
 
     def initNorm_sim(self):
@@ -648,6 +702,8 @@ class SimFitter(AbsFitter):
             self.initNorm_sim()
             self.initFitPdfs(ws)
             self.createSimDataset(ws)
+            if "constr" in self.settings.keys(): 
+                [self.setConstraints(flag) for flag in ["pass", "fail"]]
 
             self.doFit("sim")
 

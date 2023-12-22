@@ -10,7 +10,7 @@ from utilities.plot_utils import plot_bkg, plot_2d_bkg_distrib, plot_projected_b
 from array import array
 
 
-bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau"]
+# bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau"]
 
 ###############################################################################
 
@@ -83,7 +83,6 @@ def make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta,
     """
 
     axis = ws.var(f"x_{flag}_{bin_key}")
-    print(type(axis))
 
     binning = axis.getBinning("x_binning")
     axis.setBins(binning.numBins(), "plot_binning")
@@ -91,23 +90,16 @@ def make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta,
     datasets = {}
     datasets.update({"axis" : axis})
 
-    type_dataset, subs = "", ""
-
     for cat in import_categories:
-        if "bkg" in cat: 
-            cat.replace("_SS", "")
-            type_dataset, subs = cat.split("_")
+        try:
+            type_dataset, subs = cat.split("_", 1)
             subs = f"_{subs}"
-        elif cat=="data": 
-            type_dataset = "data"
-        elif "mc" in cat: 
-            type_dataset = "mc"
-        else:
-            sys.exit("ERROR: wrong category name")
+        except:
+            type_dataset, subs = cat, ""
 
         datasets[cat] = ws.data(f"Minv_{type_dataset}_{flag}_{bin_key}{subs}")
 
-    datasets["bkg_total"] = get_totbkg_roohist([ws, import_categories], axis, bin_key,)
+    datasets["bkg_total"] = get_totbkg_roohist([ws, import_categories], flag, axis, bin_key, bin_pt, bin_eta)
 
     if import_fit_pars:
         res_obj = ws.obj(f"results_{flag}_{bin_key}")
@@ -139,9 +131,10 @@ def make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta,
 ###############################################################################
 
 def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, binning_eta, 
-                           plot_on_data=False, plot_fit_bkgpdf=False,
-                           plot_on_signal=False, compare_bkgfrac=False,
-                           logscale=True, figpath='figs/bkg_and_sig_mc'):
+                          study_SS_bkg=False,                            
+                          plot_on_data=False, plot_fit_bkgpdf=False,
+                          plot_on_signal=False, compare_bkgfrac=False,
+                          logscale=True, figpath='figs/bkg_and_sig_mc'):
     """
     Plots the M_inv distribution of the total bkg and the various background samples, for each (pt,eta) bin.
     These bkg distributions can be compared to the MC signal or the data distributions.
@@ -176,11 +169,12 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                                             array('d', bins_pull), bins_pt, bins_pt))
         histos.update(init_pass_fail_histos("h_bkgfrac_ratio", "Bkg fraction mc/fit ratio", 
                                             array('d', bins_ratio), bins_pt, bins_pt))
-
+        
+    if study_SS_bkg: bkg_categories = [cat+"_SS" if cat != "bkg_SameCharge" else cat for cat in bkg_categories]
 
     for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
-        # if bin_key != "[24.0to26.0][-2.4to-2.3]": continue
+        # if bin_key != "[24.0to35.0][-2.4to-2.3]": continue
 
         for flag in ["pass", "fail"]:
             
@@ -188,15 +182,16 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
             if plot_on_data:
 
-                datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
-                                               import_data=True, import_fit_pdf_bkg=plot_fit_bkgpdf)
+                import_categories = ["data"] + bkg_categories
+
+                datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
                 
                 plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=f"{figpath}/minv_plots_w_data")
 
                 if plot_fit_bkgpdf and 1==0:
-                    integral_histo_bkg = datasets["total_bkg"]["integral"]
+                    integral_histo_bkg = datasets["total_bkg"].sumEntries()
                     norm_bkg = datasets["pdf_bkg_fit"]["norm"]
-                    err_integral_histo_bkg = sumw2_error(datasets["total_bkg"]["roohisto"])
+                    err_integral_histo_bkg = sumw2_error(datasets["bkg_total"])
 
                     nbkg_pull = (integral_histo_bkg - norm_bkg.getVal())/norm_bkg.getError()
                     histos[f"h_nbkg_pull_{flag}"].Fill(nbkg_pull)
@@ -204,17 +199,18 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
 
             if plot_on_signal:
+
+                import_categories = ["mc"] + bkg_categories
         
-                datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories, 
-                                               import_mc_signal=True, import_fit_pars=compare_bkgfrac)
+                datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
                 
                 plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=f"{figpath}/minv_plots_w_sig")
                 
-                nbkg = datasets["total_bkg"]["integral"]
-                err_nbkg = sumw2_error(datasets["total_bkg"]["roohisto"])
+                nbkg = datasets["bkg_total"].sumEntries()
+                err_nbkg = sumw2_error(datasets["bkg_total"])
 
-                nsignal = datasets["MC_signal"]["integral"]
-                err_nsignal = sumw2_error(datasets["MC_signal"]["roohisto"])
+                nsignal = datasets["mc"].sumEntries()
+                err_nsignal = sumw2_error(datasets["mc"])
 
                 bkgfrac_mc, err_bkgfrac_mc = eval_bkgfrac(nbkg, nsignal, err_nbkg, err_nsignal)
             
@@ -269,8 +265,8 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
 
 
-def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta, 
-                       norm_data=False, norm_sig=False, norm_tot_bkg=False, 
+def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
+                       study_SS_bkg=False, norm_data=False, norm_sig=False, norm_tot_bkg=False, 
                        plot_projected=False, filepath="bkg_studies"):
     """
     Makes 2d histograms containing the differential distribution of the various
@@ -294,15 +290,18 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
     bin_dict = bin_dictionary(binning_pt, binning_eta)    
 
+    bkg_categories_dry = [cat.replace("bkg_", "") for cat in bkg_categories]
+
+    if study_SS_bkg: bkg_categories_dry = [cat+"_SS" if cat != "SameCharge" else cat for cat in bkg_categories_dry]
     
     histos = {}
 
-    norm_general_flag = norm_data or norm_sig or norm_tot_bkg
+    isNorm = norm_data or norm_sig or norm_tot_bkg
 
 
-    for bkg_cat in bkg_categories:
-        print(bkg_cat)
+    for bkg_cat in bkg_categories_dry:
         # if bkg_cat!="SameCharge": continue
+
 
         histos.update(init_pass_fail_histos(bkg_cat, bkg_cat, bins_pt, bins_pt, bins_eta))
 
@@ -316,35 +315,45 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
             num_events = {}
 
             for flag in ["pass", "fail"]:
+                bkg_hist = ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
                 num_events.update({
-                    flag : ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}").sumEntries(),
-                    f"error {flag}" : sumw2_error(ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}"))
+                    flag : bkg_hist.sumEntries(),
+                    f"error {flag}" : sumw2_error(bkg_hist)
                     })
                 
-                if norm_data: h_norm = ws.data(f"Minv_data_{flag}_{bin_key}")
-                elif norm_sig: h_norm = ws.data(f"Minv_mc_{flag}_{bin_key}")
+                if norm_data: 
+                    h_norm = ws.data(f"Minv_data_{flag}_{bin_key}")
+                elif norm_sig:
+                    h_norm = ws.data(f"Minv_mc_{flag}_{bin_key}")
                 elif norm_tot_bkg:
+                    if type(ws.data(f"Minv_bkg_{flag}_{bin_key}_total")) is ROOT.RooDataHist:
+                        h_norm = ws.data(f"Minv_bkg_{flag}_{bin_key}_total")
+                    else:
                         axis = ws.var(f"x_{flag}_{bin_key}")
-                        if binning_pt!="pt" or binning_eta!="eta":
+                        if binning_pt not in ["pt", "pt_tracking"] or binning_eta!="eta":
                             extended_bin_dict = bin_global_idx_dict(binning_pt, binning_eta)
                             bin_pt_ext, bin_eta_ext = extended_bin_dict[str(gl_idx[0])]
                         else:
                             bin_pt_ext, bin_eta_ext = bin_pt, bin_eta
-                        h_norm = get_totbkg_roohist([ws, bkg_categories], axis, bin_key, bin_pt_ext, bin_eta_ext)
-
-                if h_norm.sumEntries() > 0 and num_events[flag] > 0:
-                    if h_norm.sumEntries() < num_events[flag]:
-                        print(num_events[flag], h_norm.sumEntries())
-                    num_events[flag] = num_events[flag]/h_norm.sumEntries()
-                    num_events[f"error {flag}"] = num_events[flag]*(
-                        (num_events[f"error {flag}"]/num_events[flag])**2 + (sumw2_error(h_norm)/h_norm.sumEntries())**2)**0.5
+                        h_norm = get_totbkg_roohist([ws, bkg_categories], flag, axis, bin_key, bin_pt_ext, bin_eta_ext)
                 else:
-                    num_events[flag], num_events[f"error {flag}"] = 0, 0
+                    pass
+
+                if isNorm:
+                    if h_norm.sumEntries() > 0 and num_events[flag] > 0:
+                        if h_norm.sumEntries() < num_events[flag]:
+                            print(num_events[flag], h_norm.sumEntries())
+                        num_events[flag] = num_events[flag]/h_norm.sumEntries()
+                        num_events[f"error {flag}"] = num_events[flag]*(
+                            (num_events[f"error {flag}"]/num_events[flag])**2 + (sumw2_error(h_norm)/h_norm.sumEntries())**2)**0.5
+                    else:
+                        num_events[flag], num_events[f"error {flag}"] = 0, 0
+                else:
+                    pass
             
-            histos[f"{bkg_cat}_pass_2d"].SetBinContent(bin_pt, bin_eta, num_events["pass"])
-            histos[f"{bkg_cat}_pass_2d"].SetBinError(bin_pt, bin_eta, num_events["error pass"])
-            histos[f"{bkg_cat}_fail_2d"].SetBinContent(bin_pt, bin_eta, num_events["fail"])
-            histos[f"{bkg_cat}_fail_2d"].SetBinError(bin_pt, bin_eta, num_events["error fail"])
+                histos[f"{bkg_cat}_{flag}_2d"].SetBinContent(bin_pt, bin_eta, num_events[flag])
+                histos[f"{bkg_cat}_{flag}_2d"].SetBinError(bin_pt, bin_eta, num_events[f"error {flag}"])
+
 
         hist_dict_bkgcat = {"pass" : histos[f"{bkg_cat}_pass_2d"], "fail" : histos[f"{bkg_cat}_fail_2d"]}
         plot_2d_bkg_distrib(hist_dict_bkgcat, bkg_cat, figpath=f"{filepath}/bkg_2d_distrib")

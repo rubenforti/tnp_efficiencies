@@ -18,7 +18,7 @@ bkg_sum_selector = {
     "bkg_Ztautau" : 1,
     "bkg_SameCharge" : 1,
     "bkg_WJets" : 0,
-    "mc_SS" : 0.
+    "mc_SS" : -1.,
 }
 
 ###############################################################################
@@ -85,7 +85,7 @@ def import_pdf_library(*functions):
     
     for function in functions:
         ctrl_head = ROOT.gInterpreter.Declare(f' #include "{import_path}/{function}.h"')
-        ctrl_source = ROOT.gSystem.CompileMacro(f"{import_path}/{function}.cc", opt="ks")
+        ctrl_source = ROOT.gSystem.CompileMacro(f"{import_path}/{function}.cc", opt="k")
 
         if ctrl_head is not True:
             print("ERROR in header loading")
@@ -129,7 +129,7 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
 
     for it_file in range(n_files):
         
-        file = files[it_file] if n_files > 1 else files
+        file = files[it_file] # if n_files > 1 else files
 
         histo3d = file.Get(f"{flag}_mu_{type_suffix}")
 
@@ -137,6 +137,7 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
         # generic selection of bin_pt and bin_eta. Without it, all works as expected ONLY IF the projection is done 
         # on a single bin of pt-eta
         th1_histo = histo3d.ProjectionX(f"Histo_{type_set}_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")
+        print("Under/overflow events:", th1_histo.GetBinContent(0), th1_histo.GetBinContent(numBins+1))
 
         if global_scale > 0: th1_histo.Scale(global_scale)
 
@@ -181,48 +182,74 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, bkg_sel
     and are normalized in this function.Their impact in the total bkg histogram
     is managed by the "bkg_selector" dictionary.
     """
+
     if type(import_obj) is list and type(import_obj[0]) is ROOT.RooWorkspace:  # First position has to be occupied by the workspace, the second by the list of the processes to be summed
         ws = import_obj[0]
-        if type(ws.data(f"Minv_bkg_{flag}_{bin_key}")) is ROOT.RooDataHist:
-            return ws.data(f"Minv_bkg_{flag}_{bin_key}")
+        if type(ws.data(f"Minv_bkg_{flag}_{bin_key}_total")) is ROOT.RooDataHist:
+            return ws.data(f"Minv_bkg_{flag}_{bin_key}_total")
         else:
-            iter_object = zip(import_obj[1], repeat(import_obj[0]))
-    if type(import_obj) is dict:
-        iter_object = import_obj.items()
+            iter_dict = {}
+            for bkg_cat in import_obj[1]:
+                try:
+                    type_dataset, subs = bkg_cat.split("_", 1)
+                    subs = f"_{subs}"
+                except:
+                    type_dataset, subs = bkg_cat, ""
+                iter_dict[bkg_cat] = ws.data(f"Minv_{type_dataset}_{flag}_{bin_key}{subs}")
+                print(bkg_cat, iter_dict[bkg_cat].sumEntries())
+    elif type(import_obj) is dict:
+        iter_dict = import_obj
     else:
         sys.exit("ERROR: invalid object type given")
     
+
     bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", f"Minv_bkg_{flag}_{bin_key}_total", 
                                        ROOT.RooArgSet(axis), "x_binning")
     
     bkg_flags = []
     n_events_bkg = []
 
-    # Loop over the background categories                
-    for bkg_cat, bkg_obj in iter_object:
+    for k in iter_dict.keys():
+        if ("SS" in k) and ("mc" not in k) :
+            bkg_total_histo.SetName(f"Minv_bkg_{flag}_{bin_key}_total_SS")
+            bkg_total_histo.SetTitle(f"Minv_bkg_{flag}_{bin_key}_total_SS")
+            break
+    
 
-        if (("SS" in bkg_cat) and ("bkg" in bkg_cat)) or (bkg_sum_selector[bkg_cat]==0): continue
+    # Loop over the background categories                
+    for bkg_cat, bkg_obj in iter_dict.items():
         
-        if type(bkg_obj) is not ROOT.RooWorkspace:
+        if "bkg" in bkg_cat: bkg_cat = bkg_cat.replace("_SS", "")
+
+        try:
+            if bkg_sum_selector[bkg_cat]==0: continue
+        except:
+            print(f"WARNING: {bkg_cat} category not found in the selector")
+            continue
+        
+        if type(bkg_obj) is dict:
             files, lumi_scale = bkg_obj["filenames"], bkg_obj["lumi_scale"]
             dset_type = "bkg" if not "SameCharge" in bkg_cat else "data_SC"
             
             bkg_histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, global_scale=lumi_scale)
         else:
-            bkg_histo = bkg_obj.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
-      
-        bkg_histo_copy = bkg_histo.Clone(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_copy")  # idk if is strictly necessary, but it's safer
+            bkg_histo = bkg_obj
+            
+        bkg_histo_tmp = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_tmp", f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_tmp",
+                                         ROOT.RooArgSet(axis), "x_binning")
 
         coeff_sum = bkg_selector[bkg_cat]
+
         for i in range(axis.getBinning("x_binning").numBins()):
             bkg_histo.get(i)
-            bkg_histo_copy.set(i, coeff_sum*bkg_histo.weight(i), abs(coeff_sum)*bkg_histo.weightError(ROOT.RooAbsData.SumW2))
+            bkg_histo_tmp.set(i, coeff_sum*bkg_histo.weight(i), abs(coeff_sum)*bkg_histo.weightError(ROOT.RooAbsData.SumW2))
         
         bkg_flags.append(bkg_cat)
-        n_events_bkg .append(bkg_histo_copy.sumEntries())
+        n_events_bkg.append(bkg_histo_tmp.sumEntries())
 
-        bkg_total_histo.add(bkg_histo_copy)
+        bkg_total_histo.add(bkg_histo_tmp)
 
+    
     return bkg_total_histo
 
 

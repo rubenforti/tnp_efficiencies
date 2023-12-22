@@ -11,13 +11,12 @@ from utilities.dataset_utils import import_pdf_library
 
 
 
-def printFitStatus(type_analysis, bin_key, res, status, prob_bins):
+def printFitStatus(type_analysis, bin_key, res, status):
 
     if status is True:
         print(f"Bin {bin_key} is OK!\n\n")
     else:
         print(f"Bin {bin_key} has problems!\n")
-        prob_bins.append(bin_key)
         if type_analysis == "indep":
             print("****")
             res["pass"].Print()
@@ -47,7 +46,7 @@ def checkImportCustomPdfs(bkg_models):
     """
     """
     dict_classes = {
-        "cmsshape" : "RooCMSShape",
+        "cmsshape" : "RooCMSShape_old",
         "cmsshape_w_prefitSS" : "RooCMSShape",
         "cmsshape_new" : "RooCMSShape_mod",
         "CB" : "my_double_CB"
@@ -93,8 +92,8 @@ def runFits(ws_name, bin_dict, fit_settings, parallelize=True, import_pdfs=False
 
     for bin_key in bin_dict.keys():
         
-        # if bin_key != "[45.0to55.0][0.7to0.8]": continue
-        # if bin_key != "[24.0to26.0][-0.1to0.0]": continue
+        # if bin_key != "[45.0to55.0][2.1to2.2]": continue
+        # if bin_key != "[35.0to45.0][0.7to0.8]": continue
 
         if fit_settings["type_analysis"] == "indep":
             dict_flags = ["pass", "fail"]
@@ -110,7 +109,8 @@ def runFits(ws_name, bin_dict, fit_settings, parallelize=True, import_pdfs=False
 
         if import_pdfs: fitter.importFitObjects(ws)
 
-        printFitStatus(fit_settings["type_analysis"], bin_key, res, status, prob_bins)
+        if status is False: prob_bins.append(bin_key)
+        printFitStatus(fit_settings["type_analysis"], bin_key, res, status)
         # if status is False: prob_bins.append(bin_key)
 
     print(f"NUM of problematic bins = {len(prob_bins)}")
