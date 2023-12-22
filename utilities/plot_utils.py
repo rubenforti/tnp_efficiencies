@@ -11,15 +11,16 @@ from utilities.CMS_lumi import CMS_lumi
 
 
 colors = { 
-    "bkg_WW" : ROOT.kOrange+1,
-    "bkg_WZ" : ROOT.kYellow+3,
-    "bkg_ZZ" : ROOT.kGreen+1,
-    "bkg_TTFullyleptonic" : ROOT.kCyan+1,
+    "bkg_WW" : ROOT.kGreen-1,
+    "bkg_WZ" : ROOT.kYellow+2,
+    "bkg_ZZ" : ROOT.kOrange-6,
+    "bkg_TTSemileptonic" : ROOT.kCyan+1,
+    "bkg_TTFullyleptonic" : ROOT.kCyan+4,
     "bkg_Ztautau" : ROOT.kMagenta+1,
-    "bkg_SameCharge" : ROOT.kOrange+6,
+    "bkg_SameCharge" : ROOT.kOrange+7,
     "bkg_total" : ROOT.kRed,
     "mc" : ROOT.kBlue,
-    "mc_SS" : ROOT.kBlue,
+    "mc_SS" : ROOT.kBlue+4,
     "pdf_bkg_fit" : ROOT.kRed,
 }
 
@@ -253,7 +254,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     The objects to be plotted are contained in the dictionary "plot_objects", 
     which must be structured as follows:
         plot_objects = { "axis" : RooRealVar,
-                         "total_bkg" : RooDataHist,
+                         "bkg_total" : RooDataHist,
                          "bkg_{process}" : RooDataHist, 
                          "mc (optional)" : RooDataHist,
                          "data (optional)" : RooDataHist,
@@ -324,14 +325,15 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     
     if "mc" in plot_objects.keys():
         imported_mc_sig = True
-        mc_sig_dict = plot_objects.pop("mc")
-        mc_sig_dict["histo_pdf"].plotOn(frame,
+        mc_sig_hist = plot_objects.pop("mc")
+        mc_sig_roohistpdf = ROOT.RooHistPdf(f"MC signal", f"MC signal", ROOT.RooArgSet(axis), mc_sig_hist)
+        mc_sig_roohistpdf.plotOn(frame,
                                         ROOT.RooFit.Name("MC signal"),
-                                        ROOT.RooFit.LineColor(colors["signal"]),
-                                        ROOT.RooFit.Normalization(mc_sig_dict["integral"], ROOT.RooAbsReal.NumEvent))
-        for bin_idx in range(mc_sig_dict["roohisto"].numEntries()):
-            if mc_sig_dict["roohisto"].weight(bin_idx) > ctrl_plot_max:
-                ctrl_plot_max = mc_sig_dict["roohisto"].weight(bin_idx)
+                                        ROOT.RooFit.LineColor(colors["mc"]),
+                                        ROOT.RooFit.Normalization(mc_sig_hist.sumEntries(), ROOT.RooAbsReal.NumEvent))
+        for bin_idx in range(mc_sig_hist.numEntries()):
+            if mc_sig_hist.weight(bin_idx) > ctrl_plot_max:
+                ctrl_plot_max = mc_sig_hist.weight(bin_idx)
 
     if "pdf_bkg_fit" in plot_objects.keys():
         imported_pdf_bkg = True
@@ -403,7 +405,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     if imported_mc_sig:
         legend.AddEntry("MC signal", "MC signal", "l")
         legend_obj = legend.GetListOfPrimitives().Last()
-        legend_obj.SetLineColor(colors["signal"])
+        legend_obj.SetLineColor(colors["mc"])
         legend_obj.SetLineWidth(3)
     if imported_pdf_bkg:
         legend.AddEntry("Fitted bkg", "Fitted bkg", "l")
@@ -423,9 +425,9 @@ def plot_bkg(plot_dictionary, flag, bin_key, logscale=True, figpath=''):
     if imported_data:
         textbox.AddText(f"Data entries: {datahist.sumEntries()}")
     if imported_mc_sig:
-        sigma_histo_signal = sumw2_error(mc_sig_dict['roohisto'])
+        sigma_histo_signal = sumw2_error(mc_sig_hist)
         textbox.AddText(
-            f"MC signal entries: {mc_sig_dict['integral']:.2f} #pm {sigma_histo_signal:.2f}") 
+            f"MC signal entries: {mc_sig_hist.sumEntries():.2f} #pm {sigma_histo_signal:.2f}") 
     if imported_pdf_bkg:
         textbox.AddText(
             f"Nbkg from fit: {pdf_bkg_obj['norm'].getVal():.2f} #pm {pdf_bkg_obj['norm'].getError():.2f}")
@@ -707,8 +709,8 @@ def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=
                            ROOT.RooFit.Name("Total bkg"),
                            ROOT.RooFit.Binning("plot_binning_total_bkg"),
                            # ROOT.RooFit.Invisible(),
-                           ROOT.RooFit.LineColor(colors["total_bkg"]),
-                           ROOT.RooFit.MarkerColor(colors["total_bkg"]))
+                           ROOT.RooFit.LineColor(colors["bkg_total"]),
+                           ROOT.RooFit.MarkerColor(colors["bkg_total"]))
     
     pad_plot.SetLogy() if logscale is True else pad_plot.SetLogy(False)   
 

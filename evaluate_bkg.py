@@ -21,18 +21,18 @@ gen_res_folder = "/scratchnvme/rforti/tnp_efficiencies_results"
 
 type_eff = "tracking"
 type_analysis = "indep"
-bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau", "bkg_SameCharge", "mc"]
+bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTSemileptonic", "bkg_TTFullyleptonic", "bkg_Ztautau", "bkg_SameCharge"]
 
 
 binning_pt = "pt_tracking"
 binning_eta = "eta"
 binning_mass = "mass_50_130"
 
-study_SS_bkg = True
+study_SS_bkg = False
 
-folder = gen_res_folder+"/tracking/bkg_SS_figs"
+folder = gen_res_folder+"/tracking/bkg_figs"
 
-ws_filename = folder+"/ws_tracking_bkg_SS.root"
+ws_filename = folder+"/ws_tracking_bkg.root"
 
 generate_datasets = False       
 
@@ -44,18 +44,18 @@ binnings_list = [["pt", "eta"]]
                  
 
 minv_plots = {
-    "flag" : True,
+    "flag" : False,
     "plot_on_data" : True,
     "plot_fit_bkgpdf" : False,
-    "plot_on_sig" : False,
+    "plot_on_sig" : True,
     "compare_bkgfrac" : False,
     "logscale" : True,
 }
 plot_bkg_distrib = {
-    "flag" : False,
+    "flag" : True,
     "norm_on_data" : False,
     "norm_on_sig" : False,
-    "norm_tot_bkg" : True,
+    "norm_tot_bkg" : False,
     "plot_projected" : False,
 }
 
@@ -70,7 +70,8 @@ for tp in ["data", "sig"]:
 
 if generate_datasets is True:
 
-    base_folder = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023"
+    # base_folder = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023"
+    base_folder = "datasets"
 
     import_categories = ["data", "mc"] + bkg_categories
     

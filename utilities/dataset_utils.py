@@ -210,7 +210,6 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, bkg_sel
     n_events_bkg = []
 
     for k in iter_dict.keys():
-        print(k)
         if ("SS" in k) and ("mc" not in k) :
             bkg_total_histo.SetName(f"Minv_bkg_{flag}_{bin_key}_total_SS")
             bkg_total_histo.SetTitle(f"Minv_bkg_{flag}_{bin_key}_total_SS")
