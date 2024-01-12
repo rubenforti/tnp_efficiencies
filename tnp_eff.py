@@ -26,18 +26,21 @@ type_eff = "tracking"
 type_analysis = "indep"
 charge_selection = ["plus", "minus"]
 
-folder = gen_res_folder+f"/tracking/bb_light"
-ws_filename = folder+f"/ws_tracking_indep_barlowbeeston.root"
 
-generate_datasets = False
+folder = gen_res_folder+f"/tracking/benchmark"
+ws_filename = folder+f"/ws_tracking_indep_benchmark.root"
 
-fit_settings = "custom_run2"
+generate_datasets = True
+
+use_extended_sig_template_fail = False
+
+fit_settings = "custom_run1"
 
 binning_pt, binning_eta, binning_mass = "pt_tracking", "eta", "mass_50_130"
 
 mergedbins_bkg, binning_pt_bkg, binning_eta_bkg = False, "pt_12bins", "eta_16bins"
 
-load_bkg_datasets = True
+load_bkg_datasets = False
 bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau", "bkg_SameCharge"]
 import_bkg_samesign = False
 import_mc_samesign = False
@@ -54,10 +57,12 @@ useMinos = False
 
 import_pdfs = True
 
-savefigs = True
+savefigs = False
+
 
 figpath = {"good": f"{folder}/fit_plots", 
-           "check": f"{folder}/fit_plots/check"} 
+           "check": f"{folder}/fit_plots/check"}
+
 
 if mergedbins_bkg and (binning_pt != "pt" or binning_eta != "eta"):
     sys.exit("ERROR: Evaluation of background in merged bins for its comparison on data is allowed only wrt reco-bins of pt and eta for data")
@@ -87,7 +92,8 @@ if generate_datasets:
     print(import_dictionary)
 
 
-    ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass, lightMode_bkg=True)
+    ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass, 
+                 lightMode_bkg=True, fail_template_with_all_SA=use_extended_sig_template_fail)
 
     ws.writeToFile(ws_filename)
 
@@ -101,8 +107,9 @@ if generate_datasets:
             binning_pt_bkg, binning_eta_bkg = binning_pt, binning_eta
         
         ws = ws_init(import_dict_bkg, type_analysis, binning_pt_bkg, binning_eta_bkg, 
-                             binning_mass, import_existing_ws=True, existing_ws_filename=ws_filename, 
-                             lightMode_bkg=True, altBinning_bkg=mergedbins_bkg)
+                     binning_mass, import_existing_ws=True, existing_ws_filename=ws_filename, 
+                     lightMode_bkg=True, altBinning_bkg=mergedbins_bkg,
+                     fail_template_with_all_SA=use_extended_sig_template_fail)
         ws.writeToFile(ws_filename)
 
 # -----------------------------------------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import os
 import ROOT
 from copy import copy, deepcopy
 from itertools import repeat
-from utilities.base_library import binning, bin_dictionary, lumi_factor, bin_global_idx_dict
+from utilities.base_library import binning, bin_dictionary, lumi_factor, bin_global_idx_dict, binnings
 
 
 bkg_sum_selector = {
@@ -17,7 +17,8 @@ bkg_sum_selector = {
     "bkg_TTSemileptonic" : 0,
     "bkg_Ztautau" : 1,
     "bkg_SameCharge" : 1,
-    "bkg_WJets" : 0,
+    "bkg_WplusJets" : 0,
+    "bkg_WminusJets" : 0,
     "mc_SS" : -1.,
 }
 
@@ -97,8 +98,8 @@ def import_pdf_library(*functions):
 ###############################################################################
 
 
-def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta, 
-                global_scale=-1.):
+def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
+                global_scale=-1.0, fail_template_with_all_SA=True):
     """
     Returns a RooDataHists of the variable TP_mass, in a single pt-eta bin.
     For MC datasets, the "global_scale" parameter is used to scale the
@@ -116,7 +117,7 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
 
     numBins = axis.getBinning("x_binning").numBins()
 
-    n_files = len(files) if type(files) is list else 1
+    files = [files] if type(files) is str else files
 
     if type_set=="data_SC": type_set = "bkg"
 
@@ -125,18 +126,29 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
     
     tmp_histos, tmp_roohistos = [], []
 
+    if bool(fail_template_with_all_SA*(type_set=="mc")*(flag=="fail")):
+        files = files + files
+    else:
+        fail_template_with_all_SA = False
+
     print(f"\nImporting histograms in bin {bin_key}")
 
-    for it_file in range(n_files):
-        
-        file = files[it_file] # if n_files > 1 else files
+    idx_file = 0
 
-        histo3d = file.Get(f"{flag}_mu_{type_suffix}")
+    for file in files:
+
+        histo_name = f"{flag}_mu_{type_suffix}"
+        
+        if fail_template_with_all_SA and \
+            ( (len(files)==2 and idx_file==1) or (len(files)==4 and idx_file==2) or (len(files)==4 and idx_file==3) ):
+                histo_name = f"pass_mu_{type_suffix}_alt"
+        
+        histo3d = file.Get(histo_name)
 
         # In the projection, option "e" is specified to calculate the bin content errors in the new histogram for 
         # generic selection of bin_pt and bin_eta. Without it, all works as expected ONLY IF the projection is done 
         # on a single bin of pt-eta
-        th1_histo = histo3d.ProjectionX(f"Histo_{type_set}_{flag}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")
+        th1_histo = histo3d.ProjectionX(f"Histo_{type_set}_{flag}_{idx_file}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")
         print("Under/overflow events:", th1_histo.GetBinContent(0), th1_histo.GetBinContent(numBins+1))
 
         if global_scale > 0: th1_histo.Scale(global_scale)
@@ -147,23 +159,25 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
 
         th1_histo.Rebin(int(th1_histo.GetNbinsX()/numBins))
 
-        tmp_histos.append(th1_histo.Clone(f"Minv_{type_set}_{flag}_{bin_key}_tmp"))
+        tmp_histos.append(th1_histo)
 
-        tmp_roohistos.append(ROOT.RooDataHist(f"Minv_{type_set}_{flag}_{bin_key}", f"Minv_{type_set}_{flag}_{bin_key}",
-                                      ROOT.RooArgList(axis), th1_histo))
+        tmp_roohistos.append(ROOT.RooDataHist(f"Minv_{type_set}_{flag}_{bin_key}_{idx_file}", f"Minv_{type_set}_{flag}_{bin_key}",
+                                              ROOT.RooArgList(axis), th1_histo))
 
-        roohisto.add(tmp_roohistos[it_file])
+        roohisto.add(tmp_roohistos[-1])
+
+        idx_file += 1
+
 
     print("Beginning consistency check...")
     th1_integral = 0
-    for it_file in range(n_files):
-        th1_integral += tmp_histos[it_file].Integral()
+    for tmp_histo in tmp_histos: th1_integral += tmp_histo.Integral()
     if round(th1_integral, 5) != round(roohisto.sumEntries(), 5):
         sys.exit(f"ERROR: TH1 and RooDataHist have different integrals in bin {bin_key}")
     for i in range(numBins):
         roohisto.get(i)
         th1_bincontent = 0
-        for it_file in range(n_files): 
+        for it_file in range(len(files)): 
             th1_bincontent += tmp_histos[it_file].GetBinContent(i+1)
         if round(roohisto.weight(i), 5) != round(th1_bincontent, 5):
             # print(roohisto.weight(i), th1_bincontent)
@@ -175,7 +189,9 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
 ###############################################################################
 
 
-def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, bkg_selector=bkg_sum_selector):
+def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, 
+                       bkg_selector=bkg_sum_selector,
+                       fail_template_with_all_SA=False):
     """
     Returns a RooDataHist that represents the total background, for a given
     pt-eta bin. The background sources are stored in the "dataset_dict" object
@@ -231,7 +247,8 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, bkg_sel
             files, lumi_scale = bkg_obj["filenames"], bkg_obj["lumi_scale"]
             dset_type = "bkg" if not "SameCharge" in bkg_cat else "data_SC"
             
-            bkg_histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, global_scale=lumi_scale)
+            bkg_histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, 
+                                    global_scale=lumi_scale, fail_template_with_all_SA=fail_template_with_all_SA)
         else:
             bkg_histo = bkg_obj
             
@@ -258,7 +275,7 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, bkg_sel
 def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mass, 
             import_existing_ws = False, 
             existing_ws_filename = "",
-            create_totbkg = False,
+            fail_template_with_all_SA=False,
             lightMode_bkg = False, 
             altBinning_bkg = False):
     """
@@ -329,14 +346,16 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                     dset_type = dset_name
                     dset_subs = ""
 
-                histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, global_scale=lumi_scale)
+                histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, 
+                                    global_scale=lumi_scale, fail_template_with_all_SA=fail_template_with_all_SA)
                 histo.SetName(f"{histo.GetName()}{dset_subs}")
                 ws.Import(histo)
             
             # Importing the total background histogram if light mode is called (only for OS)
             if lightMode_bkg is True and len(merging_dict)>0:
                 if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
-                bkg_total_histo = get_totbkg_roohist(merging_dict, flag, axis, bin_key, bin_pt, bin_eta)
+                bkg_total_histo = get_totbkg_roohist(merging_dict, flag, axis, bin_key, bin_pt, bin_eta,
+                                                     fail_template_with_all_SA=fail_template_with_all_SA)
                 ws.Import(bkg_total_histo)
     
     return ws

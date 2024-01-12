@@ -3,6 +3,7 @@
 
 import sys
 import os
+import math
 import ROOT
 from array import array
 
@@ -40,7 +41,7 @@ def getSidebands(histo, axis, cut=0.68):
 
     print(binning)
     
-    if NBINS%2 !=0:
+    if NBINS%2 != 0:
         print("ERROR: number of bins must be even")
         sys.exit()
 
@@ -154,6 +155,29 @@ def llr_eval(histo, pdf, axis):
 ###############################################################################
 
 
+def status_parsAtLim(res, absTol=1e-6, relTol=1e-4):
+    """
+    """
+    pars = res.floatParsFinal()
+    status = True
+    cnt_pars_at_lim = 0
+    for par in pars:
+        final_val, par_min, par_max = par.getVal(), par.getMin(), par.getMax()
+
+        status_par = bool( math.isclose(final_val, par_min, abs_tol=absTol, rel_tol=relTol) * \
+                           math.isclose(final_val, par_max, abs_tol=absTol, rel_tol=relTol) )
+        
+        if status_par: cnt_pars_at_lim += 1
+    
+        status = bool(status*status_par)
+    
+    if cnt_pars_at_lim > 0: print(f"WARNING: {res.GetTitle()} has {cnt_pars_at_lim} parameters at limit")
+
+    return (not status)
+
+###############################################################################
+
+
 def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
     """
     """
@@ -190,31 +214,42 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
 ###############################################################################
 
 
-def fit_quality(fit_obj, type_checks="benchmark"):
+def fit_quality(fit_obj, type_checks="benchmark_old"):
     """
     """
     check_edm = True
     check_migrad = True
     check_chi2 = True
     check_covm = True
+    check_parsAtLim = True
 
-    if type_checks == "benchmark":
+    if type_checks == "egm_legacy":
         check_migrad = (fit_obj["res"].status() == 0 or fit_obj["res"].status() == 1)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
                                  fit_obj["res"], type_chi2="pearson", nsigma=15)
     
-    elif type_checks == "new":
+    elif type_checks == "new_robust":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
-        check_edm = (fit_obj["res"].edm() < 1e-3)
+        check_edm = (fit_obj["res"].edm() < 5e-3)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
                                  fit_obj["res"], type_chi2="llr", nsigma=5)
+        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-5, relTol=1e-5)
+    
+    elif type_checks == "new_loose":
+        check_migrad = (fit_obj["res"].status() == 0 or fit_obj["res"].status() == 1)
+        check_covm = (fit_obj["res"].covQual() == 3)
+        check_edm = (fit_obj["res"].edm() < 5e-2)
+        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
+                                 fit_obj["res"], type_chi2="llr", nsigma=10)
+        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-6, relTol=1e-6)
     
     elif type_checks == "pseudodata":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
-        check_edm = (fit_obj["res"].edm() < 9e-3)
+        check_edm = (fit_obj["res"].edm() < 1e-2)
+        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-6, relTol=1e-4)
     
     else:
         sys.exit("ERROR: wrong type of fit quality check indicated")
@@ -227,7 +262,7 @@ def fit_quality(fit_obj, type_checks="benchmark"):
         return bool(check_migrad*check_covm)
     '''  
 
-    return bool(check_migrad*check_covm*check_edm*check_chi2)
+    return bool(check_migrad*check_covm*check_edm*check_chi2*check_parsAtLim)
  
 ###############################################################################
 
