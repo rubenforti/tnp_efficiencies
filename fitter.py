@@ -76,19 +76,6 @@ class AbsFitter():
                                     self.axis[flag], self.pars["mu"][flag], self.pars["sigma"][flag]) 
             })
 
-        '''
-        # WARNING: feature adopted JUS TO CKECK THE RESULTS WITH EGM_TNP_ANALYSIS'S ONES
-        if flag == "fail":
-            self.mc_template["fail"] = ROOT.RooDataHist(
-                f"mc_template_fail_{self.bin_key}", "mc template_hist", ROOT.RooArgList(self.axis[flag]), "x_binning")
-            self.mc_template["fail"].add(ws.data(f"Minv_mc_pass_{self.bin_key}"))
-            self.mc_template["fail"].add(ws.data(f"Minv_mc_fail_{self.bin_key}"))
-        elif flag == "pass":
-            self.mc_template["pass"] = ws.data(f"Minv_mc_pass_{self.bin_key}")
-        else:
-            sys.exit("ERROR: flag not recognized")
-        '''
-
         self.pdfs["mc_pdf"].update({
             flag : ROOT.RooHistPdf(f"mc_pdf_{flag}_{self.bin_key}", "MC pdf",
                                    self.axis[flag], ws.data(f"Minv_mc_{flag}_{self.bin_key}"), 3)
@@ -516,7 +503,7 @@ class IndepFitter(AbsFitter):
         if self.settings["type_refit"] == "benchmark":
             nsig_fitted, nbkg_fitted = self.norm["nsig"][flag], self.norm["nbkg"][flag]
             refit_ctrl = nbkg_fitted.getVal() < 0.005*nsig_fitted.getVal()
-        elif self.settings["type_refit"] == "llr":
+        elif self.settings["type_refit"] == "llr_test":
             # NOT TESTED YET
             # refit_ctrl = llr_test_bkg(self.histo_data[flag], self.pdfs["fit_model"][flag], alpha=0.05)
             pass
@@ -524,7 +511,9 @@ class IndepFitter(AbsFitter):
             sys.exit("ERROR: refit type not recognized")
 
         if refit_ctrl is True:
+            self.norm["nbkg"][flag].setMin(0)
             self.norm["nbkg"][flag].setVal(0)
+            self.norm["nbkg"][flag].setError(0)
             self.norm["nbkg"][flag].setConstant()
             for par in self.pdfs["bkg_pdf"][flag].getParameters(self.histo_data[flag]): par.setConstant()
             self.doFit(flag)

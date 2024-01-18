@@ -93,7 +93,7 @@ def runFits(ws_name, bin_dict, fit_settings, parallelize=True, import_pdfs=False
     for bin_key in bin_dict.keys():
         
         # if bin_key != "[45.0to55.0][2.1to2.2]": continue
-        # if bin_key != "[35.0to45.0][0.7to0.8]": continue
+        # if bin_key != "[24.0to35.0][-0.5to-0.4]": continue
 
         if fit_settings["type_analysis"] == "indep":
             dict_flags = ["pass", "fail"]

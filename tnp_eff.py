@@ -27,14 +27,14 @@ type_analysis = "indep"
 charge_selection = ["plus", "minus"]
 
 
-folder = gen_res_folder+f"/tracking/benchmark"
+folder = gen_res_folder+f"/tracking/benchmark_opt"
 ws_filename = folder+f"/ws_tracking_indep_benchmark.root"
 
-generate_datasets = True
+generate_datasets = False
 
 use_extended_sig_template_fail = False
 
-fit_settings = "custom_run1"
+fit_settings = "custom_run4"
 
 binning_pt, binning_eta, binning_mass = "pt_tracking", "eta", "mass_50_130"
 
@@ -57,7 +57,7 @@ useMinos = False
 
 import_pdfs = True
 
-savefigs = False
+savefigs = True
 
 
 figpath = {"good": f"{folder}/fit_plots", 
@@ -116,8 +116,8 @@ if generate_datasets:
 # FIT SETTINGS
 # -------------
 
-if fit_settings == "default":
-    with open(f"default_fit_settings.json") as file: fit_settings_json = json.load(file)
+if fit_settings == "legacy":
+    with open(f"legacy_fit_settings.json") as file: fit_settings_json = json.load(file)
     if type_eff in ["idip", "trigger", "iso"]:
         fit_settings = fit_settings_json["idip_trig_iso"]
     else:

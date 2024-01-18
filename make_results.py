@@ -287,31 +287,23 @@ if __name__ == '__main__':
     resCmp_list = resCmp_var_dict.keys()
     print(resCmp_list)
 
-    import_pdf_library("RooCMSShape_old")
+    import_pdf_library("RooCMSShape")
 
     base_folder = "/scratchnvme/rforti/tnp_efficiencies_results/tracking"
 
+    benchmark_res = base_folder+"/legacy_fit/old_results.txt"
 
-    benchmark_res = base_folder+"/benchmark_plus/old_results.txt"
-
-    # bmark_fit_filename = base_folder+"/benchmark_opt/ws_tracking_indep_benchmark.root"
     bmark_fit_filename =  base_folder+"/benchmark_opt/ws_tracking_indep_benchmark.root"
     
-    #ws_filename = "results/pseudodata_trig_minus/ws_triggerminus_pseudodata.root"
-    # ws_filename = "results/pseudodata_iso/ws_iso_pseudodata.root"
 
-    ws_filename_1 =  base_folder+"/prefit_bkg_fail_80_100/ws_tracking_indep_prefit_bkg_fail.root"
+    ws_filename =  base_folder+"/bb_samecharge_fail/ws_tracking_indep_barlowbeeston.root"
 
-    ws_filename =  base_folder+"/prefit_bkg_fail_75_105/ws_tracking_indep_prefit_bkg_fail.root"
 
-    # ws_filename = "results/pseudodata_iso/ws_iso_indep_pseudodata_new.root"
 
-    # bmark_fit_filename = "results/iso_indep_2gev_r628/ws_iso_indep_2gev.root"
-    # ws_filename = "results/iso_indep_2gev_mcbkg/ws_iso_indep_2gev_mcbkg.root"
 
 
     # save_eff_results(bmark_fit_filename, "indep", "pt", "eta")
-    compare_efficiency(ws_filename_1, ws_filename, "pt_tracking", "eta", resCmp_list)
+    compare_efficiency(bmark_fit_filename, ws_filename, "pt_tracking", "eta", resCmp_list)
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 

@@ -130,7 +130,7 @@ def llr_eval(histo, pdf, axis):
 
         pdf_val = pdf.getVal(ROOT.RooArgSet(axis))
         mu = n_fitted_events*BIN_VOLUME*pdf_val
-        mu = round(mu, 5)
+        mu = round(mu, 3)
 
         new_sumll = weight*ROOT.TMath.Log(mu) - mu if mu>0 else 0.0
         sum_ll += 2*new_sumll
@@ -162,18 +162,20 @@ def status_parsAtLim(res, absTol=1e-6, relTol=1e-4):
     status = True
     cnt_pars_at_lim = 0
     for par in pars:
+        if par.isConstant(): continue
         final_val, par_min, par_max = par.getVal(), par.getMin(), par.getMax()
 
-        status_par = bool( math.isclose(final_val, par_min, abs_tol=absTol, rel_tol=relTol) * \
-                           math.isclose(final_val, par_max, abs_tol=absTol, rel_tol=relTol) )
-        
-        if status_par: cnt_pars_at_lim += 1
-    
-        status = bool(status*status_par)
-    
-    if cnt_pars_at_lim > 0: print(f"WARNING: {res.GetTitle()} has {cnt_pars_at_lim} parameters at limit")
+        if math.isclose(final_val, par_min, abs_tol=absTol, rel_tol=relTol) or \
+           math.isclose(final_val, par_max, abs_tol=absTol, rel_tol=relTol):
+            cnt_pars_at_lim += 1
+            status = False
+            print(par.GetName(), par.getVal(), par.getMin(), par.getMax())
 
-    return (not status)
+            
+    
+    if status is False: print(f"WARNING: {res.GetName()} has {cnt_pars_at_lim} parameters at limit")
+
+    return status
 
 ###############################################################################
 
@@ -214,7 +216,7 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
 ###############################################################################
 
 
-def fit_quality(fit_obj, type_checks="benchmark_old"):
+def fit_quality(fit_obj, type_checks="egm_legacy"):
     """
     """
     check_edm = True
@@ -232,18 +234,18 @@ def fit_quality(fit_obj, type_checks="benchmark_old"):
     elif type_checks == "new_robust":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
-        check_edm = (fit_obj["res"].edm() < 5e-3)
+        check_edm = (fit_obj["res"].edm() < 2e-3)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
-                                 fit_obj["res"], type_chi2="llr", nsigma=5)
-        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-5, relTol=1e-5)
+                                 fit_obj["res"], type_chi2="llr", nsigma=7)
+        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
     
     elif type_checks == "new_loose":
-        check_migrad = (fit_obj["res"].status() == 0 or fit_obj["res"].status() == 1)
+        check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 5e-2)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
                                  fit_obj["res"], type_chi2="llr", nsigma=10)
-        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-6, relTol=1e-6)
+        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
     
     elif type_checks == "pseudodata":
         check_migrad = (fit_obj["res"].status() == 0)
