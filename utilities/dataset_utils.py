@@ -14,12 +14,12 @@ bkg_sum_selector = {
     "bkg_WZ" : 1,
     "bkg_ZZ" : 1,
     "bkg_TTFullyleptonic" : 1,
-    "bkg_TTSemileptonic" : 0,
+    "bkg_TTSemileptonic" : 1,
     "bkg_Ztautau" : 1,
-    "bkg_SameCharge" : 1,
-    "bkg_WplusJets" : 0,
-    "bkg_WminusJets" : 0,
-    "mc_SS" : -1.,
+    "bkg_SameCharge" : 0,
+    "bkg_WplusJets" : 1,
+    "bkg_WminusJets" : 1,
+    "mc_SS" : 0.,
 }
 
 ###############################################################################

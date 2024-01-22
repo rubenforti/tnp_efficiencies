@@ -12,7 +12,7 @@ t0 = time.time()
 ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
-gen_res_folder = "/scratchnvme/rforti/tnp_efficiencies_results"
+gen_res_folder = "/scratch/rforti/tnp_efficiencies_results"
 
 
 # -----------------------------------------------------------------------------
@@ -21,7 +21,10 @@ gen_res_folder = "/scratchnvme/rforti/tnp_efficiencies_results"
 
 type_eff = "tracking"
 type_analysis = "indep"
-bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTSemileptonic", "bkg_TTFullyleptonic", "bkg_Ztautau", "bkg_SameCharge"]
+bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", 
+                  "bkg_TTSemileptonic", "bkg_TTFullyleptonic", "bkg_Ztautau",
+                  "bkg_WplusJets", "bkg_WminusJets",                  
+                  "bkg_SameCharge"]
 
 
 binning_pt = "pt_tracking"
@@ -44,15 +47,15 @@ binnings_list = [["pt", "eta"]]
                  
 
 minv_plots = {
-    "flag" : False,
+    "flag" : True,
     "plot_on_data" : True,
     "plot_fit_bkgpdf" : False,
-    "plot_on_sig" : True,
+    "plot_on_sig" : False,
     "compare_bkgfrac" : False,
     "logscale" : True,
 }
 plot_bkg_distrib = {
-    "flag" : True,
+    "flag" : False,
     "norm_on_data" : False,
     "norm_on_sig" : False,
     "norm_tot_bkg" : False,

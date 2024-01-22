@@ -47,6 +47,8 @@ xsec_bkg = {
     "ZZ" : 0.60,
     "TTFullyleptonic" : 88.29,
     "TTSemileptonic" : 366.34,
+    "WplusJets" : 11765.9,
+    "WminusJets" : 8703.87,
     "Ztautau" : xsec_ZmmPostVFP*Z_TAU_TO_LEP_RATIO
 }
 
