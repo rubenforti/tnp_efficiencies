@@ -88,12 +88,11 @@ def import_pdf_library(*functions):
         ctrl_head = ROOT.gInterpreter.Declare(f' #include "{import_path}/{function}.h"')
         ctrl_source = ROOT.gSystem.CompileMacro(f"{import_path}/{function}.cc", opt="k")
 
-        if ctrl_head is not True:
-            print("ERROR in header loading")
-            sys.exit()
-        if ctrl_source != 1:
-            print("ERROR in sourcefile compiling and loading")
-            sys.exit()
+        if ctrl_head is not True: 
+            sys.exit("ERROR in header loading")
+        if ctrl_source != 1: 
+            sys.exit("ERROR in sourcefile compiling and loading")
+            
 
 ###############################################################################
 
@@ -212,7 +211,7 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
                 except:
                     type_dataset, subs = bkg_cat, ""
                 iter_dict[bkg_cat] = ws.data(f"Minv_{type_dataset}_{flag}_{bin_key}{subs}")
-                print(bkg_cat, iter_dict[bkg_cat].sumEntries())
+                #print(bkg_cat, iter_dict[bkg_cat].sumEntries())
     elif type(import_obj) is dict:
         iter_dict = import_obj
     else:

@@ -50,9 +50,9 @@ minv_plots = {
     "flag" : True,
     "plot_on_data" : True,
     "plot_fit_bkgpdf" : False,
-    "plot_on_sig" : False,
+    "plot_on_sig" : True,
     "compare_bkgfrac" : False,
-    "logscale" : True,
+    "logscale" : "hybrid",
 }
 plot_bkg_distrib = {
     "flag" : False,

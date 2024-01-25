@@ -91,6 +91,7 @@ def make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta,
     datasets.update({"axis" : axis})
 
     for cat in import_categories:
+        print(cat)
         try:
             type_dataset, subs = cat.split("_", 1)
             subs = f"_{subs}"
@@ -172,22 +173,31 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
         
     if study_SS_bkg: bkg_categories = [cat+"_SS" if cat != "bkg_SameCharge" else cat for cat in bkg_categories]
 
+    print(bkg_categories)
+
     for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
-        if bin_key != "[24.0to35.0][-0.1to0.0]": continue
+        # if bin_key != "[24.0to35.0][-0.1to0.0]": continue
 
         for flag in ["pass", "fail"]:
+
+            if logscale=="hybrid": 
+                setlog=True if flag=="pass" else False
             
             # print(flag, bin_key)
 
             if plot_on_data:
-
+                
                 import_categories = ["data"] + bkg_categories
+
+                if study_SS_bkg: import_categories += ["mc_SS"]
 
                 datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
                 
-                plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=f"{figpath}/minv_plots_w_data")
+                plot_bkg(datasets, flag, bin_key, logscale=setlog, figpath=f"{figpath}/minv_plots_w_data")
 
+                '''
+                ## NOT USED STUFF
                 if plot_fit_bkgpdf and 1==0:
                     integral_histo_bkg = datasets["total_bkg"].sumEntries()
                     norm_bkg = datasets["pdf_bkg_fit"]["norm"]
@@ -196,16 +206,21 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                     nbkg_pull = (integral_histo_bkg - norm_bkg.getVal())/norm_bkg.getError()
                     histos[f"h_nbkg_pull_{flag}"].Fill(nbkg_pull)
                     histos[f"h_nbkg_pull_{flag}_2d"].SetBinContent(bin_pt, bin_eta, nbkg_pull)
+                '''
 
 
             if plot_on_signal:
 
                 import_categories = ["mc"] + bkg_categories
+
+                if study_SS_bkg: import_categories += ["mc_SS"]
         
                 datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
                 
-                plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=f"{figpath}/minv_plots_w_sig")
+                plot_bkg(datasets, flag, bin_key, logscale=setlog, figpath=f"{figpath}/minv_plots_w_sig")
                 
+                '''
+                ## NOT USED STUFF
                 nbkg = datasets["bkg_total"].sumEntries()
                 err_nbkg = sumw2_error(datasets["bkg_total"])
 
@@ -243,6 +258,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                     histos[f"h_bkgfrac_ratio_{flag}_2d"].SetBinContent(bin_pt, bin_eta, bkgfrac_ratio)
                     histos[f"h_bkgfrac_pull_{flag}"].Fill(bkg_frac_pull)
                     histos[f"h_bkgfrac_pull_{flag}_2d"].SetBinContent(bin_pt, bin_eta, bkg_frac_pull)
+                '''
 
             if plot_on_data is False and plot_on_signal is False:
                 datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories)

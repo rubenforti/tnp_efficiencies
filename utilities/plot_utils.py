@@ -29,27 +29,24 @@ colors = {
     "Top" : ROOT.kCyan,
     "Ztautau" : ROOT.kMagenta+1,
     "Wjets" : ROOT.kOrange,
+    "Diboson_SS" : ROOT.kGreen-2,
+    "Top_SS" : ROOT.kCyan-2,
+    "Ztautau_SS" : ROOT.kMagenta-1,
+    "Wjets_SS" : ROOT.kOrange-2,
     "SameCharge" : ROOT.kYellow+2,
 }
-
-bkg_grouping = {
-    "bkg_WW" : "Diboson",
-    "bkg_WZ" : "Diboson",
-    "bkg_ZZ" : "Diboson",
-    "bkg_TTSemileptonic" : "Top",
-    "bkg_TTFullyleptonic" : "Top",
-    "bkg_Ztautau" : "Ztautau",
-    "bkg_WplusJets" : "Wjets",
-    "bkg_WminusJets" : "Wjets",
-    "bkg_SameCharge" : "SameCharge"
-}
-
 
 bkg_grouping = {
     "Diboson" : ["bkg_WW", "bkg_WZ", "bkg_ZZ"],
     "Top" : ["bkg_TTSemileptonic", "bkg_TTFullyleptonic"],
     "Ztautau" : ["bkg_Ztautau"],
     "Wjets" : ["bkg_WplusJets", "bkg_WminusJets"],
+
+    "Diboson_SS" : ["bkg_WW_SS", "bkg_WZ_SS", "bkg_ZZ_SS"],
+    "Top_SS" : ["bkg_TTSemileptonic_SS", "bkg_TTFullyleptonic_SS"],
+    "Ztautau_SS" : ["bkg_Ztautau_SS"],
+    "Wjets_SS" : ["bkg_WplusJets_SS", "bkg_WminusJets_SS"],
+
     "SameCharge" : ["bkg_SameCharge"]
 }
 
@@ -298,7 +295,6 @@ def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
     plot_commands.Add(ROOT.RooFit.Name(label))
     plot_commands.Add(ROOT.RooFit.LineColor(colors[label]))
 
-    print(label, tmp_histo.numEntries())
 
     if isHistPlot:
         bkg_obj_plot = tmp_histo
@@ -430,18 +426,30 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
     pad_info.cd()
     textbox.AddText("--------------------")
     textbox.AddText("Background events for category:")
+        
+    
+    bkg_plot_it_dict = {k : v for k , v in plot_objects.items() if "bkg_" in k}
 
-    bkg_plot_it_dict = bkg_grouping if group_backgrounds else {k : v for k , v in plot_objects.items() if "bkg_" in k}
+    if group_backgrounds:
+        bkg_obj_tmp_container = copy(bkg_plot_it_dict)
+        bkg_grouping_tmp = {}
+        for bkg_group, bkg_cat_list in bkg_grouping.items():
+            bkg_grouping_tmp[bkg_group] = []
+            for bkg_cat in bkg_cat_list:
+                if bkg_cat in bkg_obj_tmp_container.keys(): bkg_grouping_tmp[bkg_group].append(bkg_cat)
+        bkg_plot_it_dict = bkg_grouping_tmp
 
-    for bkg_key, bkg_obj in bkg_plot_it_dict.items():
-        if bkg_key == "bkg_total": continue
+    for bkg_cat, bkg_obj in bkg_plot_it_dict.items():
+
+        if bkg_cat == "bkg_total": continue
         pad_plot.cd()
-        bkg_key_print = copy(bkg_key).replace("bkg_", "")
+        bkg_key_print = copy(bkg_cat).replace("bkg_", "")
         if group_backgrounds:
-            hist_plotting = [plot_objects[key] for key in plot_objects.keys() if key in bkg_grouping[bkg_key]]
+            hist_plotting = [plot_objects[key] for key in bkg_obj]
+            if len(hist_plotting) == 0: continue
         else:
             hist_plotting = [bkg_obj]
-        plot_bkg_object(frame, axis, hist_plotting, bkg_key, list_nbins_plot)
+        plot_bkg_object(frame, axis, hist_plotting, bkg_cat, list_nbins_plot)
         bkg_obj_new = hist_plotting[0]
         for hist in hist_plotting[1:]: bkg_obj_new.add(hist)
         plotted_histos.append(bkg_obj_new)
@@ -450,7 +458,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
         textbox.AddText(f"  {bkg_key_print} = {bkg_obj_new.sumEntries():.2f} #pm {bkg_error:.2f}")
         legend.AddEntry(bkg_key_print, bkg_key_print, "l")
         legend_obj = legend.GetListOfPrimitives().Last()
-        legend_obj.SetLineColor(colors[bkg_key.replace("_SS", "")])
+        legend_obj.SetLineColor(colors[bkg_cat.replace("_SS", "")])
         legend_obj.SetLineWidth(3)
 
     # Plotting other objects
@@ -472,7 +480,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
         legend_obj.SetLineWidth(3)
         textbox.AddText(f"Data events: {datahist.sumEntries():.0f} #pm {datahist.sumEntries()**0.5:.0f}")
     
-    if "mc" in plot_objects.keys():
+    if "mc" in plot_objects.keys() and not (flag == "pass" and logscale is False):
         mc_sig_hist = plot_objects["mc"]
         pad_plot.cd()
         mc_sig_roohistpdf = ROOT.RooHistPdf(f"MC signal", f"MC signal", ROOT.RooArgSet(axis), mc_sig_hist)
@@ -487,7 +495,24 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
         legend_obj.SetLineColor(colors["mc"])
         legend_obj.SetLineWidth(3)
         textbox.AddText(
-            f"MC signal entries: {mc_sig_hist.sumEntries():.2f} #pm {sumw2_error(mc_sig_hist):.2f}") 
+            f"MC signal entries: {mc_sig_hist.sumEntries():.2f} #pm {sumw2_error(mc_sig_hist):.2f}")
+    
+    if "mc_SS" in plot_objects.keys():
+        mc_SS_hist = plot_objects["mc_SS"]
+        pad_plot.cd()
+        mc_SS_roohistpdf = ROOT.RooHistPdf(f"MC_SS", f"MC_SS", ROOT.RooArgSet(axis), mc_SS_hist)
+        mc_SS_roohistpdf.plotOn(frame,
+                                 ROOT.RooFit.Name("MC_SS"),
+                                 ROOT.RooFit.LineColor(colors["mc_SS"]),
+                                 ROOT.RooFit.Normalization(mc_SS_hist.sumEntries(), ROOT.RooAbsReal.NumEvent))
+        plotted_histos.append(mc_SS_hist)
+        pad_info.cd()
+        legend.AddEntry("MC_SS", "MC_SS", "l")
+        legend_obj = legend.GetListOfPrimitives().Last()
+        legend_obj.SetLineColor(colors["mc_SS"])
+        legend_obj.SetLineWidth(3)
+        textbox.AddText(
+            f"MC SS entries: {mc_SS_hist.sumEntries():.2f} #pm {sumw2_error(mc_SS_hist):.2f}") 
 
     if "pdf_bkg_fit" in plot_objects.keys():
         pad_plot.cd()
@@ -521,7 +546,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
 
     pad_plot.cd()
     pad_plot.SetLogy() if logscale is True else pad_plot.SetLogy(False)
-    frame.SetMaximum(2.5*ctrl_plot_max)      
+    frame.SetMaximum(2.5*ctrl_plot_max if logscale is True else ctrl_plot_max+(ctrl_plot_max**0.5))      
     frame.SetMinimum(1e-1)
     frame.Draw("same")
     pad_plot.Update()
@@ -647,8 +672,7 @@ def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
 
     if not (len(bins_pt) ==2 or len(bins_eta) == 2):
-        print("ERROR: the projection has to be made by collapsing one of the two dimensions")
-        sys.exit()
+        sys.exit("ERROR: the projection has to be made by collapsing one of the two dimensions")
 
     if len(bins_pt) > len(bins_eta):
         proj_axis = "pt"
