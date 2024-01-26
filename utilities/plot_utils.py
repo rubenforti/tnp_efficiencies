@@ -195,7 +195,6 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, figpath=""):
     plot_minv_distrib_with_fit(pad_plot_pass, pass_obj["axis"], pass_obj["data"], pass_obj["model"])
     plot_minv_distrib_with_fit(pad_plot_fail, fail_obj["axis"], fail_obj["data"], fail_obj["model"])
 
-
     pad_info.cd()
     uplim_stats_gen = 0.05 if type_analysis == "indep" else 0.6
     stats_pass = ROOT.TPaveText(0, uplim_stats_gen, 0.5, 0.95, "NDC NB")

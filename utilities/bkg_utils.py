@@ -91,7 +91,6 @@ def make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta,
     datasets.update({"axis" : axis})
 
     for cat in import_categories:
-        print(cat)
         try:
             type_dataset, subs = cat.split("_", 1)
             subs = f"_{subs}"
@@ -173,7 +172,6 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
         
     if study_SS_bkg: bkg_categories = [cat+"_SS" if cat != "bkg_SameCharge" else cat for cat in bkg_categories]
 
-    print(bkg_categories)
 
     for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
@@ -294,8 +292,7 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
     ws = file.Get("w")
 
     if norm_data and norm_tot_bkg:
-        print("ERROR: can't normalize both on data and total bkg")
-        sys.exit()
+        sys.exit("ERROR: can't normalize both on data and total bkg")
     elif norm_data:
         add_title = " norm on data"
     elif norm_tot_bkg:

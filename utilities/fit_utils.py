@@ -231,7 +231,7 @@ def fit_quality(fit_obj, type_checks="egm_legacy"):
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
                                  fit_obj["res"], type_chi2="pearson", nsigma=15)
     
-    elif type_checks == "new_robust":
+    elif type_checks == "new_tight":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 2e-3)
@@ -251,7 +251,7 @@ def fit_quality(fit_obj, type_checks="egm_legacy"):
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 1e-2)
-        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-6, relTol=1e-4)
+        #check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-5, relTol=1e-6)
     
     else:
         sys.exit("ERROR: wrong type of fit quality check indicated")
