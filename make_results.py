@@ -164,7 +164,9 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
             histos.update({histo_pt.GetName() : histo_pt, histo_eta.GetName() : histo_eta})
     '''
 
-    add_flag = "cmp" if ".root" in ws_txt_bmark_filename else "cmpBmark"      
+    add_flag = "cmp" if ".root" in ws_txt_bmark_filename else "cmpBmark"
+
+    add_flag += "-prefitSS-fail"      
 
     if eval_nobkg_effect: add_flag += "_noBkgFits"
 
@@ -289,11 +291,11 @@ if __name__ == '__main__':
 
     import_pdf_library("RooCMSShape")
 
-    base_folder = "/scratchnvme/rforti/tnp_efficiencies_results/tracking"
+    base_folder = "/scratch/rforti/tnp_efficiencies_results/tracking"
 
     benchmark_res = base_folder+"/legacy_fit/old_results.txt"
 
-    bmark_fit_filename =  base_folder+"/benchmark_opt/ws_tracking_indep_benchmark.root"
+    bmark_fit_filename =  base_folder+"/prefitSS_fail/ws_tracking_indep_prefitSS_fail.root"
     
 
     ws_filename =  base_folder+"/bb_samecharge_fail/ws_tracking_indep_barlowbeeston.root"

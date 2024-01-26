@@ -4,6 +4,7 @@ import ROOT
 import time
 import json
 import sys
+import os
 from utilities.base_library import bin_dictionary
 from utilities.dataset_utils import ws_init, gen_import_dictionary
 from make_fits import runFits, runParallelFits
@@ -16,7 +17,7 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 
 ROOT.Math.MinimizerOptions.SetDefaultMinimizer("Minuit2")
 
-gen_res_folder = "/scratchnvme/rforti/tnp_efficiencies_results"
+gen_res_folder = "/scratch/rforti/tnp_efficiencies_results"
 
 
 # -----------------------------------------------------------------------------
@@ -27,23 +28,25 @@ type_analysis = "indep"
 charge_selection = ["plus", "minus"]
 
 
-folder = gen_res_folder+f"/tracking/benchmark_opt"
-ws_filename = folder+f"/ws_tracking_indep_benchmark.root"
+folder = gen_res_folder+f"/tracking/prefitSS_fail"
+ws_filename = folder+"/ws_tracking_indep_prefitSS_fail.root"
 
 generate_datasets = False
 
 use_extended_sig_template_fail = False
 
-fit_settings = "custom_run4"
+fit_settings = "custom_run3"
 
 binning_pt, binning_eta, binning_mass = "pt_tracking", "eta", "mass_50_130"
 
 mergedbins_bkg, binning_pt_bkg, binning_eta_bkg = False, "pt_12bins", "eta_16bins"
 
-load_bkg_datasets = False
-bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau", "bkg_SameCharge"]
+load_bkg_datasets = True
+bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau",
+                  "bkg_WplusJets", "bkg_WminusJets", 
+                  "bkg_SameCharge"]
 import_bkg_samesign = False
-import_mc_samesign = False
+import_mc_samesign = True
 
 fit_on_pseudodata = False
 
@@ -61,7 +64,8 @@ savefigs = True
 
 
 figpath = {"good": f"{folder}/fit_plots", 
-           "check": f"{folder}/fit_plots/check"}
+           "check": f"{folder}/fit_plots/check",
+           "prefit": f"{folder}/fit_plots/prefit_bkg"}
 
 
 if mergedbins_bkg and (binning_pt != "pt" or binning_eta != "eta"):
@@ -75,8 +79,9 @@ if fit_on_pseudodata: load_bkg_datasets = True
 # --------------------
 if generate_datasets:
 
-    datasets_folder = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023"
+    if not os.path.exists(folder): os.makedirs(folder)
 
+    datasets_folder = "datasets" 
     import_categories = ["data", "mc"]
 
     if load_bkg_datasets: 

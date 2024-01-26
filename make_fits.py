@@ -47,7 +47,7 @@ def checkImportCustomPdfs(bkg_models):
     """
     dict_classes = {
         "cmsshape" : "RooCMSShape",
-        "cmsshape_w_prefitSS" : "RooCMSShape",
+        "cmsshape_prefitSS" : "RooCMSShape",
         "cmsshape_new" : "RooCMSShape_mod",
         "CB" : "my_double_CB"
     }
@@ -65,10 +65,13 @@ def doSingleFit(fitter, ws, flags, savefigs, figpath=None):
     fitter.manageFit(ws)
 
     res = {}
+
     for flag in flags: res.update({flag : fitter.res_obj[flag]})
 
-    if savefigs is True and fitter.existingFit is False: fitter.saveFig(ws, figpath)
-    bin_key = fitter.bin_key
+    if savefigs is True and fitter.existingFit is False: 
+        fitter.saveFig(ws, figpath)
+        fitter.saveFig_prefit(figpath["prefit"], "fail")
+
 
     return fitter, res, fitter.bin_status
 
@@ -87,13 +90,17 @@ def runFits(ws_name, bin_dict, fit_settings, parallelize=True, import_pdfs=False
     file_ws = ROOT.TFile(ws_name)
     ws = file_ws.Get("w")
 
+    if savefigs is True:
+        for path in figpath.values(): 
+            if not os.path.exists(path): os.makedirs(path)
+
     prob_bins = []
 
 
     for bin_key in bin_dict.keys():
         
         # if bin_key != "[45.0to55.0][2.1to2.2]": continue
-        # if bin_key != "[24.0to35.0][-0.5to-0.4]": continue
+        #if bin_key != "[24.0to35.0][-0.2to-0.1]": continue
 
         if fit_settings["type_analysis"] == "indep":
             dict_flags = ["pass", "fail"]

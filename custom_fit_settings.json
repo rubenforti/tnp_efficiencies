@@ -1,6 +1,6 @@
 {
     "run1" : {
-        "fit_checks" : "new_robust",
+        "fit_checks" : "new_tight",
         "type_refit" : "benchmark",
         "Nbins" : {
             "pass" : 5000,
@@ -12,16 +12,16 @@
         },
         "bkg_model" : {
             "pass" : "expo",
-            "fail" : "cmsshape"
+            "fail" : "cmsshape_prefitSS"
         },
         "pars" : {
             "mu" : {
                 "pass" : [0.0, -5.0, 5.0],
-                "fail" : [0.0, -5.0, 5.0]
+                "fail" : [0.0, -10.0, 10.0]
             },
             "sigma" : {
-                "pass" : [0.5, 0.1, 5.0],
-                "fail" : [2.0, 0.1, 15.0]
+                "pass" : [0.5, 0.01, 5.0],
+                "fail" : [2.0, 0.1, 10.0]
             },
             "tau" : {
                 "pass" : [0.0, -5.0, 5.0]
@@ -58,16 +58,13 @@
             },
             "gamma" : {
                 "fail" : [0.5, 0.8]
-            },
-            "sigma" : {
-                "fail" : [2.0, 5.0]
             }
         }
     },
 
     "run2" : {
         "Nbins" : {
-            "pass" : 2000,
+            "pass" : 10000,
             "fail" : 10000
         },
         "bufFraction" : {
@@ -80,11 +77,11 @@
         "pars" : {
             "mu" : {
                 "pass" : [0.0, -5.0, 5.0],
-                "fail" : [0.0, -5.0, 5.0]
+                "fail" : [0.0, -10.0, 10.0]
             },
             "sigma" : {
-                "pass" : [0.5, 0.1, 5.0],
-                "fail" : [2.0, 0.1, 15.0]
+                "pass" : [0.5, 0.01, 5.0],
+                "fail" : [2.0, 0.01, 10.0]
             },
             "tau" : {
                 "pass" : [0.0, -5.0, 5.0]
@@ -104,13 +101,13 @@
         },
         "constr" : {
             "alpha" : {
-                "fail" : [90.0, 50.0]
+                "fail" : [90.0, 30.0]
             },
             "beta" : {
-                "fail" : [12.5, 7.0]
+                "fail" : [10, 15.0]
             },
             "gamma" : {
-                "fail" : [0.01, 0.3]
+                "fail" : [0.1, 0.4]
             },
             "sigma" : {
                 "fail" : [2.0, 3]
