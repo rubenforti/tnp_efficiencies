@@ -2,10 +2,10 @@
 """
 import ROOT
 import time
-from copy import copy
-from utilities.base_library import lumi_factors, binning, bin_dictionary
+# from copy import copy
+# from utilities.base_library import lumi_factors, binning, bin_dictionary
 from utilities.dataset_utils import ws_init, gen_import_dictionary
-from utilities.bkg_utils import gen_bkg_2d_distrib, bkg_mass_distribution, show_negweighted_bins
+from utilities.bkg_utils import bkg_2d_distrib, bkg_mass_distribution, show_negweighted_bins
 
 t0 = time.time()
 
@@ -31,11 +31,11 @@ binning_pt = "pt_tracking"
 binning_eta = "eta"
 binning_mass = "mass_50_130"
 
-study_SS_bkg = False
+study_SS_bkg = True
 
-folder = gen_res_folder+"/tracking/bkg_figs"
+folder = gen_res_folder+"/tracking/bkg_figs/SS"
 
-ws_filename = folder+"/ws_tracking_bkg.root"
+ws_filename = folder+"/ws_tracking_bkg_SS.root"
 
 generate_datasets = False       
 
@@ -79,7 +79,13 @@ if generate_datasets is True:
     import_categories = ["data", "mc"] + bkg_categories
     
     import_dictionary = gen_import_dictionary(base_folder, type_eff, import_categories,
-                                              ch_set=["plus", "minus"], scale_MC=True, add_SS_mc=True, add_SS_bkg=study_SS_bkg)
+                                              ch_set=["plus", "minus"], scale_MC=True, 
+                                              add_SS_mc=True, add_SS_bkg=study_SS_bkg)
+    
+    for k, v in import_dictionary.items():
+        print(k, v)
+
+
     
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass)
     ws.writeToFile(ws_filename)
@@ -107,7 +113,7 @@ if minv_plots["flag"]:
 
 if plot_bkg_distrib["flag"]:
     print("Plotting bkg 2D distributions")
-    gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
+    bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
                        study_SS_bkg=study_SS_bkg,
                        norm_data=plot_bkg_distrib["norm_on_data"],
                        norm_sig=plot_bkg_distrib["norm_on_sig"],

@@ -81,7 +81,6 @@ def make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta,
     """
     Creates a dictionary containing the bkg MC datasets and the useful information related to them.
     """
-
     axis = ws.var(f"x_{flag}_{bin_key}")
 
     binning = axis.getBinning("x_binning")
@@ -175,15 +174,12 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
     for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
-        # if bin_key != "[24.0to35.0][-0.1to0.0]": continue
-
         for flag in ["pass", "fail"]:
 
-            if logscale=="hybrid": 
-                setlog=True if flag=="pass" else False
-            
-            # print(flag, bin_key)
+            # if bin_key != "[24.0to35.0][-0.1to0.0]": continue
 
+            if logscale=="hybrid": setlog=True if flag=="pass" else False
+            
             if plot_on_data:
                 
                 import_categories = ["data"] + bkg_categories
@@ -191,6 +187,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                 if study_SS_bkg: import_categories += ["mc_SS"]
 
                 datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
+
                 
                 plot_bkg(datasets, flag, bin_key, logscale=setlog, figpath=f"{figpath}/minv_plots_w_data")
 
@@ -214,7 +211,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                 if study_SS_bkg: import_categories += ["mc_SS"]
         
                 datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
-                
+
                 plot_bkg(datasets, flag, bin_key, logscale=setlog, figpath=f"{figpath}/minv_plots_w_sig")
                 
                 '''
@@ -279,9 +276,9 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
 
 
-def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
-                       study_SS_bkg=False, norm_data=False, norm_sig=False, norm_tot_bkg=False, 
-                       plot_projected=False, filepath="bkg_studies"):
+def bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
+                   study_SS_bkg=False, norm_data=False, norm_sig=False, norm_tot_bkg=False, 
+                   plot_projected=False, filepath="bkg_studies"):
     """
     Makes 2d histograms containing the differential distribution of the various
     background samples; these distributions can be normalized w.r.t. data,
@@ -303,17 +300,19 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
     bin_dict = bin_dictionary(binning_pt, binning_eta)    
 
-    bkg_categories_dry = [cat.replace("bkg_", "") for cat in bkg_categories]
+    plot_categories = [cat.replace("bkg_", "") for cat in bkg_categories]
 
-    if study_SS_bkg: bkg_categories_dry = [cat+"_SS" if cat != "SameCharge" else cat for cat in bkg_categories_dry]
+    if study_SS_bkg: 
+        plot_categories = [cat+"_SS" if cat != "SameCharge" else cat for cat in plot_categories]
+        plot_categories += ["mc_SS"]
+        
     
     histos = {}
 
     isNorm = norm_data or norm_sig or norm_tot_bkg
 
 
-    for bkg_cat in bkg_categories_dry:
-        # if bkg_cat!="SameCharge": continue
+    for bkg_cat in plot_categories:
 
 
         histos.update(init_pass_fail_histos(bkg_cat, bkg_cat, bins_pt, bins_pt, bins_eta))
@@ -327,8 +326,14 @@ def gen_bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
 
             num_events = {}
 
+            if bkg_cat != "mc_SS":
+                type_dset, subs = "bkg", bkg_cat
+            else:
+                type_dset, subs = "mc", "SS"
+        
+
             for flag in ["pass", "fail"]:
-                bkg_hist = ws.data(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}")
+                bkg_hist = ws.data(f"Minv_{type_dset}_{flag}_{bin_key}_{subs}")
                 num_events.update({
                     flag : bkg_hist.sumEntries(),
                     f"error {flag}" : sumw2_error(bkg_hist)

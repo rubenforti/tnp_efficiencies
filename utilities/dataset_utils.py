@@ -6,19 +6,19 @@ import os
 import ROOT
 from copy import copy, deepcopy
 from itertools import repeat
-from utilities.base_library import binning, bin_dictionary, lumi_factor, bin_global_idx_dict, binnings
+from utilities.base_library import binning, bin_dictionary, lumi_factor, bin_global_idx_dict
 
 
 bkg_sum_selector = {
-    "bkg_WW" : 0,
-    "bkg_WZ" : 0,
-    "bkg_ZZ" : 0,
-    "bkg_TTFullyleptonic" : 0,
-    "bkg_TTSemileptonic" : 0,
-    "bkg_Ztautau" : 0,
-    "bkg_SameCharge" : 1,
-    "bkg_WplusJets" : 0,
-    "bkg_WminusJets" : 0,
+    "bkg_WW" : 1,
+    "bkg_WZ" : 1,
+    "bkg_ZZ" : 1,
+    "bkg_TTFullyleptonic" : 1,
+    "bkg_TTSemileptonic" : 1,
+    "bkg_Ztautau" : 1,
+    "bkg_SameCharge" : 0,
+    "bkg_WplusJets" : 1,
+    "bkg_WminusJets" : 1,
     "mc_SS" : 0.,
 }
 
@@ -71,6 +71,7 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
             import_dictionary[f"bkg_{flag_set}_SS"]["filenames"] = [f.replace("OS", "SS").replace("oscharge1", "oscharge0")
                                                                     for f in import_dictionary[f"bkg_{flag_set}"]["filenames"]]
             import_dictionary[f"bkg_{flag_set}_SS"]["lumi_scale"] = import_dictionary[f"bkg_{flag_set}"]["lumi_scale"]
+
 
     return import_dictionary
                 
@@ -207,17 +208,15 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
             for bkg_cat in import_obj[1]:
                 try:
                     type_dataset, subs = bkg_cat.split("_", 1)
-                    subs = f"_{subs}"
+                    subs = f"_{subs}"   
                 except:
                     type_dataset, subs = bkg_cat, ""
                 iter_dict[bkg_cat] = ws.data(f"Minv_{type_dataset}_{flag}_{bin_key}{subs}")
-                #print(bkg_cat, iter_dict[bkg_cat].sumEntries())
     elif type(import_obj) is dict:
         iter_dict = import_obj
     else:
         sys.exit("ERROR: invalid object type given")
     
-
     bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", f"Minv_bkg_{flag}_{bin_key}_total", 
                                        ROOT.RooArgSet(axis), "x_binning")
     
@@ -225,6 +224,8 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
     n_events_bkg = []
 
     for k in iter_dict.keys():
+        # Checks if the total bkg histogram that is going to be created is made
+        # of SS events (of montecarlo datasets) and adjust the name accordingly
         if ("SS" in k) and ("mc" not in k) :
             bkg_total_histo.SetName(f"Minv_bkg_{flag}_{bin_key}_total_SS")
             bkg_total_histo.SetTitle(f"Minv_bkg_{flag}_{bin_key}_total_SS")
@@ -236,11 +237,10 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
         
         if "bkg" in bkg_cat: bkg_cat = bkg_cat.replace("_SS", "")
 
-        try:
-            if bkg_sum_selector[bkg_cat]==0: continue
-        except:
+        if (bkg_cat not in bkg_sum_selector.keys()): 
             print(f"WARNING: {bkg_cat} category not found in the selector")
             continue
+        if bkg_sum_selector[bkg_cat]==0: continue
         
         if type(bkg_obj) is dict:
             files, lumi_scale = bkg_obj["filenames"], bkg_obj["lumi_scale"]

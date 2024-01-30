@@ -4,9 +4,9 @@ import ROOT
 import sys
 import os
 import pickle
-from copy import copy
+from copy import deepcopy
 from array import array
-from utilities.base_library import lumi_factors, binning, sumw2_error
+from utilities.base_library import  binning, sumw2_error
 from utilities.CMS_lumi import CMS_lumi
 
 
@@ -144,7 +144,6 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, figpath=""):
     pad_plot_fail = ROOT.TPad("pad_plot_fail", "Failing probes", 0.5, plot_info_edge, 1, main_info_edge)
     pad_info = ROOT.TPad("pad_info", "pad_info", 0, 0, 1, plot_info_edge)
 
-    
     pad_title_eff.SetMargin(0.15, 0.15, 0.15, 0.15)
     pad_title_eff.Draw()
 
@@ -157,7 +156,7 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, figpath=""):
     pad_plot_fail.SetMargin(0.15, 0.05, 0.1, 0.05)
     pad_plot_fail.Draw()
 
-    pad_info.SetMargin(0.15, 0.05, 0.05, 0.05), 
+    pad_info.SetMargin(0.15, 0.05, 0.05, 0.05)
     pad_info.Draw()
     
     pad_title_eff.cd()
@@ -273,7 +272,7 @@ def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
     """
     """        
     isHistPlot = True if label=="bkg_total" else False
-    label = copy(label).replace("_SS", "")
+    label = deepcopy(label).replace("_SS", "")
     minNBins = 20 if isHistPlot else 15
     
     for nbins_total_bkg in list_nbins_plot:
@@ -359,7 +358,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
     titlebox.Draw()
     c.Update()
 
-    plot_objects = copy(plot_dictionary)
+    plot_objects = deepcopy(plot_dictionary)
 
     axis = plot_objects["axis"]
 
@@ -410,6 +409,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
     total_bkg = plot_objects["bkg_total"]
     pad_plot.cd()
     plot_bkg_object(frame, axis, [total_bkg], "bkg_total", list_nbins_plot)
+    plotted_histos.append(total_bkg)
     pad_info.cd()
     legend.AddEntry("Total bkg", "Total bkg", "lp")
     legend_obj = legend.GetListOfPrimitives().Last()
@@ -430,7 +430,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
     bkg_plot_it_dict = {k : v for k , v in plot_objects.items() if "bkg_" in k}
 
     if group_backgrounds:
-        bkg_obj_tmp_container = copy(bkg_plot_it_dict)
+        bkg_obj_tmp_container = deepcopy(bkg_plot_it_dict)
         bkg_grouping_tmp = {}
         for bkg_group, bkg_cat_list in bkg_grouping.items():
             bkg_grouping_tmp[bkg_group] = []
@@ -442,7 +442,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
 
         if bkg_cat == "bkg_total": continue
         pad_plot.cd()
-        bkg_key_print = copy(bkg_cat).replace("bkg_", "")
+        bkg_key_print = deepcopy(bkg_cat).replace("bkg_", "")
         if group_backgrounds:
             hist_plotting = [plot_objects[key] for key in bkg_obj]
             if len(hist_plotting) == 0: continue
@@ -536,7 +536,9 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
     # Setting the control variable for the maximum value of the y-axis
     ctrl_plot_max = 0  
     for plot_hist in plotted_histos:
+        #print(plot_hist.GetName())
         for bin_idx in range(plot_hist.numEntries()):
+            #print(plot_hist.weight(bin_idx), ctrl_plot_max)
             if plot_hist.weight(bin_idx) > ctrl_plot_max:
                 ctrl_plot_max = plot_hist.weight(bin_idx)
 
@@ -544,11 +546,15 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
     # c.Update()
 
     pad_plot.cd()
-    pad_plot.SetLogy() if logscale is True else pad_plot.SetLogy(False)
-    frame.SetMaximum(2.5*ctrl_plot_max if logscale is True else ctrl_plot_max+(ctrl_plot_max**0.5))      
-    frame.SetMinimum(1e-1)
-    frame.Draw("same")
-    pad_plot.Update()
+    if logscale is True:
+        pad_plot.SetLogy()
+        frame.SetMaximum(2.5*ctrl_plot_max)
+    
+    frame.SetMinimum(0.1)
+    
+    print(ctrl_plot_max, frame.GetMaximum())
+    frame.Draw()
+    #pad_plot.Update()
 
  
     CMS_lumi(pad_plot, 5, 0, simulation=True)
@@ -582,7 +588,7 @@ def plot_2d_bkg_distrib(histos_dict, bkg_cat, figpath=""):
     c.cd()
 
     if bkg_cat != "TTFullyleptonic_bkg":
-        bkg_key_print = copy(bkg_cat).replace("_bkg", "") 
+        bkg_key_print = deepcopy(bkg_cat).replace("_bkg", "") 
     else:
         bkg_key_print = "TTLeptonic"
 
@@ -700,7 +706,7 @@ def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=
     titlebox.Draw()
     c.Update()
 
-    plot_objects = copy(plot_dictionary)
+    plot_objects = deepcopy(plot_dictionary)
 
     # ref_histo = plot_objects.pop("ref_histo")
 
@@ -733,7 +739,7 @@ def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=
     for bkg_key in plot_objects.keys():
 
         if bkg_key != "TTFullyleptonic_bkg":
-            bkg_key_print = copy(bkg_key).replace("_bkg", "") 
+            bkg_key_print = deepcopy(bkg_key).replace("_bkg", "") 
         else:
             bkg_key_print = "TTLeptonic"
 
