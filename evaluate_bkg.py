@@ -2,6 +2,7 @@
 """
 import ROOT
 import time
+import sys
 # from copy import copy
 # from utilities.base_library import lumi_factors, binning, bin_dictionary
 from utilities.dataset_utils import ws_init, gen_import_dictionary
@@ -23,7 +24,7 @@ type_eff = "tracking"
 type_analysis = "indep"
 bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", 
                   "bkg_TTSemileptonic", "bkg_TTFullyleptonic", "bkg_Ztautau",
-                  "bkg_WplusJets", "bkg_WminusJets",                  
+                  "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets",                 
                   "bkg_SameCharge"]
 
 
@@ -47,15 +48,15 @@ binnings_list = [["pt", "eta"]]
                  
 
 minv_plots = {
-    "flag" : True,
-    "plot_on_data" : True,
+    "flag" : False,
+    "plot_on_data" : False,
     "plot_fit_bkgpdf" : False,
-    "plot_on_sig" : True,
+    "plot_on_sig" : False,
     "compare_bkgfrac" : False,
     "logscale" : "hybrid",
 }
 plot_bkg_distrib = {
-    "flag" : False,
+    "flag" : True,
     "norm_on_data" : False,
     "norm_on_sig" : False,
     "norm_tot_bkg" : False,
@@ -67,6 +68,10 @@ for tp in ["data", "sig"]:
     plot_bkg_distrib.update({f"norm_on_{tp}" : bool(plot_bkg_distrib[f"norm_on_{tp}"]*plot_bkg_distrib["flag"])})
 
 
+if study_SS_bkg:
+    bkg_categories = [f"{cat}_SS" if (cat!="bkg_SameCharge") else cat for cat in bkg_categories]
+
+
 # -----------------------------------------------------------------------------------------------------------
 #  DATASET GENERATION
 # --------------------
@@ -74,19 +79,25 @@ for tp in ["data", "sig"]:
 if generate_datasets is True:
 
     # base_folder = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023"
-    base_folder = "datasets"
-
-    import_categories = ["data", "mc"] + bkg_categories
+    base_folder = "../steve_hists_tmp"
+    
+    import_categories = bkg_categories
+    if minv_plots["flag"] and minv_plots["plot_on_data"]:
+        import_categories += ["data"]
+    if minv_plots["flag"] and minv_plots["plot_on_sig"]:
+        import_categories += ["mc"]
     
     import_dictionary = gen_import_dictionary(base_folder, type_eff, import_categories,
-                                              ch_set=["plus", "minus"], scale_MC=True, 
-                                              add_SS_mc=True, add_SS_bkg=study_SS_bkg)
-    
+                                              ch_set=["plus", "minus"], scale_MC=True,
+                                              do_OS_tracking=(not study_SS_bkg),
+                                              add_SS_mc=True)
+    '''
     for k, v in import_dictionary.items():
-        print(k, v)
+        print(k, " ", v)
+        print(" ")
+    sys.exit()  
+    '''
 
-
-    
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass)
     ws.writeToFile(ws_filename)
     

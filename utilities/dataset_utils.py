@@ -19,11 +19,20 @@ bkg_sum_selector = {
     "bkg_SameCharge" : 0,
     "bkg_WplusJets" : 1,
     "bkg_WminusJets" : 1,
-    "mc_SS" : 0.,
+    "bkg_Zjets" : 1,
+    
+    "data" : 0.,
+    "mc" : 0.,
 }
 
 ###############################################################################
 
+
+# This function works for the previous version of root files in output from 
+# Steve, where the gen-matching flag was not present and it was necessary to
+# separate the SS events from the OS ones into two folders.
+# The same function adapted to the new formalism is present below
+'''
 def gen_import_dictionary(base_folder, type_eff, dset_names,
                           ch_set = [""],
                           scale_MC = False,
@@ -72,6 +81,78 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
                                                                     for f in import_dictionary[f"bkg_{flag_set}"]["filenames"]]
             import_dictionary[f"bkg_{flag_set}_SS"]["lumi_scale"] = import_dictionary[f"bkg_{flag_set}"]["lumi_scale"]
 
+    return import_dictionary
+                
+###############################################################################
+'''
+
+def gen_import_dictionary(base_folder, type_eff, dset_names,
+                          ch_set = [""],
+                          do_OS_tracking = False,
+                          scale_MC = True,
+                          add_SS_mc = False,
+                          add_SS_bkg = False):
+    """
+    Generates a dictionary that contains the information about the datasets
+    to be imported. The keys are the names of the datasets, the values are
+    dictionaries that contain the filepath(s) and the luminosity scale factor
+    """
+    import_dictionary = {}
+
+    for dset_name in dset_names:
+
+        import_dictionary[dset_name] = {}
+        import_dictionary[dset_name]["filenames"] = []
+        
+        lumi_scale = -1
+
+        ## Flags that specify the file name
+        # General gen-matching and os/ss-charge settings
+        gm_sel, c_sel, S_sel = "1", "1", ""
+        # Gen-matching removed for backgrounds
+        if "bkg" in dset_name : gm_sel = "0"
+        # For tracking step we don't require OS events, unless specified
+        if type_eff=="tracking" and do_OS_tracking is False: c_sel="0"
+        # Flags for same-sign events
+        if "SS" in dset_name: c_sel, S_sel = "0", "_SS"
+        # Extraction of process name by removing the prefix  (if present)
+        process_name = dset_name.replace("bkg_", "").replace("_SS", "")  
+        # "SameCharge" data events, that are called among the other backgrounds
+        if "SameCharge" in dset_name: 
+            process_name = "data"
+            gm_sel, c_sel, S_sel = "1", "0", "_SS"
+        # "Zjets" events, that are defined as Zmumu MC with the reversed gen-matching cut
+        if "Zjets" in dset_name:
+            process_name = "mc"
+            gm_sel = "-1"
+
+        for ch in ch_set:
+            filename = f"{base_folder}/tnp_{type_eff}{ch}_{process_name}_vertexWeights1_genMatching{gm_sel}_oscharge{c_sel}{S_sel}.root"
+            import_dictionary[dset_name]["filenames"].append(filename)
+        
+        if (dset_name=="mc" and scale_MC is True) or ("bkg" in dset_name and "SameCharge" not in dset_name): 
+            lumi_scale = lumi_factor(filename, process_name)
+        
+        import_dictionary[dset_name]["lumi_scale"] = lumi_scale
+
+        # Option to add the same-sign events for the MC (signal) dataset
+        if dset_name=="mc" and add_SS_mc is True:
+            import_dictionary["mc_SS"] = deepcopy(import_dictionary["mc"])
+            mc_ss_filenames = [f"{f.replace('.root', '').split('oscharge')[0]}oscharge0_SS.root" 
+                               for f in import_dictionary["mc"]["filenames"]]
+            import_dictionary["mc_SS"]["filenames"] = mc_ss_filenames
+        
+        print(dset_name)
+        
+        # Option to add the same-sign events for the background datasets IN ADDITION to the OS ones
+        if add_SS_bkg is True and ("bkg" in dset_name) and ("SameCharge" not in dset_name):
+            if f"{dset_name}_SS" in import_dictionary.keys():
+                print(f"{dset_name} SS dataset already present in the dictionary")
+                continue
+            import_dictionary[f"{dset_name}_SS"] = deepcopy(import_dictionary[dset_name])
+            ss_filenames = [f"{f.replace('.root', '').split('oscharge')[0]}oscharge0_SS.root" 
+                            for f in import_dictionary[dset_name]["filenames"]]
+            import_dictionary[f"{dset_name}_SS"]["filenames"] = ss_filenames
 
     return import_dictionary
                 
@@ -234,6 +315,8 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
 
     # Loop over the background categories                
     for bkg_cat, bkg_obj in iter_dict.items():
+
+        print(bkg_cat)
         
         if "bkg" in bkg_cat: bkg_cat = bkg_cat.replace("_SS", "")
 
@@ -312,7 +395,7 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
     for dataset_obj in import_datasets.values():
         dataset_obj["filenames"] = [ROOT.TFile(v, "READ") for v in dataset_obj["filenames"]]
    
-    merging_dict = {k : v for k, v in import_datasets.items() if k in bkg_sum_selector.keys()}
+    merging_dict = {k : v for k, v in import_datasets.items() if bkg_sum_selector[k.replace("_SS","")]!=0}
     
     # Loop over the pt-eta bins
     for bin_key, [gl_idx, bin_pt, bin_eta] in bins.items():
@@ -351,7 +434,7 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                 ws.Import(histo)
             
             # Importing the total background histogram if light mode is called (only for OS)
-            if lightMode_bkg is True and len(merging_dict)>0:
+            if len(merging_dict)>0:
                 if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
                 bkg_total_histo = get_totbkg_roohist(merging_dict, flag, axis, bin_key, bin_pt, bin_eta,
                                                      fail_template_with_all_SA=fail_template_with_all_SA)

@@ -169,7 +169,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
         histos.update(init_pass_fail_histos("h_bkgfrac_ratio", "Bkg fraction mc/fit ratio", 
                                             array('d', bins_ratio), bins_pt, bins_pt))
         
-    if study_SS_bkg: bkg_categories = [cat+"_SS" if cat != "bkg_SameCharge" else cat for cat in bkg_categories]
+    # if study_SS_bkg: bkg_categories = [cat+"_SS" if cat != "bkg_SameCharge" else cat for cat in bkg_categories]
 
 
     for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
@@ -256,8 +256,8 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                 '''
 
             if plot_on_data is False and plot_on_signal is False:
-                datasets = make_bkg_dictionary(type_eff, ws, flag, bin_key, bkg_categories)
-                plot_bkg(datasets, flag, bin_key, logscale=logscale, figpath=figpath)
+                datasets = make_bkg_dictionary(ws, bkg_categories, flag, bin_key, bin_pt, bin_eta)
+                plot_bkg(datasets, flag, bin_key, logscale=setlog, figpath=f"{figpath}/minv_plots")
             
             
     saveHists = False
@@ -302,9 +302,9 @@ def bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
 
     plot_categories = [cat.replace("bkg_", "") for cat in bkg_categories]
 
-    if study_SS_bkg: 
-        plot_categories = [cat+"_SS" if cat != "SameCharge" else cat for cat in plot_categories]
-        plot_categories += ["mc_SS"]
+    # if study_SS_bkg: 
+        # plot_categories = [cat+"_SS" if cat != "SameCharge" else cat for cat in plot_categories]
+        #plot_categories += ["mc_SS"]
         
     
     histos = {}

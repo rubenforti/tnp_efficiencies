@@ -20,19 +20,22 @@ colors = {
     "bkg_WplusJets" : ROOT.kOrange+7,
     "bkg_WminusJets" : ROOT.kOrange-3,
     "bkg_SameCharge" : ROOT.kYellow+2,
+    "bkg_Zjets" : ROOT.kBlue+4,
     "bkg_total" : ROOT.kRed,
     "mc" : ROOT.kBlue,
-    "mc_SS" : ROOT.kBlue+4,
+    "mc_SS" : ROOT.kBlue-2,
     "pdf_bkg_fit" : ROOT.kRed-2,
 
     "Diboson" : ROOT.kGreen,
     "Top" : ROOT.kCyan,
     "Ztautau" : ROOT.kMagenta+1,
     "Wjets" : ROOT.kOrange,
+    "Zjets" : ROOT.kBlue+4,
     "Diboson_SS" : ROOT.kGreen-2,
     "Top_SS" : ROOT.kCyan-2,
     "Ztautau_SS" : ROOT.kMagenta-1,
     "Wjets_SS" : ROOT.kOrange-2,
+    "Zjets_SS" : ROOT.kBlue+2,
     "SameCharge" : ROOT.kYellow+2,
 }
 
@@ -41,11 +44,13 @@ bkg_grouping = {
     "Top" : ["bkg_TTSemileptonic", "bkg_TTFullyleptonic"],
     "Ztautau" : ["bkg_Ztautau"],
     "Wjets" : ["bkg_WplusJets", "bkg_WminusJets"],
+    "Zjets" : ["bkg_Zjets"],
 
     "Diboson_SS" : ["bkg_WW_SS", "bkg_WZ_SS", "bkg_ZZ_SS"],
     "Top_SS" : ["bkg_TTSemileptonic_SS", "bkg_TTFullyleptonic_SS"],
     "Ztautau_SS" : ["bkg_Ztautau_SS"],
     "Wjets_SS" : ["bkg_WplusJets_SS", "bkg_WminusJets_SS"],
+    "Zjets_SS" : ["bkg_Zjets_SS"],
 
     "SameCharge" : ["bkg_SameCharge"]
 }
@@ -443,11 +448,18 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
         if bkg_cat == "bkg_total": continue
         pad_plot.cd()
         bkg_key_print = deepcopy(bkg_cat).replace("bkg_", "")
+
+        nEntries = 0
         if group_backgrounds:
             hist_plotting = [plot_objects[key] for key in bkg_obj]
+            for hist in hist_plotting: nEntries += hist.sumEntries()
             if len(hist_plotting) == 0: continue
         else:
             hist_plotting = [bkg_obj]
+            nEntries = bkg_obj.sumEntries()
+        
+        if nEntries < 0: continue
+
         plot_bkg_object(frame, axis, hist_plotting, bkg_cat, list_nbins_plot)
         bkg_obj_new = hist_plotting[0]
         for hist in hist_plotting[1:]: bkg_obj_new.add(hist)

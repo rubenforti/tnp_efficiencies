@@ -43,13 +43,14 @@ xsec_ZmmPostVFP = 2001.9
 xsec_bkg = {
     # Unit = pb
     "WW" : 12.6,
-    "WZ" : 5.4341,
+    "WZ" : 27.59,  #5.4341,
     "ZZ" : 0.60,
     "TTFullyleptonic" : 88.29,
     "TTSemileptonic" : 366.34,
     "WplusJets" : 11765.9,
     "WminusJets" : 8703.87,
-    "Ztautau" : xsec_ZmmPostVFP*Z_TAU_TO_LEP_RATIO
+    "Ztautau" : xsec_ZmmPostVFP*Z_TAU_TO_LEP_RATIO,
+    "Zjets" : xsec_ZmmPostVFP  # obtained from the signal MC file with the "reverse" gen-matching option
 }
 
 ###############################################################################
