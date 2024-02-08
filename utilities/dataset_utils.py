@@ -8,7 +8,7 @@ from copy import copy, deepcopy
 from itertools import repeat
 from utilities.base_library import binning, bin_dictionary, lumi_factor, bin_global_idx_dict
 
-
+'''
 bkg_sum_selector = {
     "bkg_WW" : 1,
     "bkg_WZ" : 1,
@@ -23,6 +23,24 @@ bkg_sum_selector = {
     
     "data" : 0.,
     "mc" : 0.,
+    "mc_SS" : 0.
+}
+'''
+bkg_sum_selector = {
+    "bkg_WW" : 0,
+    "bkg_WZ" : 0,
+    "bkg_ZZ" : 0,
+    "bkg_TTFullyleptonic" : 0,
+    "bkg_TTSemileptonic" : 0,
+    "bkg_Ztautau" : 0,
+    "bkg_SameCharge" : 1,
+    "bkg_WplusJets" : 0,
+    "bkg_WminusJets" : 0,
+    "bkg_Zjets" : 0,
+    
+    "data" : 0.,
+    "mc" : 0.,
+    "mc_SS" : 0.
 }
 
 ###############################################################################
@@ -275,18 +293,24 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
                        fail_template_with_all_SA=False):
     """
     Returns a RooDataHist that represents the total background, for a given
-    pt-eta bin. The background sources are stored in the "dataset_dict" object
-    and are normalized in this function.Their impact in the total bkg histogram
-    is managed by the "bkg_selector" dictionary.
+    pt-eta bin. This can be created in two ways, corresponding to two different
+    "import_obj" types:
+      - "import_obj" is a list: the first position has to be occupied by the
+        workspace, the second by the list of the processes to be summed;
+      - "import_obj" is a dictionary: the keys must be the names of the 
+        datasets to be summed, while the values have to be dictionaries
+        containing the filepath(s) and the luminosity factor for the process. 
+    The contribution of each process, in the total bkg histogram can be tuned
+    manually with the "bkg_selector" dictionary (e.g. to include/exclude a
+    certain process or to subtract it from the sum).
     """
-
     if type(import_obj) is list and type(import_obj[0]) is ROOT.RooWorkspace:  # First position has to be occupied by the workspace, the second by the list of the processes to be summed
-        ws = import_obj[0]
+        ws, categories = import_obj
         if type(ws.data(f"Minv_bkg_{flag}_{bin_key}_total")) is ROOT.RooDataHist:
             return ws.data(f"Minv_bkg_{flag}_{bin_key}_total")
         else:
             iter_dict = {}
-            for bkg_cat in import_obj[1]:
+            for bkg_cat in categories:
                 try:
                     type_dataset, subs = bkg_cat.split("_", 1)
                     subs = f"_{subs}"   
@@ -315,8 +339,6 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
 
     # Loop over the background categories                
     for bkg_cat, bkg_obj in iter_dict.items():
-
-        print(bkg_cat)
         
         if "bkg" in bkg_cat: bkg_cat = bkg_cat.replace("_SS", "")
 
@@ -421,10 +443,11 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                     dset_type = "bkg" if not "SameCharge" in dset_name else "data_SC"
                     dset_subs = dset_name.replace("bkg", "")
                     if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
-                elif "SS" in dset_name:
+                elif dset_name=="mc_SS":
                     dset_type = dset_name.replace("_SS", "")
                     dset_subs = "_SS"
                 else:
+                    # Other types are only "data" and "mc"
                     dset_type = dset_name
                     dset_subs = ""
 

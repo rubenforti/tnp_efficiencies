@@ -32,13 +32,15 @@ binning_pt = "pt_tracking"
 binning_eta = "eta"
 binning_mass = "mass_50_130"
 
-study_SS_bkg = True
+study_SS_bkg = False
 
-folder = gen_res_folder+"/tracking/bkg_figs/SS"
+charge_flag = "OS" if not study_SS_bkg else "SS"
 
-ws_filename = folder+"/ws_tracking_bkg_SS.root"
+folder = gen_res_folder+f"/tracking/bkg_figs/{charge_flag}"
 
-generate_datasets = False       
+ws_filename = folder+f"/ws_tracking_bkg_{charge_flag}.root"
+
+generate_datasets = True       
 
 figpath = folder
 filepath = folder
@@ -48,15 +50,15 @@ binnings_list = [["pt", "eta"]]
                  
 
 minv_plots = {
-    "flag" : False,
+    "flag" : True,
     "plot_on_data" : False,
     "plot_fit_bkgpdf" : False,
-    "plot_on_sig" : False,
+    "plot_on_sig" : True,
     "compare_bkgfrac" : False,
     "logscale" : "hybrid",
 }
 plot_bkg_distrib = {
-    "flag" : True,
+    "flag" : False,
     "norm_on_data" : False,
     "norm_on_sig" : False,
     "norm_tot_bkg" : False,
@@ -90,7 +92,7 @@ if generate_datasets is True:
     import_dictionary = gen_import_dictionary(base_folder, type_eff, import_categories,
                                               ch_set=["plus", "minus"], scale_MC=True,
                                               do_OS_tracking=(not study_SS_bkg),
-                                              add_SS_mc=True)
+                                              add_SS_mc=study_SS_bkg)
     '''
     for k, v in import_dictionary.items():
         print(k, " ", v)

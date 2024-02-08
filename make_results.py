@@ -295,17 +295,16 @@ if __name__ == '__main__':
 
     benchmark_res = base_folder+"/legacy_fit/old_results.txt"
 
-    bmark_fit_filename =  base_folder+"/prefitSS_fail/ws_tracking_indep_prefitSS_fail.root"
-    
+    ws_filename =  base_folder+"/prefitSS_fail_new/ws_tracking_indep_prefitSS_fail.root"
 
-    ws_filename =  base_folder+"/bb_samecharge_fail/ws_tracking_indep_barlowbeeston.root"
-
+    # ws_filename =  base_folder+"/bb_samecharge_fail/ws_tracking_indep_barlowbeeston.root"
 
 
 
 
-    # save_eff_results(bmark_fit_filename, "indep", "pt", "eta")
-    compare_efficiency(bmark_fit_filename, ws_filename, "pt_tracking", "eta", resCmp_list)
+
+    save_eff_results(ws_filename, "indep", "pt_tracking", "eta")
+    compare_efficiency(benchmark_res, ws_filename, "pt_tracking", "eta", resCmp_list)
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 

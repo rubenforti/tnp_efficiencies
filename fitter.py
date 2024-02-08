@@ -2,7 +2,8 @@
 """
 import ROOT
 import sys
-import copy
+
+from copy import copy as cp, deepcopy as dcp
 from utilities.dataset_utils import get_totbkg_roohist
 from utilities.results_utils import efficiency_from_res
 from utilities.plot_utils import plot_fitted_pass_fail
@@ -23,7 +24,7 @@ class AbsFitter():
         Constructor. Initializes the basic attributes of the fitter.
         """
         self.bin_key = bin_key
-        settings_obj = copy.deepcopy(fit_settings)
+        settings_obj = dcp(fit_settings)
         self.pars = settings_obj.pop("pars")
         self.norm = settings_obj.pop("norm")
         self.settings = settings_obj
@@ -185,14 +186,16 @@ class AbsFitter():
     def _createPseudodata(self, flag, ws):
         """
         Creates the pseudodata histogram, which is the sum of the signal and
-        background MC histograms. The histogram is loaded into the histo_data
-        attribute.
+        background MC histograms (previously saved into the workspace). The 
+        histogram is loaded into the histo_data attribute.
         """
         roohist_pseudodata = ROOT.RooDataHist(f"Minv_pseudodata_{flag}_{self.bin_key}", "pseudodata_histo",
                                               ROOT.RooArgSet(self.axis[flag]), "x_binning")
 
         roohist_pseudodata.add(ws.data(f"Minv_mc_{flag}_{self.bin_key}"))
-        [roohist_pseudodata.add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_{cat}")) for cat in self.settings["bkg_categories"]]
+        # To have a proper meaning, the "total" bkg histogram has to be created
+        # by summing only the MC datasets, not the SameCharge one.
+        roohist_pseudodata.add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total"))
 
         self.histo_data.update({flag : roohist_pseudodata})
 
@@ -252,6 +255,10 @@ class AbsFitter():
                 self.bin_status = True
             else:
                 self.existingFit = False
+        else:
+            sys.exit("ERROR: type of analysis not recognized")
+
+        return self.existingFit
 
 
     def importAxis(self, flag, ws):
@@ -280,27 +287,28 @@ class AbsFitter():
             import_bkgSS = True if self.settings["bkg_model"][flag] in ["num_estimation", "cmsshape_prefitSS"] else False
             import_mcSS = True if self.settings["bkg_model"][flag] == "cmsshape_prefitSS" else False
 
-            if self.settings["fit_on_pseudodata"] is False:
-
-                self.histo_data.update({flag : ws.data(f"Minv_data_{flag}_{self.bin_key}")})
-
-                if import_mc:
-                    # To be imported only if the fit has to retrieve the scale 
-                    # factor parameter directly
-                    self.histo_data.update({f"mc_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}")})
-                
-                if import_mcSS:
-                    # Dataset used to evaluate the (complementary of the) 
-                    # fitting region for bkg estimation on the SS region
-                    self.histo_data.update({f"mcSS_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}_SS")})
-
-                if import_bkgSS:
-                    # Imports the SameCharge dataset, to be used as control 
-                    # sample for the background, under the hypoythesis that it
-                    # represents appropriately the background in the OS region
-                    self.histo_data.update({f"bkgSS_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
-            else:
+            if self.settings["fit_on_pseudodata"]:
                 self._createPseudodata(flag, ws)
+                continue
+
+            self.histo_data.update({flag : ws.data(f"Minv_data_{flag}_{self.bin_key}")})
+
+            if import_mc:
+                # To be imported only if the fit has to retrieve the scale 
+                # factor parameter directly
+                self.histo_data.update({f"mc_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}")})
+            
+            if import_mcSS:
+                # Dataset used to evaluate the (complementary of the) fitting
+                # region for bkg estimation on the SS region
+                self.histo_data.update({f"mcSS_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}_SS")})
+
+            if import_bkgSS:
+                # Imports the SameCharge dataset, to be used as control 
+                # sample for the background, under the hypoythesis that it
+                # represents appropriately the background in the OS region
+                self.histo_data.update({f"bkgSS_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
+
 
 
     def initNorm(self):
@@ -553,8 +561,7 @@ class IndepFitter(AbsFitter):
         """
         """
         AbsFitter.__init__(self, bin_key, settings)
-        self.minos_pars = { fl: "" for fl in ["pass", "fail"]}
-        
+        self.minos_pars = { fl : "" for fl in ["pass", "fail"]}
 
 
     def attempt_noBkgFit(self, flag):
@@ -586,36 +593,34 @@ class IndepFitter(AbsFitter):
     def manageFit(self, ws):
         """
         """
-        self.checkExistingFit(ws)  
 
-        if self.existingFit is False:
-
-            [self.importAxis(flag, ws) for flag in ["pass", "fail"]], print("Imported axis")
-            self.initDatasets(ws), print("Imported datasets")
-            self.initNorm(),       print("Imported normalization parameters")
-            self.initFitPdfs(ws),  print("Imported fit pdfs")
-            
-            for flag in ["pass", "fail"]:
-
-                if self.settings["bkg_model"][flag] == "cmsshape_prefitSS":
-                    print(f"Fixing bkg_{flag} parameters by operating a fit on SS data with CMSShape")
-                    self.doFit(flag, prefit_bkgSS=True)
-                    #for par in self.pdfs["bkg_pdf"][flag].getParameters(self.histo_data[flag]): par.Print()
-                    if self.status[f"{flag}_prefitSS"] is False: 
-                        self.status[flag] = False
-                        self.res_obj[flag] = copy.copy(self.res_obj[f"{flag}_prefitSS"])
-                        continue
-        
-                # if self.status[flag] is True: 
-                print(f"Starting fit for {flag} category")
-                self.doFit(flag)
-                if self.status[flag] is False and self.settings["refit_nobkg"]:
-                    self.attempt_noBkgFit(flag)
-
-            self.bin_status = bool(self.status["pass"]*self.status["fail"])
-            print(f"Fitted bin {self.bin_key} with status {self.bin_status}\n")
-        else:
+        if self.checkExistingFit(ws) is True:
             print("Not possible to refit an existing PDF! \nUsing the results obtained previously")
+            return
+
+        [self.importAxis(flag, ws) for flag in ["pass", "fail"]], print("Imported axis")
+        self.initDatasets(ws), print("Imported datasets")
+        self.initNorm(),       print("Imported normalization parameters")
+        self.initFitPdfs(ws),  print("Imported fit pdfs")
+        
+        for flag in ["pass", "fail"]:
+
+            if "prefitSS" in self.settings["bkg_model"][flag]:
+                print(f"Fixing bkg_{flag} parameters by operating a fit on SS data with CMSShape")
+                self.doFit(flag, prefit_bkgSS=True)
+                #for par in self.pdfs["bkg_pdf"][flag].getParameters(self.histo_data[flag]): par.Print()
+                if self.status[f"{flag}_prefitSS"] is False: 
+                    self.status[flag] = False
+                    self.res_obj[flag] = cp(self.res_obj[f"{flag}_prefitSS"])
+                    continue
+    
+            print(f"Starting fit for {flag} category")
+            self.doFit(flag)
+            if self.status[flag] is False and self.settings["refit_nobkg"]:
+                self.attempt_noBkgFit(flag)
+
+        self.bin_status = bool(self.status["pass"]*self.status["fail"])
+        print(f"Fitted bin {self.bin_key} with status {self.bin_status}\n")
 
 
     def importFitObjects(self, ws):

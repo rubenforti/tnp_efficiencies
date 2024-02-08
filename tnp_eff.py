@@ -27,9 +27,14 @@ type_eff = "tracking"
 type_analysis = "indep"
 charge_selection = ["plus", "minus"]
 
-
-folder = gen_res_folder+f"/tracking/prefitSS_fail"
+folder = gen_res_folder+f"/tracking/prefitSS_fail_new"
 ws_filename = folder+"/ws_tracking_indep_prefitSS_fail.root"
+'''
+
+folder = "."
+ws_filename = folder+"/ws_prova.root"
+
+'''
 
 generate_datasets = False
 
@@ -43,10 +48,10 @@ mergedbins_bkg, binning_pt_bkg, binning_eta_bkg = False, "pt_12bins", "eta_16bin
 
 load_bkg_datasets = True
 bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau",
-                  "bkg_WplusJets", "bkg_WminusJets", 
+                  "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets",
                   "bkg_SameCharge"]
 import_bkg_samesign = False
-import_mc_samesign = True
+import_mc_samesign = False
 
 fit_on_pseudodata = False
 
@@ -81,21 +86,20 @@ if generate_datasets:
 
     if not os.path.exists(folder): os.makedirs(folder)
 
-    datasets_folder = "datasets" 
+    datasets_folder = "../steve_hists_tmp" 
     import_categories = ["data", "mc"]
 
+    # Not used, MC is always scaled
     if load_bkg_datasets: 
         scale_MC = True,
         if not mergedbins_bkg: import_categories += bkg_categories
     else:
         scale_MC = False
+    
 
     import_dictionary = gen_import_dictionary(datasets_folder, type_eff, import_categories,
-                                              ch_set=charge_selection, scale_MC=scale_MC, 
+                                              ch_set=charge_selection, scale_MC=True, 
                                               add_SS_mc=import_mc_samesign, add_SS_bkg=import_bkg_samesign)
-    
-    print(import_dictionary)
-
 
     ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass, 
                  lightMode_bkg=True, fail_template_with_all_SA=use_extended_sig_template_fail)
@@ -110,10 +114,12 @@ if generate_datasets:
 
         if mergedbins_bkg is False:
             binning_pt_bkg, binning_eta_bkg = binning_pt, binning_eta
+
+        lightBkg = True if not fit_on_pseudodata else False
         
         ws = ws_init(import_dict_bkg, type_analysis, binning_pt_bkg, binning_eta_bkg, 
                      binning_mass, import_existing_ws=True, existing_ws_filename=ws_filename, 
-                     lightMode_bkg=True, altBinning_bkg=mergedbins_bkg,
+                     lightMode_bkg=lightBkg, altBinning_bkg=mergedbins_bkg,
                      fail_template_with_all_SA=use_extended_sig_template_fail)
         ws.writeToFile(ws_filename)
 
