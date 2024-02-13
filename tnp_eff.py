@@ -20,12 +20,12 @@ ROOT.Math.MinimizerOptions.SetDefaultMinimizer("Minuit2")
 
 
 gen_res_folder = "/scratch/rforti/tnp_efficiencies_results"
-folder = gen_res_folder+"/fit_background"
+folder = gen_res_folder+"/tracking/test_bias_SSvOS"
 datasets_folder = "../steve_hists_tmp" 
 
 
 fit_settings = {
-    "ws_name" : folder+"/ws_prova.root",
+    "ws_name" : folder+"/ws_indep_pseudodata.root",
 
     "type_eff" : "tracking",
 
@@ -39,13 +39,13 @@ fit_settings = {
     "binning_eta" : "eta",
     "binning_mass" : "mass_50_130",
 
-    "fitOnlyBkg" : True,
+    "fitOnlyBkg" : False,
 
-    "fitPseudodata" : False,
+    "fitPseudodata" : True,
 
     "use_extended_sig_template_fail" : False,
 
-    "par_fit_settings_type" : "custom_run2",
+    "par_fit_settings_type" : "custom_run3",
 
     "load_bkg_datasets" : False,
 
@@ -119,13 +119,16 @@ if fit_settings["generate_datasets"]:
                                               add_SS_mc=fit_settings["import_mc_samesign"], 
                                               add_SS_bkg=fit_settings["import_bkg_samesign"])
     
-    for k,v in import_dictionary.items(): print(k, " ", v)
 
-
-    ws = ws_init(import_dictionary, fit_settings["type_analysis"], fit_settings["binning_pt"], fit_settings["binning_eta"], fit_settings["binning_mass"], 
-                 lightMode_bkg=True, fail_template_with_all_SA=fit_settings["use_extended_sig_template_fail"])
+    
+    ws = ws_init(import_dictionary, fit_settings["type_analysis"], 
+                 fit_settings["binning_pt"], fit_settings["binning_eta"], fit_settings["binning_mass"], 
+                 lightMode_bkg=False, fail_template_with_all_SA=fit_settings["use_extended_sig_template_fail"])
 
     ws.writeToFile(fit_settings["ws_name"])
+
+    
+    
 
 
     if fit_settings["load_bkg_datasets"] and fit_settings["mergedbins_bkg"]: 

@@ -278,25 +278,26 @@ class AbsFitter():
                                                            self.settings["Nbins"][flag]), "cache" )
 
 
-    def initDatasets(self, ws, fitOnlyBkg=False, fitPseudodata=False):
+    def initDatasets(self, ws, loadOnlyBkg=False, loadPseudodata=False):
         """
         """
-        if fitPseudodata and fitOnlyBkg: sys.exit("ERROR: fitPseudodata and fitOnlyBkg cannot be both True!")
+        if loadPseudodata and loadOnlyBkg: sys.exit("ERROR: fitPseudodata and fitOnlyBkg cannot be both True!")
 
         for flag in ["pass", "fail"]:
 
-            if fitPseudodata:
-                self._createPseudodata(flag, ws)
-                continue
-
-            if fitOnlyBkg:
-                self.histo_data.update({flag : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
-                continue
-
             import_mc = True if self.settings["type_analysis"] == "sim_sf" else False
             import_mcSS = True if self.settings["bkg_model"][flag] == "cmsshape_prefitSS" else False
-            
             import_bkgControl = True if self.settings["bkg_model"][flag] in ["num_estimation", "cmsshape_prefitSS"] else False
+
+            if loadPseudodata:
+                self._createPseudodata(flag, ws)
+                if import_bkgControl:
+                    self.histo_data.update({f"bkgControl_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_SameCharge")})
+                continue
+
+            if loadOnlyBkg:
+                self.histo_data.update({flag : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
+                continue
                 
             self.histo_data.update({flag : ws.data(f"Minv_data_{flag}_{self.bin_key}")})
 
@@ -340,7 +341,7 @@ class AbsFitter():
                     norm_obj[0], norm_obj[1], norm_obj[2] )
 
 
-    def initFitPdfs(self, ws):
+    def initFitPdfs(self, ws, fitOnlyBkg=False):
         """
         """
         for flag in ["pass", "fail"]:
@@ -351,7 +352,7 @@ class AbsFitter():
             else:
                 self._createFixedPdfs(flag, ws)
             
-            if self.settings["fitOnlyBkg"]:
+            if fitOnlyBkg:
                 self.pdfs["fit_model"][flag] = self.pdfs["bkg_pdf"][flag]
                 self.pdfs["fit_model"][flag].SetName(f"fitPDF_{flag}_{self.bin_key}")
                 continue
@@ -603,9 +604,9 @@ class IndepFitter(AbsFitter):
             return
 
         [self.importAxis(flag, ws) for flag in ["pass", "fail"]]
-        self.initDatasets(ws, fitOnlyBkg=self.settings["fitOnlyBkg"], fitPseudodata=self.settings["fitPseudodata"])
+        self.initDatasets(ws, loadOnlyBkg=self.settings["fitOnlyBkg"], loadPseudodata=self.settings["fitPseudodata"])
         self.initNorm()
-        self.initFitPdfs(ws)
+        self.initFitPdfs(ws, fitOnlyBkg=self.settings["fitOnlyBkg"])
         
         for flag in ["pass", "fail"]:
 
@@ -759,9 +760,9 @@ class SimFitter(AbsFitter):
 
         if self.existingFit is False:
             [self.importAxis(flag, ws) for flag in ["pass", "fail"]]
-            self.initDatasets(ws, fitOnlyBkg=self.settings["fitOnlyBkg"], fitPseudodata=self.settings["fitPseudodata"])
+            self.initDatasets(ws, loadOnlyBkg=self.settings["fitOnlyBkg"], loadPseudodata=self.settings["fitPseudodata"])
             self.initNorm_sim()
-            self.initFitPdfs(ws)
+            self.initFitPdfs(ws, )
             self.createSimDataset(ws)
             if "constr" in self.settings.keys(): 
                 [self.setConstraints(flag) for flag in ["pass", "fail"]]

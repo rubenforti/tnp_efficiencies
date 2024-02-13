@@ -70,10 +70,12 @@ def doSingleFit(fitter, ws, flags):
     for flag in flags: res.update({flag : fitter.res_obj[flag]})
 
     if fitter.settings["savefigs"] is True and fitter.existingFit is False: 
-        figpath = fitter.settings["figpath"]
         fitter.saveFig(ws)
         for flag in ["pass", "fail"]:
-            if "prefit" in fitter.settings["bkg_model"][flag]: fitter.saveFig_prefit(flag)
+            print(fitter.settings["bkg_model"][flag], "prefit" in fitter.settings["bkg_model"][flag])
+            if "prefit" in fitter.settings["bkg_model"][flag]: 
+                print("\nSaving prefit plots\n")
+                fitter.saveFig_prefit(flag)
 
     return fitter, res, fitter.bin_status
 

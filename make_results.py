@@ -202,6 +202,17 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list):
         
         eff, d_eff = results.getEff(bin_key)
 
+        '''
+        # Select this to isolate the effect of the fin on failing probes 
+        npass = ws.data(f"Minv_mc_pass_{bin_key}").sumEntries()
+        d_npass = sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}"))
+
+        pars_fail = ws.obj(f"results_fail_{bin_key}").floatParsFinal()
+        nfail, d_nfail = pars_fail.find(f"nsig_fail_{bin_key}").getVal(), pars_fail.find(f"nsig_fail_{bin_key}").getError()
+
+        eff, d_eff = eval_efficiency(npass, nfail, d_npass, d_nfail)
+        '''
+
         eff_mc, d_eff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
                                            ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
                                            sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
@@ -295,7 +306,7 @@ if __name__ == '__main__':
 
     benchmark_res = base_folder+"/legacy_fit/old_results.txt"
 
-    ws_filename =  base_folder+"/prefitSS_fail_new/ws_tracking_indep_prefitSS_fail.root"
+    ws_filename =  base_folder+"/test_bias_prefitSameCharge/ws_indep_pseudodata.root"
 
     # ws_filename =  base_folder+"/bb_samecharge_fail/ws_tracking_indep_barlowbeeston.root"
 
@@ -303,12 +314,12 @@ if __name__ == '__main__':
 
 
 
-    save_eff_results(ws_filename, "indep", "pt_tracking", "eta")
-    compare_efficiency(benchmark_res, ws_filename, "pt_tracking", "eta", resCmp_list)
+    # save_eff_results(ws_filename, "indep", "pt_tracking", "eta")
+    #compare_efficiency(benchmark_res, ws_filename, "pt_tracking", "eta", resCmp_list)
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 
-    # compare_eff_pseudodata(ws_filename, "pt", "eta", resCmp_list)
+    compare_eff_pseudodata(ws_filename, "pt_tracking", "eta", resCmp_list)
 
     
 
