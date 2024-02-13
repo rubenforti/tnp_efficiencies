@@ -35,10 +35,10 @@ class AbsFitter():
 
         self.pdfs = { "smearing" : {}, "mc_pdf" : {}, "conv_pdf" : {}, 
                       "bkg_pdf" : {}, "sum_pdf" : {}, "fit_model" : {} }
-        self.constr_set = {"pass" : "", "fail" : ""}
+        self.constr_set = { "pass" : "", "fail" : "" }
         # self.mc_template = {}
 
-        if "BB" in self.settings["bkg_model"]["pass"] or "BB" in self.settings["bkg_model"]["fail"]:
+        if "BB" in [self.settings["bkg_model"][fl] for fl in ["pass", "fail"]]:
             self.bkg_paramHist, self.bkg_histConstr = {}, {}
             self._one = ROOT.RooRealVar("one", "one", 1.0)
             self._one.setConstant() 
@@ -98,7 +98,7 @@ class AbsFitter():
     def _createFixedPdfs(self, flag, ws):
         """
         """
-        Ndata, Nbkg_raw = self.histo_data[flag].sumEntries(), self.histo_data[f"bkgSS_{flag}"].sumEntries()
+        Ndata, Nbkg_raw = self.histo_data[flag].sumEntries(), self.histo_data[f"bkgControl_{flag}"].sumEntries()
         print(Nbkg_raw)
         #f_bad_charge_assign = 0
         f_ch_assign, f_ch_assign_error = eval_efficiency(ws.data(f"Minv_mc_{flag}_{self.bin_key}_SS").sumEntries(),
@@ -159,7 +159,7 @@ class AbsFitter():
         
         elif bkg_model == "mc_raw":  #WARNING: the total bkg histo HAS TO BE APPROPRIATELY CREATED BEFORE THE CREATION OF FITTER OBJETCT
             self.pdfs["bkg_pdf"].update({ 
-                flag : ROOT.RooHistPdf(f"mcbkg_{flag}_{self.bin_key}_total", "MC-driven background", 
+                flag : ROOT.RooHistPdf(f"mc_bkg_{flag}_{self.bin_key}_total", "MC-driven background", 
                                        ROOT.RooArgSet(self.axis[flag]),  ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total"))
                 })
     
@@ -176,7 +176,7 @@ class AbsFitter():
             self.constr_set[flag].add( self.bkg_histConstr[flag] )
 
             self.pdfs["bkg_pdf"].update({
-                flag : ROOT.RooRealSumPdf(f"BBbkg_{flag}_{self.bin_key}", "Barlow-Beeston background", 
+                flag : ROOT.RooRealSumPdf(f"BB_bkg_{flag}_{self.bin_key}", "Barlow-Beeston background", 
                                           ROOT.RooArgList(self.bkg_paramHist[flag]), ROOT.RooArgList(self._one)) })
  
         else:
@@ -236,8 +236,8 @@ class AbsFitter():
         into the results attribute.
         """
         if self.settings["type_analysis"] == 'indep':
-            isFittedPass = type(ws.obj(f'fitPDF_pass_{self.bin_key}')) is ROOT.RooAddPdf
-            isFittedFail = type(ws.obj(f'fitPDF_fail_{self.bin_key}')) is ROOT.RooAddPdf
+            isFittedPass = issubclass( type(ws.obj(f'fitPDF_pass_{self.bin_key}')), ROOT.RooAbsPdf )
+            isFittedFail = issubclass( type(ws.obj(f'fitPDF_fail_{self.bin_key}')), ROOT.RooAbsPdf )
             if isFittedPass and isFittedFail:
                 self.res_obj = {
                     "pass": ws.obj(f'results_pass_{self.bin_key}'),
@@ -278,19 +278,26 @@ class AbsFitter():
                                                            self.settings["Nbins"][flag]), "cache" )
 
 
-    def initDatasets(self, ws):
+    def initDatasets(self, ws, fitOnlyBkg=False, fitPseudodata=False):
         """
         """
+        if fitPseudodata and fitOnlyBkg: sys.exit("ERROR: fitPseudodata and fitOnlyBkg cannot be both True!")
+
         for flag in ["pass", "fail"]:
 
-            import_mc = True if self.settings["type_analysis"] == "sim_sf" else False
-            import_bkgSS = True if self.settings["bkg_model"][flag] in ["num_estimation", "cmsshape_prefitSS"] else False
-            import_mcSS = True if self.settings["bkg_model"][flag] == "cmsshape_prefitSS" else False
-
-            if self.settings["fit_on_pseudodata"]:
+            if fitPseudodata:
                 self._createPseudodata(flag, ws)
                 continue
 
+            if fitOnlyBkg:
+                self.histo_data.update({flag : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
+                continue
+
+            import_mc = True if self.settings["type_analysis"] == "sim_sf" else False
+            import_mcSS = True if self.settings["bkg_model"][flag] == "cmsshape_prefitSS" else False
+            
+            import_bkgControl = True if self.settings["bkg_model"][flag] in ["num_estimation", "cmsshape_prefitSS"] else False
+                
             self.histo_data.update({flag : ws.data(f"Minv_data_{flag}_{self.bin_key}")})
 
             if import_mc:
@@ -303,12 +310,12 @@ class AbsFitter():
                 # region for bkg estimation on the SS region
                 self.histo_data.update({f"mcSS_{flag}" : ws.data(f"Minv_mc_{flag}_{self.bin_key}_SS")})
 
-            if import_bkgSS:
-                # Imports the SameCharge dataset, to be used as control 
-                # sample for the background, under the hypoythesis that it
-                # represents appropriately the background in the OS region
-                self.histo_data.update({f"bkgSS_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
-
+            if import_bkgControl:
+                # Imports the dataset to be used as control sample for the 
+                # total background. For example, it can correspond to the
+                # SameCharge dataset under the hypoythesis that it represents 
+                # appropriately the background in the OS region
+                self.histo_data.update({f"bkgControl_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
 
 
     def initNorm(self):
@@ -327,9 +334,10 @@ class AbsFitter():
                         norm_obj[idx] = float(norm_obj[idx].replace("n",""))*n_events
                     else:
                         norm_obj[idx] = float(norm_obj[idx])
-                self.norm[norm_key].update({ flag : ROOT.RooRealVar(
-                    f"{norm_key}_{flag}_{self.bin_key}", f"{norm_key} {flag}",
-                    norm_obj[0], norm_obj[1], norm_obj[2]) })
+        
+                self.norm[norm_key][flag] = ROOT.RooRealVar(
+                    f"{norm_key}_{flag}_{self.bin_key}", f"{norm_key} {flag}", 
+                    norm_obj[0], norm_obj[1], norm_obj[2] )
 
 
     def initFitPdfs(self, ws):
@@ -337,20 +345,23 @@ class AbsFitter():
         """
         for flag in ["pass", "fail"]:
             self._initParams(flag)
+
             if self.settings["bkg_model"][flag] != "num_estimation":
                 self._createSigPdf(flag, ws), self._createBkgPdf(flag, ws)
             else:
                 self._createFixedPdfs(flag, ws)
-            self.pdfs["sum_pdf"].update({ 
-                flag : ROOT.RooAddPdf(f"sum_{flag}_{self.bin_key}", "Signal+Bkg model", 
-                                      ROOT.RooArgList(self.pdfs["conv_pdf"][flag], self.pdfs["bkg_pdf"][flag]), 
-                                      ROOT.RooArgList(self.norm["nsig"][flag], self.norm["nbkg"][flag]))
-                })
+            
+            if self.settings["fitOnlyBkg"]:
+                self.pdfs["fit_model"][flag] = self.pdfs["bkg_pdf"][flag]
+                self.pdfs["fit_model"][flag].SetName(f"fitPDF_{flag}_{self.bin_key}")
+                continue
 
+            self.pdfs["sum_pdf"][flag] = ROOT.RooAddPdf(
+                f"sum_{flag}_{self.bin_key}", "Signal+Bkg model", 
+                ROOT.RooArgList(self.pdfs["conv_pdf"][flag], self.pdfs["bkg_pdf"][flag]), 
+                ROOT.RooArgList(self.norm["nsig"][flag], self.norm["nbkg"][flag]) )
             # Creating a new pdf for plotting purposes, I guess there are other ways but this is the simplest
-            self.pdfs["fit_model"].update({
-                flag : ROOT.RooAddPdf(self.pdfs["sum_pdf"][flag], f'fitPDF_{flag}_{self.bin_key}')
-                })
+            self.pdfs["fit_model"][flag] = ROOT.RooAddPdf(self.pdfs["sum_pdf"][flag], f"fitPDF_{flag}_{self.bin_key}")
 
 
     def doFit(self, flag, prefit_bkgSS=False, sidebands_lims=[90,90]):
@@ -374,7 +385,7 @@ class AbsFitter():
 
         elif prefit_bkgSS:
             pdf_fit = self.pdfs["bkg_pdf"][flag]
-            data_fit = self.histo_data[f"bkgSS_{flag}"]
+            data_fit = self.histo_data[f"bkgControl_{flag}"]
             if sidebands_lims[0]==sidebands_lims[1]:
                 range_fit = ""
             else:
@@ -391,7 +402,7 @@ class AbsFitter():
             ## It is not the best thing to run such a fit, but it is the easiest
             ## in order to have a roofitresult object to be used by the other functions
             pdf_fit = self.pdfs["bkg_pdf"][flag]
-            data_fit = self.histo_data[f"bkgSS_{flag}"]
+            data_fit = self.histo_data[f"bkgControl_{flag}"]
             range_fit = ""
             subs_res = ""
             checks = "pseudodata"   # Don't do the chi2 check if it is a prefit on SS data (WHY?)
@@ -402,13 +413,15 @@ class AbsFitter():
         if "constr" in self.settings.keys(): 
             self.setConstraints(flag, pdf_fit, data_fit)
 
-        '''print("")
+        """
+        print("")
         print("Data fit", data_fit.GetName())
         print("Pdf fit", pdf_fit.GetName())
         print("Range fit", range_fit)
         print("Subs res", subs_res)
         print("Checks", checks)
-        print("")'''
+        print("")
+        """
 
         if flag == "sim" : self.constr_set[flag] = ROOT.RooArgSet(self.constr_set["pass"], self.constr_set["fail"])
 
@@ -461,7 +474,7 @@ class AbsFitter():
             ROOT.RooArgList(self.pars["f_ch_assign"][flag], self.norm["nbkg"][flag], self.norm["nsig"][flag]))
 
 
-    def saveFig(self, ws, figpath):
+    def saveFig(self, ws):
         """
         """
 
@@ -470,7 +483,6 @@ class AbsFitter():
         for flag in ["pass", "fail"]:
     
             finalPars = ROOT.RooArgList(self.norm["nsig"][flag], self.norm["nbkg"][flag])
-            finalPars.Print("v")
 
             for par in self.pars.values():
                 try:
@@ -482,52 +494,43 @@ class AbsFitter():
 
             self.res_obj[flag].setFinalParList(finalPars)
 
-            plot_objects.update({ 
-                flag : { "axis":self.axis[flag], "data":self.histo_data[flag],
-                         "model":self.pdfs["fit_model"][flag], "res":self.res_obj[flag] }
-                })
+            plot_objects[flag] = { "axis":self.axis[flag], "data":self.histo_data[flag],
+                                   "model":self.pdfs["fit_model"][flag], "res":self.res_obj[flag] } 
 
         if self.settings["type_analysis"] == "indep":
             eff, d_eff = efficiency_from_res(plot_objects["pass"]["res"], plot_objects["fail"]["res"])
-            fig_status = self.bin_status
-            
-        if self.settings["type_analysis"] == "sim":
+        elif self.settings["type_analysis"] == "sim":
             eff, d_eff = self.efficiency.getVal(), self.efficiency.getError()
-            fig_status = bool(self.status["sim"])
-            self.res_obj.update({
-                "pass" : self.res_obj["sim"], "fail" : self.res_obj["sim"]["res_obj"]})
+            self.res_obj.update( {"pass":self.res_obj["sim"], "fail":self.res_obj["sim"]["res_obj"]} )
         else:
             pass
         # ATTENZIONE: CONTROLLARE CHE SUCCEDE SE SI FA IL FIT CON L'OPZIONE "SIM_SF"
 
-        eff_mc, deff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{self.bin_key}").sumEntries(), 
-                                          ws.data(f"Minv_mc_fail_{self.bin_key}").sumEntries(),
-                                          sumw2_error(ws.data(f"Minv_mc_pass_{self.bin_key}")),
-                                          sumw2_error(ws.data(f"Minv_mc_fail_{self.bin_key}")))
-        
+        eff_mc, deff_mc = eval_efficiency(
+            ws.data(f"Minv_mc_pass_{self.bin_key}").sumEntries(), ws.data(f"Minv_mc_fail_{self.bin_key}").sumEntries(),
+            sumw2_error(ws.data(f"Minv_mc_pass_{self.bin_key}")), sumw2_error(ws.data(f"Minv_mc_fail_{self.bin_key}")) )
         
         scale_factor = eff/eff_mc
         d_scale_factor = scale_factor*((d_eff/eff)**2 + (deff_mc/eff_mc)**2)**0.5
-
-        fig_folder = figpath["good"] if fig_status is True else figpath["check"]
-          
 
         plot_objects.update({"efficiency" : [eff, d_eff],
                              "efficiency_mc" : [eff_mc, deff_mc],
                              "scale_factor" : [scale_factor, d_scale_factor]})
 
-        plot_fitted_pass_fail(self.settings["type_analysis"], plot_objects, self.bin_key, figpath=fig_folder)
+        figpath = (self.settings["figpath"]["good"] if self.bin_status is True else self.settings["figpath"]["check"])
+
+        plot_fitted_pass_fail(self.settings["type_analysis"], plot_objects, self.bin_key, 
+                              figpath=figpath)
 
 
-
-    def saveFig_prefit(self, figpath, flag):
+    def saveFig_prefit(self, flag):
         """
         """
         plot_objects={}
         
-        for fit_type in ["bkgSS_", ""]:
+        for fit_type in ["bkgControl_", ""]:
 
-            pseudoflag, subs_res = ["pass", "_prefitSS"] if fit_type=="bkgSS_" else ["fail", ""]
+            pseudoflag, subs_res = ["pass", "_prefitSS"] if fit_type=="bkgControl_" else ["fail", ""]
             
             finalPars = ROOT.RooArgList(self.norm["nsig"][flag], self.norm["nbkg"][flag])
 
@@ -542,12 +545,13 @@ class AbsFitter():
             self.res_obj[flag].setFinalParList(finalPars)
 
             plot_objects[pseudoflag] = {"axis":self.axis[flag], "data":self.histo_data[fit_type+flag],
-                                        "model":self.pdfs["bkg_pdf" if fit_type=="bkgSS_" else "fit_model"][flag], 
+                                        "model":self.pdfs["bkg_pdf" if fit_type=="bkgControl_" else "fit_model"][flag], 
                                         "res":self.res_obj[flag+subs_res] }       
 
         plot_objects.update({"efficiency":[1,0], "efficiency_mc":[1,0], "scale_factor":[1,0]})
         
-        plot_fitted_pass_fail(self.settings["type_analysis"], plot_objects, self.bin_key, figpath=figpath)
+        plot_fitted_pass_fail(self.settings["type_analysis"], plot_objects, self.bin_key, 
+                              figpath=self.settings["figpath"]["prefit"])
 
 
 ###############################################################################
@@ -598,10 +602,10 @@ class IndepFitter(AbsFitter):
             print("Not possible to refit an existing PDF! \nUsing the results obtained previously")
             return
 
-        [self.importAxis(flag, ws) for flag in ["pass", "fail"]], print("Imported axis")
-        self.initDatasets(ws), print("Imported datasets")
-        self.initNorm(),       print("Imported normalization parameters")
-        self.initFitPdfs(ws),  print("Imported fit pdfs")
+        [self.importAxis(flag, ws) for flag in ["pass", "fail"]]
+        self.initDatasets(ws, fitOnlyBkg=self.settings["fitOnlyBkg"], fitPseudodata=self.settings["fitPseudodata"])
+        self.initNorm()
+        self.initFitPdfs(ws)
         
         for flag in ["pass", "fail"]:
 
@@ -616,7 +620,7 @@ class IndepFitter(AbsFitter):
     
             print(f"Starting fit for {flag} category")
             self.doFit(flag)
-            if self.status[flag] is False and self.settings["refit_nobkg"]:
+            if self.status[flag] is False and self.settings["refit_nobkg"] and not self.settings["fitOnlyBkg"]:
                 self.attempt_noBkgFit(flag)
 
         self.bin_status = bool(self.status["pass"]*self.status["fail"])
@@ -755,7 +759,7 @@ class SimFitter(AbsFitter):
 
         if self.existingFit is False:
             [self.importAxis(flag, ws) for flag in ["pass", "fail"]]
-            self.initDatasets(ws)
+            self.initDatasets(ws, fitOnlyBkg=self.settings["fitOnlyBkg"], fitPseudodata=self.settings["fitPseudodata"])
             self.initNorm_sim()
             self.initFitPdfs(ws)
             self.createSimDataset(ws)
