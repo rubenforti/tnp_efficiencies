@@ -8,7 +8,6 @@ from copy import copy, deepcopy
 from itertools import repeat
 from utilities.base_library import binning, bin_dictionary, lumi_factor, bin_global_idx_dict
 
-'''
 bkg_sum_selector = {
     "bkg_WW" : 1,
     "bkg_WZ" : 1,
@@ -20,23 +19,6 @@ bkg_sum_selector = {
     "bkg_WplusJets" : 1,
     "bkg_WminusJets" : 1,
     "bkg_Zjets" : 1,
-    
-    "data" : 0.,
-    "mc" : 0.,
-    "mc_SS" : 0.
-}
-'''
-bkg_sum_selector = {
-    "bkg_WW" : 0,
-    "bkg_WZ" : 0,
-    "bkg_ZZ" : 0,
-    "bkg_TTFullyleptonic" : 0,
-    "bkg_TTSemileptonic" : 0,
-    "bkg_Ztautau" : 0,
-    "bkg_SameCharge" : 1,
-    "bkg_WplusJets" : 0,
-    "bkg_WminusJets" : 0,
-    "bkg_Zjets" : 0,
     
     "data" : 0.,
     "mc" : 0.,
@@ -107,7 +89,6 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
 def gen_import_dictionary(base_folder, type_eff, dset_names,
                           ch_set = [""],
                           do_OS_tracking = False,
-                          scale_MC = True,
                           add_SS_mc = False,
                           add_SS_bkg = False):
     """
@@ -148,7 +129,7 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
             filename = f"{base_folder}/tnp_{type_eff}{ch}_{process_name}_vertexWeights1_genMatching{gm_sel}_oscharge{c_sel}{S_sel}.root"
             import_dictionary[dset_name]["filenames"].append(filename)
         
-        if (dset_name=="mc" and scale_MC is True) or ("bkg" in dset_name and "SameCharge" not in dset_name): 
+        if dset_name=="mc" or ("bkg" in dset_name and "SameCharge" not in dset_name): 
             lumi_scale = lumi_factor(filename, process_name)
         
         import_dictionary[dset_name]["lumi_scale"] = lumi_scale
@@ -159,8 +140,6 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
             mc_ss_filenames = [f"{f.replace('.root', '').split('oscharge')[0]}oscharge0_SS.root" 
                                for f in import_dictionary["mc"]["filenames"]]
             import_dictionary["mc_SS"]["filenames"] = mc_ss_filenames
-        
-        print(dset_name)
         
         # Option to add the same-sign events for the background datasets IN ADDITION to the OS ones
         if add_SS_bkg is True and ("bkg" in dset_name) and ("SameCharge" not in dset_name):

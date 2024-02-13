@@ -250,8 +250,8 @@ def fit_quality(fit_obj, type_checks="egm_legacy"):
     elif type_checks == "pseudodata":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
-        check_edm = (fit_obj["res"].edm() < 1e-2)
-        #check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-5, relTol=1e-6)
+        check_edm = (fit_obj["res"].edm() < 5e-2)
+        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
     
     else:
         sys.exit("ERROR: wrong type of fit quality check indicated")

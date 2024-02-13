@@ -5,6 +5,7 @@ import time
 import json
 import sys
 import os
+from copy import deepcopy as dcp
 from utilities.base_library import bin_dictionary
 from utilities.dataset_utils import ws_init, gen_import_dictionary
 from make_fits import runFits, runParallelFits
@@ -17,156 +18,168 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 
 ROOT.Math.MinimizerOptions.SetDefaultMinimizer("Minuit2")
 
+
 gen_res_folder = "/scratch/rforti/tnp_efficiencies_results"
+folder = gen_res_folder+"/fit_background"
+datasets_folder = "../steve_hists_tmp" 
 
 
-# -----------------------------------------------------------------------------
-#  GENERAL SETTINGS
-# ------------------
-type_eff = "tracking"
-type_analysis = "indep"
-charge_selection = ["plus", "minus"]
+fit_settings = {
+    "ws_name" : folder+"/ws_prova.root",
 
-folder = gen_res_folder+f"/tracking/prefitSS_fail_new"
-ws_filename = folder+"/ws_tracking_indep_prefitSS_fail.root"
-'''
+    "type_eff" : "tracking",
 
-folder = "."
-ws_filename = folder+"/ws_prova.root"
+    "type_analysis" : "indep",
 
-'''
+    "charge_selection" : ["plus", "minus"],
 
-generate_datasets = False
+    "generate_datasets" : False,
 
-use_extended_sig_template_fail = False
+    "binning_pt" : "pt_tracking",
+    "binning_eta" : "eta",
+    "binning_mass" : "mass_50_130",
 
-fit_settings = "custom_run3"
+    "fitOnlyBkg" : True,
 
-binning_pt, binning_eta, binning_mass = "pt_tracking", "eta", "mass_50_130"
+    "fitPseudodata" : False,
 
-mergedbins_bkg, binning_pt_bkg, binning_eta_bkg = False, "pt_12bins", "eta_16bins"
+    "use_extended_sig_template_fail" : False,
 
-load_bkg_datasets = True
-bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau",
-                  "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets",
-                  "bkg_SameCharge"]
-import_bkg_samesign = False
-import_mc_samesign = False
+    "par_fit_settings_type" : "custom_run2",
 
-fit_on_pseudodata = False
+    "load_bkg_datasets" : False,
 
-fit_verb = -1
+    "bkg_categories" : ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau",
+                        "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets",
+                        "bkg_SameCharge"],
+    
+    "import_bkg_samesign" : False,
+    "import_mc_samesign" : False,
 
-parallel_fits = False
+    "mergedbins_bkg" : False,
+    "binning_pt_bkg" : "pt_12bins",
+    "binning_eta_bkg" : "eta_16bins",
 
-refit_nobkg = True
+    "fit_verb" : -1,
 
-useMinos = False
+    "parallel_fits" : False,
 
-import_pdfs = True
+    "refit_nobkg" : True,
 
-savefigs = True
+    "useMinos" : False,
 
+    "import_pdfs" : True,
 
-figpath = {"good": f"{folder}/fit_plots", 
-           "check": f"{folder}/fit_plots/check",
-           "prefit": f"{folder}/fit_plots/prefit_bkg"}
+    "savefigs" : True, 
+    "figpath" : {"good": f"{folder}/fit_plots",
+                "check": f"{folder}/fit_plots/check",
+                "prefit": f"{folder}/fit_plots/prefit_bkg"}
 
+}
 
-if mergedbins_bkg and (binning_pt != "pt" or binning_eta != "eta"):
+if fit_settings["mergedbins_bkg"] and (fit_settings["binning_pt"] != "pt" or fit_settings["binning_eta"] != "eta"):
     sys.exit("ERROR: Evaluation of background in merged bins for its comparison on data is allowed only wrt reco-bins of pt and eta for data")
 
-if fit_on_pseudodata: load_bkg_datasets = True
+if fit_settings["fitPseudodata"] or fit_settings["fitOnlyBkg"]: 
+    fit_settings["load_bkg_datasets"] = True
+
+
+# -----------------------------------------------------------------------------------------------------------
+#  SUMMARY OF THE SETTINGS
+# -------------------------
+print("\n")
+print("--"+('------------'*4)+"--")
+print("|-"+('------------'*4)+"-|")
+print("|         ~ Summary of the fit settings ~          |")
+print("|-"+('------------'*4)+"-|")
+print("--"+('------------'*4)+"--")
+for key, value in fit_settings.items(): print("| ", key, " ", value, f"\n| {'------------'*4}")
+print("--"+('------------'*4)+"--")
+print("\n\n")
+
+confirm = input("Do you confirm the settings and start the fit? (y/n) ")
+if confirm != "y": sys.exit("Exiting...")
 
 
 # -----------------------------------------------------------------------------------------------------------
 #  DATASET GENERATION
 # --------------------
-if generate_datasets:
+if fit_settings["generate_datasets"]:
 
     if not os.path.exists(folder): os.makedirs(folder)
 
-    datasets_folder = "../steve_hists_tmp" 
     import_categories = ["data", "mc"]
 
-    # Not used, MC is always scaled
-    if load_bkg_datasets: 
-        scale_MC = True,
-        if not mergedbins_bkg: import_categories += bkg_categories
-    else:
-        scale_MC = False
+    if fit_settings["load_bkg_datasets"] and not fit_settings["mergedbins_bkg"]: 
+        import_categories += fit_settings["bkg_categories"]
+
+    import_dictionary = gen_import_dictionary(datasets_folder, fit_settings["type_eff"], import_categories,
+                                              ch_set=fit_settings["charge_selection"],
+                                              do_OS_tracking=False,
+                                              add_SS_mc=fit_settings["import_mc_samesign"], 
+                                              add_SS_bkg=fit_settings["import_bkg_samesign"])
     
-
-    import_dictionary = gen_import_dictionary(datasets_folder, type_eff, import_categories,
-                                              ch_set=charge_selection, scale_MC=True, 
-                                              add_SS_mc=import_mc_samesign, add_SS_bkg=import_bkg_samesign)
-
-    ws = ws_init(import_dictionary, type_analysis, binning_pt, binning_eta, binning_mass, 
-                 lightMode_bkg=True, fail_template_with_all_SA=use_extended_sig_template_fail)
-
-    ws.writeToFile(ws_filename)
+    for k,v in import_dictionary.items(): print(k, " ", v)
 
 
-    if load_bkg_datasets and mergedbins_bkg: 
+    ws = ws_init(import_dictionary, fit_settings["type_analysis"], fit_settings["binning_pt"], fit_settings["binning_eta"], fit_settings["binning_mass"], 
+                 lightMode_bkg=True, fail_template_with_all_SA=fit_settings["use_extended_sig_template_fail"])
 
-        import_dict_bkg = gen_import_dictionary(datasets_folder, type_eff, bkg_categories,
-                                                ch_set=charge_selection, add_SS_bkg=import_bkg_samesign)
+    ws.writeToFile(fit_settings["ws_name"])
 
-        if mergedbins_bkg is False:
-            binning_pt_bkg, binning_eta_bkg = binning_pt, binning_eta
 
-        lightBkg = True if not fit_on_pseudodata else False
+    if fit_settings["load_bkg_datasets"] and fit_settings["mergedbins_bkg"]: 
+
+        import_dict_bkg = gen_import_dictionary(datasets_folder, fit_settings["type_eff"], fit_settings["bkg_categories"],
+                                                ch_set=fit_settings["charge_selection"], add_SS_bkg=fit_settings["import_bkg_samesign"])
+
+        if fit_settings["mergedbins_bkg"] is False:
+            binning_pt_bkg, binning_eta_bkg = fit_settings["binning_pt"], fit_settings["binning_eta"]
+
+        lightBkg = True if not fit_settings["fitPseudodata"] else False
         
-        ws = ws_init(import_dict_bkg, type_analysis, binning_pt_bkg, binning_eta_bkg, 
-                     binning_mass, import_existing_ws=True, existing_ws_filename=ws_filename, 
-                     lightMode_bkg=lightBkg, altBinning_bkg=mergedbins_bkg,
-                     fail_template_with_all_SA=use_extended_sig_template_fail)
-        ws.writeToFile(ws_filename)
+        ws = ws_init(import_dict_bkg, fit_settings["type_analysis"], binning_pt_bkg, binning_eta_bkg, 
+                     fit_settings["binning_mass"], import_existing_ws=True, existing_ws_filename=fit_settings["ws_name"], 
+                     lightMode_bkg=lightBkg, altBinning_bkg=fit_settings["mergedbins_bkg"],
+                     fail_template_with_all_SA=fit_settings["use_extended_sig_template_fail"])
+        ws.writeToFile(fit_settings["ws_name"])
+
 
 # -----------------------------------------------------------------------------------------------------------
-# FIT SETTINGS
-# -------------
+# FIT PARAMETERS SETTINGS
+# ------------------------
 
-if fit_settings == "legacy":
+if fit_settings["par_fit_settings_type"] == "legacy":
     with open(f"legacy_fit_settings.json") as file: fit_settings_json = json.load(file)
-    if type_eff in ["idip", "trigger", "iso"]:
-        fit_settings = fit_settings_json["idip_trig_iso"]
+    if fit_settings["type_eff"] in ["idip", "trigger", "iso"]:
+        par_fit_settings = fit_settings_json["idip_trig_iso"]
     else:
-        fit_settings = fit_settings_json[type_eff]
+        par_fit_settings = fit_settings_json[fit_settings["type_eff"]]
 
-elif "custom" in fit_settings:
+elif "custom" in fit_settings["par_fit_settings_type"]:
     with open(f"custom_fit_settings.json") as file: fit_settings_json = json.load(file)
-    run_key = fit_settings.split("_")[1]
+    run_key = fit_settings["par_fit_settings_type"].split("_")[1]
     nRUN = int(run_key.replace("run", ""))
-    fit_settings = fit_settings_json["run1"]
-    [fit_settings.update(fit_settings_json[run_key]) for run_idx in range(2, nRUN+1)]
+    par_fit_settings = fit_settings_json["run1"]
+    [par_fit_settings.update(fit_settings_json[run_key]) for run_idx in range(2, nRUN+1)]
 
 else:
     sys.exit("ERROR: wrong fit settings indicated")
 
-fit_settings["type_analysis"] = type_analysis
-fit_settings["refit_nobkg"] = refit_nobkg
-fit_settings["fit_on_pseudodata"] = fit_on_pseudodata
-fit_settings["import_mc_samesign"] = import_mc_samesign
-fit_settings["fit_verb"] = fit_verb
-fit_settings["useMinos"] = useMinos
+fit_settings.update(par_fit_settings)
 
-if load_bkg_datasets or fit_on_pseudodata: 
-    fit_settings["bkg_categories"] = bkg_categories
-    fit_settings["import_bkg_samesign"] = import_bkg_samesign
-
+for k,v in fit_settings.items():
+    print(k, " ", v)
 
 
 # -----------------------------------------------------------------------------------------------------------
 #  RUNNING FITS
 # --------------
 
-if parallel_fits is False:
-    runFits(ws_filename, bin_dictionary(binning_pt, binning_eta), fit_settings, 
-            import_pdfs=import_pdfs, savefigs=savefigs, figpath=figpath)
+if fit_settings["parallel_fits"] is False:
+    runFits(fit_settings)
 else:
-    runParallelFits(ws_filename, bin_dictionary(binning_pt, binning_eta), fit_settings,
-                    import_pdfs=import_pdfs, savefigs=savefigs, figpath=figpath)
+    runParallelFits(fit_settings)
 
 
 # print(fit_settings)

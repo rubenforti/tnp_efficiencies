@@ -170,14 +170,15 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                                             array('d', bins_ratio), bins_pt, bins_pt))
         
     # if study_SS_bkg: bkg_categories = [cat+"_SS" if cat != "bkg_SameCharge" else cat for cat in bkg_categories]
-
+ 
 
     for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
         for flag in ["pass", "fail"]:
 
             # if bin_key != "[24.0to35.0][-0.1to0.0]": continue
-
+            
+            setlog = logscale
             if logscale=="hybrid": setlog=True if flag=="pass" else False
             
             if plot_on_data:

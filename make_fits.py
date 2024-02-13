@@ -8,6 +8,7 @@ from multiprocessing import Pool
 from itertools import repeat
 from fitter import IndepFitter, SimFitter
 from utilities.dataset_utils import import_pdf_library
+from utilities.base_library import bin_dictionary
 
 
 
@@ -59,7 +60,7 @@ def checkImportCustomPdfs(bkg_models):
 ###############################################################################
 
 
-def doSingleFit(fitter, ws, flags, savefigs, figpath=None):
+def doSingleFit(fitter, ws, flags):
     """
     """
     fitter.manageFit(ws)
@@ -68,61 +69,57 @@ def doSingleFit(fitter, ws, flags, savefigs, figpath=None):
 
     for flag in flags: res.update({flag : fitter.res_obj[flag]})
 
-    if savefigs is True and fitter.existingFit is False: 
-        fitter.saveFig(ws, figpath)
-        fitter.saveFig_prefit(figpath["prefit"], "fail")
-
+    if fitter.settings["savefigs"] is True and fitter.existingFit is False: 
+        figpath = fitter.settings["figpath"]
+        fitter.saveFig(ws)
+        for flag in ["pass", "fail"]:
+            if "prefit" in fitter.settings["bkg_model"][flag]: fitter.saveFig_prefit(flag)
 
     return fitter, res, fitter.bin_status
 
 ###############################################################################
 
 
-def runFits(ws_name, bin_dict, fit_settings, parallelize=True, import_pdfs=False,  
-            savefigs=False, figpath={"good":"figs/stuff", "check":"figs/check/stuff"}):
+def runFits(settings):
     """
     """
     path = os.path.dirname(__file__)
     ROOT.gSystem.cd(path)
 
-    checkImportCustomPdfs(fit_settings["bkg_model"])
+    checkImportCustomPdfs(settings["bkg_model"])
 
-    file_ws = ROOT.TFile(ws_name)
+    file_ws = ROOT.TFile(settings["ws_name"])
     ws = file_ws.Get("w")
 
-    if savefigs is True:
-        for path in figpath.values(): 
+    if settings["savefigs"] is True:
+        for path in settings["figpath"].values(): 
             if not os.path.exists(path): os.makedirs(path)
 
     prob_bins = []
 
-
-    for bin_key in bin_dict.keys():
+    for bin_key in bin_dictionary(settings["binning_pt"], settings["binning_eta"]).keys():
         
-        # if bin_key != "[45.0to55.0][2.1to2.2]": continue
-        #if bin_key != "[24.0to35.0][-0.2to-0.1]": continue
-
-        if fit_settings["type_analysis"] == "indep":
+        if settings["type_analysis"] == "indep":
             dict_flags = ["pass", "fail"]
-            fitter = IndepFitter(bin_key, fit_settings)            
-        elif fit_settings["type_analysis"] == "sim" or fit_settings["type_analysis"] == "sim_sf":
+            fitter = IndepFitter(bin_key, settings)            
+        elif settings["type_analysis"] in ["sim", "sim_sf"]:
             dict_flags = ["sim"]
-            fitter = SimFitter(bin_key, fit_settings)
+            fitter = SimFitter(bin_key, settings)
         else:
             print("ERROR: wrong analysis type indicated")
             sys.exit()
 
-        fitter, res, status = doSingleFit(fitter, ws, dict_flags, savefigs, figpath=figpath)
+        fitter, res, status = doSingleFit(fitter, ws, dict_flags)
 
-        if import_pdfs: fitter.importFitObjects(ws)
+        if settings["import_pdfs"]: fitter.importFitObjects(ws)
 
         if status is False: prob_bins.append(bin_key)
-        printFitStatus(fit_settings["type_analysis"], bin_key, res, status)
+        printFitStatus(settings["type_analysis"], bin_key, res, status)
         # if status is False: prob_bins.append(bin_key)
 
     print(f"NUM of problematic bins = {len(prob_bins)}")
     print(prob_bins)
-    ws.writeToFile(ws_name)
+    ws.writeToFile(settings["ws_name"])
 
 ###############################################################################
 
@@ -158,7 +155,7 @@ def runParallelFits(ws_name, bins_dict, fit_settings, import_pdfs=False,
         doSingleFit, zip(fitters, repeat(ws), repeat(dict_flags), repeat(savefigs), repeat(figpath)))
 
     print("FITS DONE")
-
+    
     for fitter_out, res_fit, status_fit in fit_outputs:
         
         if import_pdfs: fitter_out.importFitObjects(ws)
@@ -166,8 +163,10 @@ def runParallelFits(ws_name, bins_dict, fit_settings, import_pdfs=False,
         print(f"Analyzing bin {fitter_out.bin_key}")
         if status_fit is False: prob_bins.append(fitter_out.bin_key)
         printFitStatus(fit_settings["type_analysis"], fitter_out.bin_key, res_fit, status_fit, prob_bins)
+    
 
 
     print(f"NUM of problematic bins = {len(prob_bins)}")
     print(prob_bins)
     ws.writeToFile(ws_name)
+

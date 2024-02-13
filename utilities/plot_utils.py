@@ -27,15 +27,15 @@ colors = {
     "pdf_bkg_fit" : ROOT.kRed-2,
 
     "Diboson" : ROOT.kGreen,
-    "Top" : ROOT.kCyan,
+    "Top" : ROOT.kCyan+3,
     "Ztautau" : ROOT.kMagenta+1,
-    "Wjets" : ROOT.kOrange,
+    "Wjets" : ROOT.kOrange+4,
     "Zjets" : ROOT.kBlue+4,
     "Diboson_SS" : ROOT.kGreen-2,
-    "Top_SS" : ROOT.kCyan-2,
+    "Top_SS" : ROOT.kCyan-7,
     "Ztautau_SS" : ROOT.kMagenta-1,
     "Wjets_SS" : ROOT.kOrange-2,
-    "Zjets_SS" : ROOT.kBlue+2,
+    "Zjets_SS" : ROOT.kBlue-7,
     "SameCharge" : ROOT.kYellow+2,
 }
 
@@ -277,7 +277,7 @@ def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
     """
     """        
     isHistPlot = True if label=="bkg_total" else False
-    label = deepcopy(label).replace("_SS", "")
+    label = deepcopy(label)#.replace("_SS", "")
     minNBins = 20 if isHistPlot else 15
     
     for nbins_total_bkg in list_nbins_plot:
@@ -469,7 +469,7 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
         textbox.AddText(f"  {bkg_key_print} = {bkg_obj_new.sumEntries():.2f} #pm {bkg_error:.2f}")
         legend.AddEntry(bkg_key_print, bkg_key_print, "l")
         legend_obj = legend.GetListOfPrimitives().Last()
-        legend_obj.SetLineColor(colors[bkg_cat.replace("_SS", "")])
+        legend_obj.SetLineColor(colors[bkg_cat])
         legend_obj.SetLineWidth(3)
 
     # Plotting other objects
