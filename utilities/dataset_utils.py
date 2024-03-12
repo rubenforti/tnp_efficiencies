@@ -15,7 +15,7 @@ bkg_sum_selector = {
     "bkg_TTFullyleptonic" : 1,
     "bkg_TTSemileptonic" : 1,
     "bkg_Ztautau" : 1,
-    "bkg_SameCharge" : 0,
+    "bkg_SameCharge" : 0.,
     "bkg_WplusJets" : 1,
     "bkg_WminusJets" : 1,
     "bkg_Zjets" : 1,
@@ -82,9 +82,10 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
             import_dictionary[f"bkg_{flag_set}_SS"]["lumi_scale"] = import_dictionary[f"bkg_{flag_set}"]["lumi_scale"]
 
     return import_dictionary
-                
-###############################################################################
 '''
+
+###############################################################################
+
 
 def gen_import_dictionary(base_folder, type_eff, dset_names,
                           ch_set = [""],
@@ -97,7 +98,8 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
     dictionaries that contain the filepath(s) and the luminosity scale factor
     """
     import_dictionary = {}
-
+    
+    print(dset_names)
     for dset_name in dset_names:
 
         import_dictionary[dset_name] = {}
@@ -177,7 +179,7 @@ def import_pdf_library(*functions):
 
 
 def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
-                global_scale=-1.0, fail_template_with_all_SA=True):
+                global_scale=-1.0, fail_template_with_all_SA=False):
     """
     Returns a RooDataHists of the variable TP_mass, in a single pt-eta bin.
     For MC datasets, the "global_scale" parameter is used to scale the
@@ -205,6 +207,8 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
     tmp_histos, tmp_roohistos = [], []
 
     if bool(fail_template_with_all_SA*(type_set=="mc")*(flag=="fail")):
+        # Doubled the files, so to add the failing probes (first run) to the "passing_alt" ones (second run)
+        print("Doubling the files")
         files = files + files
     else:
         fail_template_with_all_SA = False
@@ -213,17 +217,25 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
 
     idx_file = 0
 
+    histo_names = []
+
     for file in files:
 
         histo_name = f"{flag}_mu_{type_suffix}"
         
-        if fail_template_with_all_SA and \
-            ( (len(files)==2 and idx_file==1) or (len(files)==4 and idx_file==2) or (len(files)==4 and idx_file==3) ):
-                histo_name = f"pass_mu_{type_suffix}_alt"
+        if fail_template_with_all_SA and ( 
+           (len(files)==2 and idx_file==1) or (len(files)==4 and idx_file==2) or (len(files)==4 and idx_file==3) ):
+            print("Using the 'pass_alt' dataset")
+            # selecting the "pass_alt" dataset when the fail template with all
+            # SA is built; the selection above is done to take into account the
+            # possibility of having 4 or 2 files in input (probe charge-divided
+            # or not) and to select the "pass_alt" dataset after the "fail" one
+            histo_name = f"pass_mu_{type_suffix}_alt"
         
+        histo_names.append(histo_name)
         histo3d = file.Get(histo_name)
 
-        # In the projection, option "e" is specified to calculate the bin content errors in the new histogram for 
+        # In the projection, option "e" is specified tofail_template_with_all_SA calculate the bin content errors in the new histogram for 
         # generic selection of bin_pt and bin_eta. Without it, all works as expected ONLY IF the projection is done 
         # on a single bin of pt-eta
         th1_histo = histo3d.ProjectionX(f"Histo_{type_set}_{flag}_{idx_file}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")
@@ -245,7 +257,6 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
         roohisto.add(tmp_roohistos[-1])
 
         idx_file += 1
-
 
     print("Beginning consistency check...")
     th1_integral = 0
@@ -393,7 +404,8 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
         x_binning = ROOT.RooUniformBinning(bins_mass[0], bins_mass[-1], len(bins_mass)-1, "x_binning")
         ws.Import(x)
 
-    for dataset_obj in import_datasets.values():
+    for dataset_key, dataset_obj in import_datasets.items():
+        print(dataset_key, dataset_obj["filenames"])
         dataset_obj["filenames"] = [ROOT.TFile(v, "READ") for v in dataset_obj["filenames"]]
    
     merging_dict = {k : v for k, v in import_datasets.items() if bkg_sum_selector[k.replace("_SS","")]!=0}

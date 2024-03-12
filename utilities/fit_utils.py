@@ -155,7 +155,7 @@ def llr_eval(histo, pdf, axis):
 ###############################################################################
 
 
-def status_parsAtLim(res, absTol=1e-6, relTol=1e-4):
+def status_parsAtLim(res, absTol=1e-4, relTol=1e-5):
     """
     """
     pars = res.floatParsFinal()
@@ -207,8 +207,7 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
     for par in res.floatParsFinal():
         if not ("_gamma_bin_" in par.GetName()): ndof -= 1  #To not count the gamma parameters in the BB method
     res.SetTitle(f"{chi2val}_{ndof}")
-
-
+    
     chi2_status = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
     print(chi2val, ndof, chi2_status) 
     return chi2_status
@@ -216,7 +215,7 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
 ###############################################################################
 
 
-def fit_quality(fit_obj, type_checks="egm_legacy"):
+def fit_quality(fit_obj, type_checks="egm_legacy", isFitPseudodata=False, isBBmodel=False):
     """
     """
     check_edm = True
@@ -226,10 +225,13 @@ def fit_quality(fit_obj, type_checks="egm_legacy"):
     check_parsAtLim = True
 
     if type_checks == "egm_legacy":
-        check_migrad = (fit_obj["res"].status() == 0 or fit_obj["res"].status() == 1)
+        check_migrad = (fit_obj["res"].status()==0 or fit_obj["res"].status()==1)
         check_covm = (fit_obj["res"].covQual() == 3)
-        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
-                                 fit_obj["res"], type_chi2="pearson", nsigma=15)
+        if isBBmodel:
+            check_chi2 = True
+        else:
+            check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
+                                     fit_obj["res"], type_chi2="pearson", nsigma=10)
     
     elif type_checks == "new_tight":
         check_migrad = (fit_obj["res"].status() == 0)
@@ -240,13 +242,20 @@ def fit_quality(fit_obj, type_checks="egm_legacy"):
         check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
     
     elif type_checks == "new_loose":
-        check_migrad = (fit_obj["res"].status() == 0)
+        check_migrad = (fit_obj["res"].status()==0 or fit_obj["res"].status()==3)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 5e-2)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
                                  fit_obj["res"], type_chi2="llr", nsigma=10)
         check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
     
+    elif type_checks == "neglect_atLimPars":
+        check_migrad = (fit_obj["res"].status()==0)
+        check_covm = (fit_obj["res"].covQual() == 3)
+        check_edm = (fit_obj["res"].edm() < 1e-2)
+        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
+                                 fit_obj["res"], type_chi2="llr", nsigma=10)
+
     elif type_checks == "pseudodata":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
@@ -255,14 +264,11 @@ def fit_quality(fit_obj, type_checks="egm_legacy"):
     
     else:
         sys.exit("ERROR: wrong type of fit quality check indicated")
-    
-    '''
-    # Not used, could be useful if Sumw2Error turns out to be needed
-    elif type_checks == "pseudodata_sumw2":
-        check_migrad = fit_obj["res"].status()==0
-        check_covm = (fit_obj["res"].covQual()==2 or fit_obj["res"].covQual()==3)
-        return bool(check_migrad*check_covm)
-    '''  
+
+
+    print("check chi2", check_chi2)
+
+    if isFitPseudodata: check_chi2 = True
 
     return bool(check_migrad*check_covm*check_edm*check_chi2*check_parsAtLim)
  

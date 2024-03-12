@@ -48,7 +48,7 @@ def checkImportCustomPdfs(bkg_models):
     """
     dict_classes = {
         "cmsshape" : "RooCMSShape",
-        "cmsshape_prefitSS" : "RooCMSShape",
+        "cmsshape_prefitBkg" : "RooCMSShape",
         "cmsshape_new" : "RooCMSShape_mod",
         "CB" : "my_double_CB"
     }

@@ -7,7 +7,7 @@ from utilities.base_library import binning, bin_dictionary, eval_efficiency, sum
 from utilities.results_utils import results_manager, init_results_histos, fill_res_histograms
 from utilities.dataset_utils import import_pdf_library
 
-NBINS = 50
+NBINS = 51
 
 eff_min = 0.895
 rel_err_eff_min = 1e-4
@@ -18,8 +18,8 @@ sf_max = 1.03
 
 delta_min = -5e-2
 delta_error_min = -5e-3
-pull_min = -10
-rm1_min = -2e-2
+pull_min = -5
+rm1_min = -1e-2
 ratio_error_min = -1
 
 res_var_dict = {
@@ -42,6 +42,9 @@ resCmp_var_dict = {
         "array" : array("d", [round(delta_error_min + (-2*delta_error_min/NBINS)*i, 6) for i in range(NBINS+1)])},
     "pull" : {
         "title" : "Pull", 
+        "array" : array("d", [round(pull_min + (-2*pull_min/NBINS)*i, 6) for i in range(NBINS+1)])},
+    "pull_ref" : {
+        "title" : "Pull (referred to bmark stat. error)", 
         "array" : array("d", [round(pull_min + (-2*pull_min/NBINS)*i, 6) for i in range(NBINS+1)])},
     "rm1" : {
         "title" : "Relative bias", 
@@ -99,7 +102,7 @@ def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
 
 
 def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binning_eta, res_list,
-                       eval_nobkg_effect=False):
+                       eval_nobkg_effect=False, postfix_name=""):
     """
     Compare the efficiencies and their error between two results files. The first file is 
     considered as benchmark
@@ -109,9 +112,7 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
         file_bmark = ROOT.TFile(ws_txt_bmark_filename, "READ")
         ws_bmark = file_bmark.Get("w")
         print(type(ws_bmark))
-        for t_an in ["indep", "sim"]: 
-            if t_an in ws_txt_bmark_filename:
-                res_benchmark = results_manager(t_an, binning_pt, binning_eta, import_ws=ws_bmark)
+        res_benchmark = results_manager("indep", binning_pt, binning_eta, import_ws=ws_bmark)
     else:
         with open(ws_txt_bmark_filename, "r") as file_bmark:
             row_list = file_bmark.readlines()
@@ -121,9 +122,8 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
     file_new = ROOT.TFile(ws_new_filename, "READ")
     ws_new = file_new.Get("w")
 
-    for t_an in ["indep", "sim"]:
-        if t_an in ws_new_filename:
-            res_new = results_manager(t_an, binning_pt, binning_eta, import_ws=ws_new)
+
+    res_new = results_manager("indep", binning_pt, binning_eta, import_ws=ws_new)
 
     bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
     bin_dict = bin_dictionary(binning_pt, binning_eta)
@@ -149,6 +149,8 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
     [histos.update(init_results_histos(res_key, resCmp_var_dict[res_key]["title"], 
                                        resCmp_var_dict[res_key]["array"], bins_pt, bins_eta)) 
      for res_key in res_list]
+    
+    print(type(res_benchmark), type(res_new))
 
     fill_res_histograms(res_benchmark, res_new, histos, bin_dict) 
 
@@ -166,7 +168,7 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
 
     add_flag = "cmp" if ".root" in ws_txt_bmark_filename else "cmpBmark"
 
-    add_flag += "-prefitSS-fail"      
+    if postfix_name!="": add_flag += f"-{postfix_name}"
 
     if eval_nobkg_effect: add_flag += "_noBkgFits"
 
@@ -175,11 +177,12 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
     [histo.Write() for histo in histos.values()]
     file_out.Close()
 
+    print(file_out.GetName())
 
 
 ###############################################################################
 
-def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list):
+def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list, isolate_effect=""):
     """
     """
 
@@ -202,16 +205,23 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list):
         
         eff, d_eff = results.getEff(bin_key)
 
-        '''
-        # Select this to isolate the effect of the fin on failing probes 
-        npass = ws.data(f"Minv_mc_pass_{bin_key}").sumEntries()
-        d_npass = sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}"))
+        if isolate_effect=="pass":
+            nfail = ws.data(f"Minv_mc_fail_{bin_key}").sumEntries()
+            d_nfail = sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}"))   
+            pars_fail = ws.obj(f"results_pass_{bin_key}").floatParsFinal()
+            npass, d_npass = pars_fail.find(f"nsig_pass_{bin_key}").getVal(), pars_fail.find(f"nsig_pass_{bin_key}").getError()
+            eff, d_eff = eval_efficiency(npass, nfail, d_npass, d_nfail)
 
-        pars_fail = ws.obj(f"results_fail_{bin_key}").floatParsFinal()
-        nfail, d_nfail = pars_fail.find(f"nsig_fail_{bin_key}").getVal(), pars_fail.find(f"nsig_fail_{bin_key}").getError()
+        elif isolate_effect=="fail":
+            npass = ws.data(f"Minv_mc_pass_{bin_key}").sumEntries()
+            d_npass = sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}"))
 
-        eff, d_eff = eval_efficiency(npass, nfail, d_npass, d_nfail)
-        '''
+            pars_fail = ws.obj(f"results_fail_{bin_key}").floatParsFinal()
+            nfail, d_nfail = pars_fail.find(f"nsig_fail_{bin_key}").getVal(), pars_fail.find(f"nsig_fail_{bin_key}").getError()
+
+            eff, d_eff = eval_efficiency(npass, nfail, d_npass, d_nfail)
+        else:
+            pass
 
         eff_mc, d_eff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
                                            ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
@@ -225,14 +235,17 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list):
             histos["delta_error"].Fill(d_eff-d_eff_mc)
             histos["delta_error_2d"].SetBinContent(bin_pt, bin_eta, d_eff-d_eff_mc)
         if "pull" in histos.keys():
-            histos["pull"].Fill((eff_mc-eff)/d_eff)
-            histos["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff_mc-eff)/d_eff)
+            histos["pull"].Fill((eff-eff_mc)/d_eff)
+            histos["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff-eff_mc)/d_eff)
         if "rm1" in histos.keys():
             histos["rm1"].Fill((eff/eff_mc)-1)
             histos["rm1_2d"].SetBinContent(bin_pt, bin_eta, (eff/eff_mc)-1)
         if "ratio_error" in histos.keys():
             histos["ratio_error"].Fill((d_eff/d_eff_mc)-1)
             histos["ratio_error_2d"].SetBinContent(bin_pt, bin_eta, (d_eff/d_eff_mc)-1)
+
+        print(bin_key, (eff-eff_mc)/d_eff)
+
 
     resfile = ROOT.TFile(ws_filename.replace("ws", f"res_cmpMC"), "RECREATE")
     resfile.cd()
@@ -304,22 +317,31 @@ if __name__ == '__main__':
 
     base_folder = "/scratch/rforti/tnp_efficiencies_results/tracking"
 
-    benchmark_res = base_folder+"/legacy_fit/old_results.txt"
+    # benchmark_res = base_folder+"/legacy_fit/ws_tracking.root"
+    # benchmark_res = base_folder+"/legacy_fit_onlyFailSA/ws_tracking.root"
+    # ws_filename = base_folder+"/prefitBkg_MC/ws_tracking_prefitBkg.root"
+    
+    # ws_filename = base_folder+"/pseudodata_prefitBkg_MC_legacySettings/ws_tracking_pseudodata.root"
 
-    ws_filename =  base_folder+"/test_bias_prefitSameCharge/ws_indep_pseudodata.root"
+    # benchmark_res = base_folder+"/prefitBkg_MC/ws_tracking_prefitBkg.root"
+    # ws_filename = base_folder + "/BBlight/ws_tracking_BBlight.root"
 
-    # ws_filename =  base_folder+"/bb_samecharge_fail/ws_tracking_indep_barlowbeeston.root"
+    #ws_filename =  base_folder+"/test_bias_prefitSameCharge/ws_indep_pseudodata.root"
+    
+
+    ws_filename =  base_folder+"/BBlight_legacySettings/ws_tracking_BBlight.root"
+
+    benchmark_res = base_folder+"/benchmark/ws_tracking.root"
 
 
 
 
-
-    # save_eff_results(ws_filename, "indep", "pt_tracking", "eta")
-    #compare_efficiency(benchmark_res, ws_filename, "pt_tracking", "eta", resCmp_list)
+    # save_eff_results(benchmark_res, "indep", "pt_tracking", "eta")
+    compare_efficiency(benchmark_res, ws_filename, "pt_tracking", "eta", resCmp_list, postfix_name="benchmark")
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 
-    compare_eff_pseudodata(ws_filename, "pt_tracking", "eta", resCmp_list)
+    # compare_eff_pseudodata(ws_filename, "pt_tracking", "eta", resCmp_list, isolate_effect="")
 
     
 

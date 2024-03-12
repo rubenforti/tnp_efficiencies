@@ -1,6 +1,6 @@
 {
     "tracking" : {
-        "fit_checks" : "benchmark",
+        "fit_checks" : "egm_legacy",
         "type_refit" : "benchmark",
         "Nbins" : {
             "pass" : 2000,
@@ -64,7 +64,7 @@
 
     "idip_trig_iso" : {
 
-        "fit_checks" : "benchmark",
+        "fit_checks" : "egm_legacy",
         "type_refit" : "benchmark",
         "Nbins" : {
             "pass" : 2000,

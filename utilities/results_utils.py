@@ -143,8 +143,8 @@ class results_manager:
             print("Bin key not present in the results object dictionary")
             sys.exit()
 
-        return eff
-    
+        return eff         
+            
     def getPars(self, flag, bin_key=''):
         """
         """
@@ -267,8 +267,11 @@ def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict):
             hist_dict["delta_error"].Fill(deff_test-deff_bmark)
             hist_dict["delta_error_2d"].SetBinContent(bin_pt, bin_eta, deff_test-deff_bmark)
         if "pull" in hist_dict.keys():
-            hist_dict["pull"].Fill((eff_test-eff_bmark)/deff_bmark)
-            hist_dict["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff_test-eff_bmark)/deff_bmark)
+            hist_dict["pull"].Fill((eff_test-eff_bmark)/(deff_bmark**2 + deff_test**2)**0.5)
+            hist_dict["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff_test-eff_bmark)/((deff_bmark**2 + deff_test**2)**0.5))
+        if "pull_ref" in hist_dict.keys():
+            hist_dict["pull_ref"].Fill((eff_test-eff_bmark)/deff_bmark)
+            hist_dict["pull_ref_2d"].SetBinContent(bin_pt, bin_eta, (eff_test-eff_bmark)/deff_bmark)
         if "rm1" in hist_dict.keys():
             hist_dict["rm1"].Fill((eff_test/eff_bmark)-1)
             hist_dict["rm1_2d"].SetBinContent(bin_pt, bin_eta, (eff_test/eff_bmark)-1)
