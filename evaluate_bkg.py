@@ -22,25 +22,32 @@ gen_res_folder = "/scratch/rforti/tnp_efficiencies_results"
 
 type_eff = "tracking"
 type_analysis = "indep"
-bkg_categories = ["bkg_WW", "bkg_WZ", "bkg_ZZ", 
+bkg_categories = ["bkg_SameCharge",
+                  "bkg_WW", "bkg_WZ", "bkg_ZZ", 
                   "bkg_TTSemileptonic", "bkg_TTFullyleptonic", "bkg_Ztautau",
-                  "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets",                 
-                  "bkg_SameCharge"]
+                  "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets"
+                  ]
 
 
-binning_pt = "pt_tracking"
-binning_eta = "eta"
+binning_pt = "pt_singlebin"
+binning_eta = "eta_singlebin"
 binning_mass = "mass_50_130"
 
-study_SS_bkg = False
+study_SS_bkg = False 
+
 
 charge_flag = "OS" if not study_SS_bkg else "SS"
 
-folder = gen_res_folder+f"/tracking/bkg_figs/{charge_flag}"
+folder = gen_res_folder+f"/tracking/bkg_figs"
 
-ws_filename = folder+f"/ws_tracking_bkg_{charge_flag}.root"
+ws_filename = folder+f"/ws_tracking_bkg_{charge_flag}_singlebin.root"
+'''
 
-generate_datasets = True       
+folder = "zjets_tests/prova_bkg_distr/OS"
+ws_filename = "zjets_tests/ws_prova.root"
+'''
+
+generate_datasets = False       
 
 figpath = folder
 filepath = folder
@@ -90,9 +97,10 @@ if generate_datasets is True:
         import_categories += ["mc"]
     
     import_dictionary = gen_import_dictionary(base_folder, type_eff, import_categories,
-                                              ch_set=["plus", "minus"], scale_MC=True,
-                                              do_OS_tracking=(not study_SS_bkg),
+                                              ch_set=["plus", "minus"],
+                                              do_OS_tracking=True,
                                               add_SS_mc=study_SS_bkg)
+    
     '''
     for k, v in import_dictionary.items():
         print(k, " ", v)
@@ -116,7 +124,7 @@ if negweights_eval:
 if minv_plots["flag"]: 
     print("Plotting minv distributions")
     bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, binning_eta,
-                          study_SS_bkg=study_SS_bkg,
+                          is_SS_bkg=study_SS_bkg,
                           plot_on_data=minv_plots["plot_on_data"], 
                           plot_fit_bkgpdf=minv_plots["plot_fit_bkgpdf"],
                           plot_on_signal=minv_plots["plot_on_sig"], 

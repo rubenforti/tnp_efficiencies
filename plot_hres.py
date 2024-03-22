@@ -14,13 +14,14 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 
 
 folder = "/scratch/rforti/tnp_efficiencies_results/tracking"
-analysis = "BBlight_legacySettings/ws_tracking_BBlight.root"
+analysis = "pseudodata/ws_tracking_pseudodata.root"
+cmp_flag = "legacy-onlyFailSA"
 
 cmpBmark = False
 
 bmark_flag = "Bmark" if cmpBmark else ""
 
-build_results_from_txt = True
+build_results_from_txt = False
 
 
 if build_results_from_txt:
@@ -81,9 +82,8 @@ if build_results_from_txt:
     print("Rel. error:", f"Mean = {statistics.mean(rel_error_list)}", " ", f"Std. = {statistics.pvariance(rel_error_list)**0.5}")
 
 else:
-    # file_hres = ROOT.TFile(f"{folder}/res_{analysis}.root", "READ")
-    # file_hres_cmp = ROOT.TFile(f"{folder}/res_cmp{bmark_flag}_{analysis}.root", "READ")
-    file_hres_cmp = ROOT.TFile(f"{folder}/{analysis.replace('ws', 'res_cmp-benchmark')}", "READ")
+    # file_hres_cmp = ROOT.TFile(f"{folder}/{analysis.replace('ws', f'res_cmp-{cmp_flag}')}", "READ")
+    file_hres_cmp = ROOT.TFile(f"{folder}/{analysis.replace('ws', f'res_cmpMC')}", "READ")
 
     hist_dict = {}
     # [histos.update({key.GetName() : file_hres.Get(key.GetName())}) for key in file_hres.GetListOfKeys()]
@@ -114,7 +114,7 @@ for hist_key, hist in hist_dict.items():
         else:
             ROOT.gStyle.SetStatX(0.9)
         ROOT.gStyle.SetStatY(0.95)
-        x_dim = 1200
+        x_dim = 1600
         y_dim = 1200
         c = ROOT.TCanvas(hist_key, hist_key, x_dim, y_dim)
         c.cd()
@@ -153,10 +153,11 @@ for hist_key, hist in hist_dict.items():
         hist.GetXaxis().SetTitle(x_title)
         hist.GetXaxis().SetTitleOffset(1.2)
         hist.GetXaxis().SetTitleSize(0.04)
-        hist.GetXaxis().SetLabelSize(0.02)
+        hist.GetXaxis().SetLabelSize(0.025)
         y_axis.SetTitle("Events")
         y_axis.SetTitleOffset(1.25)
         y_axis.SetTitleSize(0.04)
+        y_axis.SetLabelSize(0.025)
         #pad_plot.SetLogy()
     
     

@@ -129,8 +129,8 @@ def make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta,
 
 ###############################################################################
 
-def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, binning_eta, 
-                          study_SS_bkg=False,                            
+def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, binning_eta,
+                          is_SS_bkg=False,                          
                           plot_on_data=False, plot_fit_bkgpdf=False,
                           plot_on_signal=False, compare_bkgfrac=False,
                           logscale=True, figpath='figs/bkg_and_sig_mc'):
@@ -158,6 +158,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
     bins_sigma = [round(-10.0 + i, 2) for i in range(51)]
     bins_pull = [round(-2 + 0.08*i, 2) for i in range(51)]
 
+    '''
     histos = {}
 
     if plot_on_data and plot_fit_bkgpdf:
@@ -167,11 +168,9 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
         histos.update(init_pass_fail_histos("h_bkgfrac_pull", "Bkg fraction mc vs fit pull", 
                                             array('d', bins_pull), bins_pt, bins_pt))
         histos.update(init_pass_fail_histos("h_bkgfrac_ratio", "Bkg fraction mc/fit ratio", 
-                                            array('d', bins_ratio), bins_pt, bins_pt))
-        
-    # if study_SS_bkg: bkg_categories = [cat+"_SS" if cat != "bkg_SameCharge" else cat for cat in bkg_categories]
- 
+                                            array('d', bins_ratio), bins_pt, bins_pt)) 
 
+    '''
     for bin_key, [gl_idx, bin_pt, bin_eta] in bin_dict.items():
 
         for flag in ["pass", "fail"]:
@@ -184,8 +183,6 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
             if plot_on_data:
                 
                 import_categories = ["data"] + bkg_categories
-
-                if study_SS_bkg: import_categories += ["mc_SS"]
 
                 datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
 
@@ -207,13 +204,16 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
             if plot_on_signal:
 
-                import_categories = ["mc"] + bkg_categories
-
-                if study_SS_bkg: import_categories += ["mc_SS"]
+                add_cat = "mc" if not is_SS_bkg else "mc_SS"
+                
+                import_categories = [add_cat] + bkg_categories
         
                 datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
 
-                plot_bkg(datasets, flag, bin_key, logscale=setlog, figpath=f"{figpath}/minv_plots_w_sig")
+                ch_sel = "SS" if is_SS_bkg else "OS"
+
+                # plot_bkg(datasets, flag, bin_key, logscale=setlog, figpath=f"{figpath}/minv_plots_w_sig")
+                plot_bkg(datasets, flag, bin_key, charge_separation=ch_sel, logscale=setlog, figpath=figpath)
                 
                 '''
                 ## NOT USED STUFF
@@ -258,9 +258,11 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
 
             if plot_on_data is False and plot_on_signal is False:
                 datasets = make_bkg_dictionary(ws, bkg_categories, flag, bin_key, bin_pt, bin_eta)
-                plot_bkg(datasets, flag, bin_key, logscale=setlog, figpath=f"{figpath}/minv_plots")
-            
-            
+                # plot_bkg(datasets, flag, bin_key, logscale=setlog, figpath=f"{figpath}/minv_plots")
+                plot_bkg(datasets, flag, bin_key, logscale=setlog, group_backgrounds=True, figpath=figpath)
+
+    file.Close()
+    '''
     saveHists = False
     if plot_on_data and plot_fit_bkgpdf:
         filename = f"{figpath}/nbkg_mc_vs_datafit.root"
@@ -274,6 +276,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
         file.cd()
         [histo.Write() for histo in histos.values()]
         file.Close()
+    '''
 
 
 

@@ -9,9 +9,9 @@ from utilities.base_library import binning, bin_dictionary, eval_efficiency, sum
 
 base_folder = "/scratch/rforti/tnp_efficiencies_results/tracking"
 
-ws_filename = base_folder+"/pseudodata_BBlight_legacySettings_new/ws_tracking_pseudodata.root"
+ws_filename = base_folder+"/legacy_fit/ws_tracking.root"
 
-benchmark_filename = base_folder+"/legacy_fit_onlyFailSA_allMC/ws_tracking.root"
+# benchmark_filename = base_folder+"/legacy_fit_onlyFailSA_allMC/ws_tracking.root"
 
 import_pdf_library("RooCMSShape")
 
@@ -19,17 +19,18 @@ file = ROOT.TFile(ws_filename, "READ")
 ws = file.Get("w")
 results = results_manager("indep", "pt_tracking", "eta", import_ws=ws)
 
-'''
+
+benchmark_filename = base_folder+"/allEfficiencies.txt"
 with open(benchmark_filename, "r") as file_bmark:
     row_list = file_bmark.readlines()
     print(type(row_list))
-    res_benchmark = results_manager("indep", "pt", "eta", import_txt=row_list)
-'''
+    res_benchmark = results_manager("indep", "pt_tracking", "eta", import_txt=row_list)
 
+'''
 file_bmark = ROOT.TFile(benchmark_filename, "READ")
 ws_bmark = file_bmark.Get("w")
 res_benchmark = results_manager("indep", "pt_tracking", "eta", import_ws=ws_bmark)
-
+'''
 
 bin_dict = bin_dictionary("pt_tracking", "eta")
 
@@ -56,7 +57,7 @@ for bin_key in bin_dict.keys():
     eff_benchmark, d_eff_benchmark = res_benchmark.getEff(bin_key)
 
     #if abs((eff - eff_benchmark)/d_eff_benchmark) > 2 : continue
-    '''
+    
     stats["delta_eff"].append(eff - eff_benchmark)
     stats["delta_err_eff"].append(d_eff - d_eff_benchmark)
     stats["pull"].append((eff - eff_benchmark)/d_eff_benchmark)
@@ -69,7 +70,7 @@ for bin_key in bin_dict.keys():
                                        ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
                                        sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
                                        sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
-    
+
 
     stats["delta_eff"].append(eff - eff_mc)
     stats["delta_err_eff"].append(d_eff - eff_mc)
@@ -78,7 +79,7 @@ for bin_key in bin_dict.keys():
     stats["ratio_error"].append((d_eff/d_eff_mc) - 1)
 
     # print(bin_key, (eff - eff_mc)/d_eff)
-    
+    '''
 
 
 

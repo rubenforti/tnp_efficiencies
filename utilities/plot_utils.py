@@ -10,6 +10,7 @@ from utilities.base_library import  binning, sumw2_error
 from utilities.CMS_lumi import CMS_lumi
 
 
+
 colors = { 
     "bkg_WW" : ROOT.kGreen-1,
     "bkg_WZ" : ROOT.kGreen-3,
@@ -21,9 +22,9 @@ colors = {
     "bkg_WminusJets" : ROOT.kOrange-3,
     "bkg_SameCharge" : ROOT.kYellow+2,
     "bkg_Zjets" : ROOT.kBlue+4,
-    "bkg_total" : ROOT.kRed,
-    "mc" : ROOT.kBlue,
-    "mc_SS" : ROOT.kBlue-2,
+    "bkg_total" :  ROOT.kRed, #ROOT.kBlack, 
+    "mc" : ROOT.kBlue, #ROOT.kRed,
+    "mc_SS" : ROOT.kBlue-2, #ROOT.kOrange+4, 
     "pdf_bkg_fit" : ROOT.kRed-2,
 
     "Diboson" : ROOT.kGreen,
@@ -31,15 +32,18 @@ colors = {
     "Ztautau" : ROOT.kMagenta+1,
     "Wjets" : ROOT.kOrange+4,
     "Zjets" : ROOT.kBlue+4,
-    "Diboson_SS" : ROOT.kGreen-2,
-    "Top_SS" : ROOT.kCyan-7,
-    "Ztautau_SS" : ROOT.kMagenta-1,
-    "Wjets_SS" : ROOT.kOrange-2,
-    "Zjets_SS" : ROOT.kBlue-7,
+    "Diboson_SS" : ROOT.kGreen,
+    "Top_SS" : ROOT.kCyan+3,
+    "Ztautau_SS" : ROOT.kMagenta+1,
+    "Wjets_SS" : ROOT.kOrange+4,
+    "Zjets_SS" : ROOT.kBlue+4,
     "SameCharge" : ROOT.kYellow+2,
 }
 
+
 bkg_grouping = {
+    "SameCharge" : ["bkg_SameCharge"],
+
     "Diboson" : ["bkg_WW", "bkg_WZ", "bkg_ZZ"],
     "Top" : ["bkg_TTSemileptonic", "bkg_TTFullyleptonic"],
     "Ztautau" : ["bkg_Ztautau"],
@@ -52,7 +56,7 @@ bkg_grouping = {
     "Wjets_SS" : ["bkg_WplusJets_SS", "bkg_WminusJets_SS"],
     "Zjets_SS" : ["bkg_Zjets_SS"],
 
-    "SameCharge" : ["bkg_SameCharge"]
+    
 }
 
 def style_settings():
@@ -275,8 +279,8 @@ def plot_fitted_pass_fail(type_analysis, plot_objects, bin_key, figpath=""):
 
 def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
     """
-    """        
-    isHistPlot = True if label=="bkg_total" else False
+    """
+    isHistPlot = True if "SameCharge" in label else False
     label = deepcopy(label)#.replace("_SS", "")
     minNBins = 20 if isHistPlot else 15
     
@@ -303,7 +307,7 @@ def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
         bkg_obj_plot = tmp_histo
         plot_commands.Add(ROOT.RooFit.Binning(f"plot_binning_{label}"))
         plot_commands.Add(ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2))
-        plot_commands.Add(ROOT.RooFit.MarkerColor(colors[label]))
+        plot_commands.Add(ROOT.RooFit.MarkerColor(colors[label.replace("_SS", "")]))
     else:
         bkg_obj_plot = ROOT.RooHistPdf(f"{label}_pdf", f"{label}_pdf", ROOT.RooArgSet(axis), tmp_histo)
         plot_commands.Add(ROOT.RooFit.LineColor(colors[label]))
@@ -311,15 +315,16 @@ def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
         plot_commands.Add(ROOT.RooFit.Normalization(tmp_histo.sumEntries(), ROOT.RooAbsReal.NumEvent))
 
     bkg_obj_plot.plotOn(frame, plot_commands)
-    # plot_frame.Draw("same")
 
+    print(f"{label} plotted with {nbins_total_bkg} bins")
+    # plot_frame.Draw("same")
 
 ###############################################################################
 
 
-
-
-def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=True, figpath=''):
+def plot_bkg(plot_dictionary, flag, bin_key,
+             charge_separation="",
+             group_backgrounds=True, logscale=True, figpath=''):
     """
     Function that creates and saves the plot containing the mass distributions 
     of the various bkg processes and the total bkg; a reference histogram 
@@ -359,7 +364,14 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
     titlebox.SetFillColor(0)
     # titlebox.SetTextFont(42)
     titlebox.SetTextSize(0.35)
-    titlebox.AddText(f"Bin {bin_key} - {flag}ing probes")
+
+    title_str = f"Background {flag}ing probes"
+    if charge_separation != "": 
+        title_str += f" {charge_separation}"
+    if bin_key != "[24.0to65.0][-2.4to2.4]": 
+        title_str += f" - bin {bin_key}"
+
+    titlebox.AddText(title_str)
     titlebox.Draw()
     c.Update()
 
@@ -416,14 +428,14 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
     plot_bkg_object(frame, axis, [total_bkg], "bkg_total", list_nbins_plot)
     plotted_histos.append(total_bkg)
     pad_info.cd()
-    legend.AddEntry("Total bkg", "Total bkg", "lp")
+
+    legend.AddEntry(f"Total bkg {charge_separation}", f"Total bkg {charge_separation}", "l")
     legend_obj = legend.GetListOfPrimitives().Last()
-    legend_obj.SetMarkerStyle(ROOT.kFullCircle)
-    legend_obj.SetMarkerColor(colors["bkg_total"])
-    legend_obj.SetMarkerSize(2)
     legend_obj.SetLineColor(colors["bkg_total"])
-    legend_obj.SetLineWidth(2)
-    textbox.AddText(f"Nbkg total (from MC or SS region): {total_bkg.sumEntries():.0f} #pm {sumw2_error(total_bkg):.0f}")
+    legend_obj.SetLineWidth(3)
+
+    totbkg_label = "Nbkg total from MC" if charge_separation == "" else f"Nbkg {charge_separation} total from MC"
+    textbox.AddText(f"{totbkg_label}: {total_bkg.sumEntries():.0f} #pm {sumw2_error(total_bkg):.0f}")
 
 
     # Plotting the single bkg processes
@@ -445,8 +457,10 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
 
     for bkg_cat, bkg_obj in bkg_plot_it_dict.items():
 
+        print (bkg_cat, bkg_obj)
+
         if bkg_cat == "bkg_total": continue
-        pad_plot.cd()
+    
         bkg_key_print = deepcopy(bkg_cat).replace("bkg_", "")
 
         nEntries = 0
@@ -460,6 +474,19 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
         
         if nEntries < 0: continue
 
+        
+        if bkg_cat != "SameCharge":
+            if (bkg_cat == list(bkg_plot_it_dict.keys())[-1]) or (bkg_cat=="Zjets"): continue
+            #if bkg_cat == list(bkg_plot_it_dict.keys())[-2]: continue
+            textbox.AddText(f"\n")
+            legend.AddEntry(bkg_cat, " ", "l")
+            legend_obj = legend.GetListOfPrimitives().Last()
+            legend_obj.SetLineColor(ROOT.kWhite)
+            legend_obj.SetLineWidth(3)
+            continue
+        
+        
+        pad_plot.cd()
         plot_bkg_object(frame, axis, hist_plotting, bkg_cat, list_nbins_plot)
         bkg_obj_new = hist_plotting[0]
         for hist in hist_plotting[1:]: bkg_obj_new.add(hist)
@@ -467,10 +494,15 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
         pad_info.cd()
         bkg_error = sumw2_error(bkg_obj_new)
         textbox.AddText(f"  {bkg_key_print} = {bkg_obj_new.sumEntries():.2f} #pm {bkg_error:.2f}")
-        legend.AddEntry(bkg_key_print, bkg_key_print, "l")
+        leg_marker_opt = "l" if "SameCharge" not in bkg_cat else "lp"
+        legend.AddEntry(bkg_key_print, bkg_key_print, leg_marker_opt)
         legend_obj = legend.GetListOfPrimitives().Last()
         legend_obj.SetLineColor(colors[bkg_cat])
         legend_obj.SetLineWidth(3)
+        if "SameCharge" in bkg_cat: 
+            legend_obj.SetMarkerStyle(ROOT.kFullCircle)
+            legend_obj.SetMarkerColor(colors["bkg_SameCharge"])
+            legend_obj.SetMarkerSize(2)
 
     # Plotting other objects
     pad_info.cd()
@@ -589,7 +621,10 @@ def plot_bkg(plot_dictionary, flag, bin_key, group_backgrounds=True, logscale=Tr
     textbox.Draw()  
     c.Update()
 
-    c.SaveAs(f"{figpath}/bkg_{bin_key}_{flag}.pdf")
+    filename = f"bkg_{bin_key}_{flag}" if bin_key!="[24.0to65.0][-2.4to2.4]" else f"bkg_total_{flag}"
+    if charge_separation != "": filename += f"_{charge_separation}"
+
+    c.SaveAs(f"{figpath}/{filename}.png")
 
 ###############################################################################
 

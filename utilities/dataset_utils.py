@@ -15,7 +15,7 @@ bkg_sum_selector = {
     "bkg_TTFullyleptonic" : 1,
     "bkg_TTSemileptonic" : 1,
     "bkg_Ztautau" : 1,
-    "bkg_SameCharge" : 0.,
+    "bkg_SameCharge" : 0,
     "bkg_WplusJets" : 1,
     "bkg_WminusJets" : 1,
     "bkg_Zjets" : 1,
@@ -90,6 +90,7 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
 def gen_import_dictionary(base_folder, type_eff, dset_names,
                           ch_set = [""],
                           do_OS_tracking = False,
+                          use_charge_separation = "",
                           add_SS_mc = False,
                           add_SS_bkg = False):
     """
@@ -107,7 +108,8 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
         
         lumi_scale = -1
 
-        ## Flags that specify the file name
+        ##  Flags that specify the file name
+        ## ----------------------------------
         # General gen-matching and os/ss-charge settings
         gm_sel, c_sel, S_sel = "1", "1", ""
         # Gen-matching removed for backgrounds
@@ -116,7 +118,7 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
         if type_eff=="tracking" and do_OS_tracking is False: c_sel="0"
         # Flags for same-sign events
         if "SS" in dset_name: c_sel, S_sel = "0", "_SS"
-        # Extraction of process name by removing the prefix  (if present)
+        # Extraction of process name by removing the prefix (if present)
         process_name = dset_name.replace("bkg_", "").replace("_SS", "")  
         # "SameCharge" data events, that are called among the other backgrounds
         if "SameCharge" in dset_name: 
@@ -318,6 +320,8 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
     bkg_flags = []
     n_events_bkg = []
 
+    '''
+    ## Not used for fits, it breaks all the naming conventions. It is up to the user to define correctly the names of the bkg sources :)
     for k in iter_dict.keys():
         # Checks if the total bkg histogram that is going to be created is made
         # of SS events (of montecarlo datasets) and adjust the name accordingly
@@ -325,7 +329,7 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
             bkg_total_histo.SetName(f"Minv_bkg_{flag}_{bin_key}_total_SS")
             bkg_total_histo.SetTitle(f"Minv_bkg_{flag}_{bin_key}_total_SS")
             break
-    
+    '''
 
     # Loop over the background categories                
     for bkg_cat, bkg_obj in iter_dict.items():
@@ -359,7 +363,6 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
         n_events_bkg.append(bkg_histo_tmp.sumEntries())
 
         bkg_total_histo.add(bkg_histo_tmp)
-
     
     return bkg_total_histo
 
@@ -408,10 +411,14 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
         print(dataset_key, dataset_obj["filenames"])
         dataset_obj["filenames"] = [ROOT.TFile(v, "READ") for v in dataset_obj["filenames"]]
    
-    merging_dict = {k : v for k, v in import_datasets.items() if bkg_sum_selector[k.replace("_SS","")]!=0}
+    # Automatically excluded the SS datasets from the merging process
+    # In future version of this code, the distiction between OS, SS and sign-integrated datasets should be made more clear !!!
+    merging_dict = {k : v for k, v in import_datasets.items() if ("_SS" not in k and bkg_sum_selector[k]!=0)}
     
     # Loop over the pt-eta bins
     for bin_key, [gl_idx, bin_pt, bin_eta] in bins.items():
+        
+        # if bin_key!= "[24.0to35.0][-2.4to-2.3]": continue
 
         print(f"\n\n### Importing datasets in bin {bin_key} ###\n")
 
@@ -430,7 +437,7 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                 files, lumi_scale = dset_obj["filenames"], dset_obj["lumi_scale"]
 
                 if "bkg" in dset_name:
-                    if lightMode_bkg is True: continue
+                    if lightMode_bkg is True and dset_name in merging_dict.keys(): continue
                     dset_type = "bkg" if not "SameCharge" in dset_name else "data_SC"
                     dset_subs = dset_name.replace("bkg", "")
                     if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
@@ -453,6 +460,9 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                 bkg_total_histo = get_totbkg_roohist(merging_dict, flag, axis, bin_key, bin_pt, bin_eta,
                                                      fail_template_with_all_SA=fail_template_with_all_SA)
                 ws.Import(bkg_total_histo)
+                # print(bkg_total_histo.GetTitle(), bkg_total_histo.sumEntries())
+
+
     
     return ws
       
