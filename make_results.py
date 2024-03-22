@@ -7,7 +7,7 @@ from utilities.base_library import binning, bin_dictionary, eval_efficiency, sum
 from utilities.results_utils import results_manager, init_results_histos, fill_res_histograms
 from utilities.dataset_utils import import_pdf_library
 
-NBINS = 51
+NBINS = 21
 
 eff_min = 0.895
 rel_err_eff_min = 1e-4
@@ -19,7 +19,7 @@ sf_max = 1.03
 delta_min = -5e-2
 delta_error_min = -5e-3
 pull_min = -5
-rm1_min = -1e-2
+rm1_min = -3e-2
 ratio_error_min = -1
 
 res_var_dict = {
@@ -166,7 +166,7 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
             histos.update({histo_pt.GetName() : histo_pt, histo_eta.GetName() : histo_eta})
     '''
 
-    add_flag = "cmp" if ".root" in ws_txt_bmark_filename else "cmpBmark"
+    add_flag = "cmp" if ".root" in ws_txt_bmark_filename else "cmp-egm"
 
     if postfix_name!="": add_flag += f"-{postfix_name}"
 
@@ -227,6 +227,18 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list, isola
                                            ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
                                            sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
                                            sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
+        
+        '''
+        if bin_key in ["[55.0to65.0][-0.3to-0.2]", "[55.0to65.0][0.2to0.3]",
+                       "[55.0to65.0][-0.2to-0.1]", "[55.0to65.0][0.5to0.6]", "[55.0to65.0][0.7to0.8]"]:
+            
+            histos["delta_2d"].SetBinContent(bin_pt, bin_eta, -999)
+            histos["delta_error_2d"].SetBinContent(bin_pt, bin_eta, -999)
+            histos["pull_2d"].SetBinContent(bin_pt, bin_eta, -999)
+            histos["rm1_2d"].SetBinContent(bin_pt, bin_eta, -999)
+            histos["ratio_error_2d"].SetBinContent(bin_pt, bin_eta, -999)
+            continue
+        '''
 
         if "delta" in histos.keys():
             histos["delta"].Fill(eff-eff_mc)
@@ -317,31 +329,14 @@ if __name__ == '__main__':
 
     base_folder = "/scratch/rforti/tnp_efficiencies_results/tracking"
 
-    # benchmark_res = base_folder+"/legacy_fit/ws_tracking.root"
-    # benchmark_res = base_folder+"/legacy_fit_onlyFailSA/ws_tracking.root"
-    # ws_filename = base_folder+"/prefitBkg_MC/ws_tracking_prefitBkg.root"
-    
-    # ws_filename = base_folder+"/pseudodata_prefitBkg_MC_legacySettings/ws_tracking_pseudodata.root"
+    ws_filename = base_folder+"/pseudodata/ws_tracking_pseudodata.root"
 
-    # benchmark_res = base_folder+"/prefitBkg_MC/ws_tracking_prefitBkg.root"
-    # ws_filename = base_folder + "/BBlight/ws_tracking_BBlight.root"
-
-    #ws_filename =  base_folder+"/test_bias_prefitSameCharge/ws_indep_pseudodata.root"
-    
-
-    ws_filename =  base_folder+"/BBlight_legacySettings/ws_tracking_BBlight.root"
-
-    benchmark_res = base_folder+"/benchmark/ws_tracking.root"
-
-
+    # benchmark_res = base_folder+"/legacy_fit_onlyFailSA_allMC/ws_tracking.root"
 
 
     # save_eff_results(benchmark_res, "indep", "pt_tracking", "eta")
-    compare_efficiency(benchmark_res, ws_filename, "pt_tracking", "eta", resCmp_list, postfix_name="benchmark")
+    # compare_efficiency(benchmark_res, ws_filename, "pt_tracking", "eta", resCmp_list, postfix_name="legacy-onlyFailSA")
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 
-    # compare_eff_pseudodata(ws_filename, "pt_tracking", "eta", resCmp_list, isolate_effect="")
-
-    
-
+    compare_eff_pseudodata(ws_filename, "pt_tracking", "eta", resCmp_list, isolate_effect="")

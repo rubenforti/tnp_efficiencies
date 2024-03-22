@@ -49,6 +49,7 @@ def checkImportCustomPdfs(bkg_models):
     dict_classes = {
         "cmsshape" : "RooCMSShape",
         "cmsshape_prefitBkg" : "RooCMSShape",
+        "cmsshape_prefitBkg_SS" : "RooCMSShape",
         "cmsshape_new" : "RooCMSShape_mod",
         "CB" : "my_double_CB"
     }
@@ -99,7 +100,11 @@ def runFits(settings):
 
     prob_bins = []
 
+    chi2_list, ndof_list = [], []
+
     for bin_key in bin_dictionary(settings["binning_pt"], settings["binning_eta"]).keys():
+
+        # if bin_key != "[24.0to35.0][-2.4to-2.3]": continue
         
         if settings["type_analysis"] == "indep":
             dict_flags = ["pass", "fail"]
@@ -115,12 +120,21 @@ def runFits(settings):
 
         if settings["import_pdfs"]: fitter.importFitObjects(ws)
 
+        chi2_val, ndf = res["fail"].GetTitle().split("_")
+        chi2_list.append(float(chi2_val))
+        ndof_list.append(float(ndf))
+
         if status is False: prob_bins.append(bin_key)
         printFitStatus(settings["type_analysis"], bin_key, res, status)
         # if status is False: prob_bins.append(bin_key)
 
     print(f"NUM of problematic bins = {len(prob_bins)}")
     print(prob_bins)
+    '''
+    print("")
+    print(chi2_list)
+    print(ndof_list)
+    '''
     ws.writeToFile(settings["ws_name"])
 
 ###############################################################################

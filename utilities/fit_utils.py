@@ -65,6 +65,7 @@ def getSidebands(histo, axis, cut=0.68):
 def pearson_chi2_eval(histo, pdf, axis):
     """
     """
+    print("Evaluating pearson chi2")
     binning = axis.getBinning("x_binning")
     NBINS = binning.numBins()   
     # EVTS = histo.sumEntries()
@@ -75,6 +76,9 @@ def pearson_chi2_eval(histo, pdf, axis):
     for server in pdf.servers():
         if "nsig" in server.GetName() or "nbkg" in server.GetName():
             n_fitted_events += server.getVal()
+    if n_fitted_events == 0:
+        print("Warning: not found normalization parameter in the pdf, using the number of events in the dataset as normalization")
+        n_fitted_events = histo.sumEntries()
 
     chi2_val =0
     used_bins = 0
@@ -109,7 +113,7 @@ def llr_eval(histo, pdf, axis):
     """
     """
 
-    binning = axis.getBinning()
+    binning = axis.getBinning("x_binning")
     NBINS = binning.numBins()   
     EVTS = histo.sumEntries()
     BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
@@ -121,6 +125,9 @@ def llr_eval(histo, pdf, axis):
     for server in pdf.servers():
         if "nsig" in server.GetName() or "nbkg" in server.GetName():
             n_fitted_events += server.getVal()
+    if n_fitted_events == 0:
+        print("Warning: not found normalization parameter in the pdf, using the number of events in the dataset as normalization")
+        n_fitted_events = histo.sumEntries()
 
     used_bins = 0
     for i in range(NBINS):
@@ -207,6 +214,8 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
     for par in res.floatParsFinal():
         if not ("_gamma_bin_" in par.GetName()): ndof -= 1  #To not count the gamma parameters in the BB method
     res.SetTitle(f"{chi2val}_{ndof}")
+
+    print(chi2val, used_bins)
     
     chi2_status = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
     print(chi2val, ndof, chi2_status) 

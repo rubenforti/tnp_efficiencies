@@ -200,16 +200,20 @@ class AbsFitter():
         roohist_pseudodata.add(ws.data(f"Minv_mc_{flag}_{self.bin_key}"))
 
         if type(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")) is ROOT.RooDataHist:
-                roohist_pseudodata.add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total"))
+            roohist_pseudodata.add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total"))
         else:
             # To have a proper meaning, the "total" bkg histogram has to be created
             # by summing only the MC datasets, not the SameCharge one.
+            counter_bkg_sources = 0
             for cat in self.settings["bkg_categories"]:
                 if "SameCharge" in cat: continue
-                roohist_pseudodata.add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_{cat.replace('bkg_', '')}"))
+                if type(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_{cat.replace('bkg_', '')}")) is ROOT.RooDataHist:
+                    counter_bkg_sources += 1
+                    roohist_pseudodata.add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_{cat.replace('bkg_', '')}"))
+                if counter_bkg_sources == 0: 
+                    sys.exit("ERROR: no background source has been found")
 
         self.histo_data.update({flag : roohist_pseudodata})
-
 
     def setConstraints(self, flag, pdf_fit, data_fit):
         """
@@ -299,21 +303,18 @@ class AbsFitter():
             import_mc = True if self.settings["type_analysis"] == "sim_sf" else False
             # import_mcSS = True if self.settings["bkg_model"][flag] == "cmsshape_prefitBkg" else False
             import_mcSS = False
-            import_bkgControl = True if self.settings["bkg_model"][flag] in ["num_estimation", "cmsshape_prefitBkg"] else False
+            import_bkgControl = True if self.settings["bkg_model"][flag] in ["num_estimation", "cmsshape_prefitBkg", "cmsshape_prefitBkg_SS"] else False
 
             print("Import bkgControl", import_bkgControl)
-
-            if loadPseudodata:
-                self._createPseudodata(flag, ws)
-                if import_bkgControl:
-                    self.histo_data.update({f"bkgControl_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
-                continue
 
             if loadOnlyBkg:
                 self.histo_data.update({flag : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
                 continue
-                
-            self.histo_data.update({flag : ws.data(f"Minv_data_{flag}_{self.bin_key}")})
+
+            if loadPseudodata is False:
+                self.histo_data.update({flag : ws.data(f"Minv_data_{flag}_{self.bin_key}")})
+            else:
+                self._createPseudodata(flag, ws)  
 
             if import_mc:
                 # To be imported only if the fit has to retrieve the scale 
@@ -330,8 +331,22 @@ class AbsFitter():
                 # total background. For example, it can correspond to the
                 # SameCharge dataset under the hypoythesis that it represents 
                 # appropriately the background in the OS region
-                self.histo_data.update({f"bkgControl_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
-
+                if "_SS" in self.settings["bkg_model"][flag]:
+                    # Up to now, the "_SS" datasets are provided for the separate processes; the function that generates the datasets has to be inproved to create a "_total_SS" dataset
+                    roohist_bkgSS = ROOT.RooDataHist(f"Minv_bkg_{flag}_{self.bin_key}_total_SS", 
+                                                     f"Minv_bkg_{flag}_{self.bin_key}_total_SS",
+                                                     ROOT.RooArgSet(self.axis[flag]), "x_binning")
+                    counter_bkg_sources = 0
+                    for cat in self.settings["bkg_categories"]:
+                        dset_name = f"Minv_bkg_{flag}_{self.bin_key}_{cat.replace('bkg_', '')}_SS"
+                        if type(ws.data(dset_name)) is ROOT.RooDataHist:
+                            counter_bkg_sources += 1
+                            roohist_bkgSS.add(ws.data(dset_name))
+                        if counter_bkg_sources == 0: 
+                            sys.exit("ERROR: no background source has been found")
+                    self.histo_data.update({f"bkgControl_{flag}" : roohist_bkgSS})
+                else:
+                    self.histo_data.update({f"bkgControl_{flag}" : ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")})
 
     def initNorm(self):
         """
@@ -390,6 +405,10 @@ class AbsFitter():
             pass
 
         doRegularFit = not (prefit_bkg or self.settings["bkg_model"][flag] == "num_estimation")
+
+        print("Do regular fit", doRegularFit)
+        print("Do prefit bkg", prefit_bkg)
+        print("Do num estimation", self.settings["bkg_model"][flag] == "num_estimation")
     
         if doRegularFit:
             pdf_fit = self.pdfs["fit_model"][flag]
@@ -440,7 +459,8 @@ class AbsFitter():
         print("Range fit", range_fit)
         print("Subs res", subs_res)
         print("Checks", checks)
-        print("")        
+        print("")     
+
 
         if flag == "sim" : self.constr_set[flag] = ROOT.RooArgSet(self.constr_set["pass"], self.constr_set["fail"])
 
@@ -453,7 +473,6 @@ class AbsFitter():
                             ROOT.RooFit.Strategy(2),
                             ROOT.RooFit.SumW2Error(False),
                             ROOT.RooFit.ExternalConstraints(self.constr_set[flag]),
-                            ROOT.RooFit.Extended(True),
                             ROOT.RooFit.Save(1), 
                             ROOT.RooFit.PrintLevel(self.settings["fit_verb"]))
         
@@ -468,7 +487,6 @@ class AbsFitter():
         
         isBBmodel = ("BB" in self.settings["bkg_model"][flag] or prefit_bkg is True)
 
-        print(isBBmodel)
         
         self.status.update({ 
             flag+subs_res : fit_quality(fit_obj, type_checks=checks, 
@@ -548,7 +566,7 @@ class AbsFitter():
 
         figpath = (self.settings["figpath"]["good"] if self.bin_status is True else self.settings["figpath"]["check"])
 
-        plot_fitted_pass_fail(self.settings["type_analysis"], plot_objects, self.bin_key, 
+        plot_fitted_pass_fail(self.settings["type_analysis"], plot_objects, self.bin_key,
                               figpath=figpath)
 
 

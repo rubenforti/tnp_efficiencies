@@ -83,9 +83,11 @@ fit_settings = {
 
     "load_bkg_datasets" : True,
 
-    "bkg_categories" : ["bkg_WW", "bkg_WZ", "bkg_ZZ", "bkg_TTFullyleptonic", "bkg_Ztautau",
-                        "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets",
-                        #"bkg_SameCharge"
+    "bkg_categories" : [# "bkg_WW", "bkg_WZ", "bkg_ZZ", 
+                        # "bkg_TTFullyleptonic", "bkg_TTSemileptonic",
+                        # "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets",
+                        # "bkg_Ztautau",
+                        "bkg_SameCharge"
                         ],
     
     "import_bkg_samesign" : False,
@@ -158,11 +160,14 @@ if fit_settings["generate_datasets"]:
                                               ch_set=fit_settings["charge_selection"],
                                               do_OS_tracking=False,
                                               add_SS_mc=fit_settings["import_mc_samesign"], 
-                                              add_SS_bkg=fit_settings["import_bkg_samesign"])    
+                                              add_SS_bkg=fit_settings["import_bkg_samesign"])
+
+    
     
     ws = ws_init(import_dictionary, fit_settings["type_analysis"], 
                  fit_settings["binning_pt"], fit_settings["binning_eta"], fit_settings["binning_mass"], 
-                 lightMode_bkg=True, fail_template_with_all_SA=fit_settings["use_extended_sig_template_fail"])
+                 lightMode_bkg=True, # (True if fit_settings["import_bkg_samesign"] is False else False), 
+                 fail_template_with_all_SA=fit_settings["use_extended_sig_template_fail"])
 
     ws.writeToFile(fit_settings["ws_name"])
     ws.Print()
