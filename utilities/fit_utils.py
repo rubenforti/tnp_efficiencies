@@ -70,7 +70,7 @@ def pearson_chi2_eval(histo, pdf, axis):
     NBINS = binning.numBins()   
     # EVTS = histo.sumEntries()
     BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
-    PRECISION = 1
+    PRECISION = 0
 
     n_fitted_events=0
     for server in pdf.servers():
