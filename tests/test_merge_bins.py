@@ -86,7 +86,7 @@ class TestMergeBins(unittest.TestCase):
 
         histo = create_flat_th3()
 
-        new_bin_dictionary = bin_dictionary("pt_6bins", "eta_16bins")
+        new_bin_dictionary = bin_dictionary("pt_6bins", "eta_16bins", get_mergedbins_bounds=True)
 
         axis = ROOT.RooRealVar("x", "x", 60, 120)
         axis.setRange("range", 60, 120)

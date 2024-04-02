@@ -3,6 +3,7 @@
 
 import sys
 import os
+import math
 import ROOT
 from array import array
 
@@ -40,7 +41,7 @@ def getSidebands(histo, axis, cut=0.68):
 
     print(binning)
     
-    if NBINS%2 !=0:
+    if NBINS%2 != 0:
         print("ERROR: number of bins must be even")
         sys.exit()
 
@@ -64,16 +65,20 @@ def getSidebands(histo, axis, cut=0.68):
 def pearson_chi2_eval(histo, pdf, axis):
     """
     """
+    print("Evaluating pearson chi2")
     binning = axis.getBinning("x_binning")
     NBINS = binning.numBins()   
     # EVTS = histo.sumEntries()
     BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
-    PRECISION = 1
+    PRECISION = 0
 
     n_fitted_events=0
     for server in pdf.servers():
         if "nsig" in server.GetName() or "nbkg" in server.GetName():
             n_fitted_events += server.getVal()
+    if n_fitted_events == 0:
+        print("Warning: not found normalization parameter in the pdf, using the number of events in the dataset as normalization")
+        n_fitted_events = histo.sumEntries()
 
     chi2_val =0
     used_bins = 0
@@ -108,7 +113,7 @@ def llr_eval(histo, pdf, axis):
     """
     """
 
-    binning = axis.getBinning()
+    binning = axis.getBinning("x_binning")
     NBINS = binning.numBins()   
     EVTS = histo.sumEntries()
     BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
@@ -120,6 +125,9 @@ def llr_eval(histo, pdf, axis):
     for server in pdf.servers():
         if "nsig" in server.GetName() or "nbkg" in server.GetName():
             n_fitted_events += server.getVal()
+    if n_fitted_events == 0:
+        print("Warning: not found normalization parameter in the pdf, using the number of events in the dataset as normalization")
+        n_fitted_events = histo.sumEntries()
 
     used_bins = 0
     for i in range(NBINS):
@@ -129,7 +137,7 @@ def llr_eval(histo, pdf, axis):
 
         pdf_val = pdf.getVal(ROOT.RooArgSet(axis))
         mu = n_fitted_events*BIN_VOLUME*pdf_val
-        mu = round(mu, 5)
+        mu = round(mu, 3)
 
         new_sumll = weight*ROOT.TMath.Log(mu) - mu if mu>0 else 0.0
         sum_ll += 2*new_sumll
@@ -150,6 +158,31 @@ def llr_eval(histo, pdf, axis):
     print("***")
 
     return llr, used_bins
+
+###############################################################################
+
+
+def status_parsAtLim(res, absTol=1e-4, relTol=1e-5):
+    """
+    """
+    pars = res.floatParsFinal()
+    status = True
+    cnt_pars_at_lim = 0
+    for par in pars:
+        if par.isConstant(): continue
+        final_val, par_min, par_max = par.getVal(), par.getMin(), par.getMax()
+
+        if math.isclose(final_val, par_min, abs_tol=absTol, rel_tol=relTol) or \
+           math.isclose(final_val, par_max, abs_tol=absTol, rel_tol=relTol):
+            cnt_pars_at_lim += 1
+            status = False
+            print(par.GetName(), par.getVal(), par.getMin(), par.getMax())
+
+            
+    
+    if status is False: print(f"WARNING: {res.GetName()} has {cnt_pars_at_lim} parameters at limit")
+
+    return status
 
 ###############################################################################
 
@@ -182,7 +215,8 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
         if not ("_gamma_bin_" in par.GetName()): ndof -= 1  #To not count the gamma parameters in the BB method
     res.SetTitle(f"{chi2val}_{ndof}")
 
-
+    print(chi2val, used_bins)
+    
     chi2_status = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
     print(chi2val, ndof, chi2_status) 
     return chi2_status
@@ -190,44 +224,62 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
 ###############################################################################
 
 
-def fit_quality(fit_obj, type_checks="benchmark"):
+def fit_quality(fit_obj, type_checks="egm_legacy", isFitPseudodata=False, isBBmodel=False):
     """
     """
     check_edm = True
     check_migrad = True
     check_chi2 = True
     check_covm = True
+    check_parsAtLim = True
 
-    if type_checks == "benchmark":
-        check_migrad = (fit_obj["res"].status() == 0 or fit_obj["res"].status() == 1)
+    if type_checks == "egm_legacy":
+        check_migrad = (fit_obj["res"].status()==0 or fit_obj["res"].status()==1)
         check_covm = (fit_obj["res"].covQual() == 3)
-        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
-                                 fit_obj["res"], type_chi2="pearson", nsigma=15)
+        if isBBmodel:
+            check_chi2 = True
+        else:
+            check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
+                                     fit_obj["res"], type_chi2="pearson", nsigma=10)
     
-    elif type_checks == "new":
+    elif type_checks == "new_tight":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
-        check_edm = (fit_obj["res"].edm() < 1e-3)
+        check_edm = (fit_obj["res"].edm() < 2e-3)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
-                                 fit_obj["res"], type_chi2="llr", nsigma=5)
+                                 fit_obj["res"], type_chi2="llr", nsigma=7)
+        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
     
+    elif type_checks == "new_loose":
+        check_migrad = (fit_obj["res"].status()==0 or fit_obj["res"].status()==3)
+        check_covm = (fit_obj["res"].covQual() == 3)
+        check_edm = (fit_obj["res"].edm() < 5e-2)
+        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
+                                 fit_obj["res"], type_chi2="llr", nsigma=10)
+        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
+    
+    elif type_checks == "neglect_atLimPars":
+        check_migrad = (fit_obj["res"].status()==0)
+        check_covm = (fit_obj["res"].covQual() == 3)
+        check_edm = (fit_obj["res"].edm() < 1e-2)
+        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
+                                 fit_obj["res"], type_chi2="llr", nsigma=10)
+
     elif type_checks == "pseudodata":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
-        check_edm = (fit_obj["res"].edm() < 9e-3)
+        check_edm = (fit_obj["res"].edm() < 5e-2)
+        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
     
     else:
         sys.exit("ERROR: wrong type of fit quality check indicated")
-    
-    '''
-    # Not used, could be useful if Sumw2Error turns out to be needed
-    elif type_checks == "pseudodata_sumw2":
-        check_migrad = fit_obj["res"].status()==0
-        check_covm = (fit_obj["res"].covQual()==2 or fit_obj["res"].covQual()==3)
-        return bool(check_migrad*check_covm)
-    '''  
 
-    return bool(check_migrad*check_covm*check_edm*check_chi2)
+
+    print("check chi2", check_chi2)
+
+    if isFitPseudodata: check_chi2 = True
+
+    return bool(check_migrad*check_covm*check_edm*check_chi2*check_parsAtLim)
  
 ###############################################################################
 

@@ -43,11 +43,14 @@ xsec_ZmmPostVFP = 2001.9
 xsec_bkg = {
     # Unit = pb
     "WW" : 12.6,
-    "WZ" : 5.4341,
+    "WZ" : 27.59,  #5.4341,
     "ZZ" : 0.60,
     "TTFullyleptonic" : 88.29,
     "TTSemileptonic" : 366.34,
-    "Ztautau" : xsec_ZmmPostVFP*Z_TAU_TO_LEP_RATIO
+    "WplusJets" : 11765.9,
+    "WminusJets" : 8703.87,
+    "Ztautau" : xsec_ZmmPostVFP*Z_TAU_TO_LEP_RATIO,
+    "Zjets" : xsec_ZmmPostVFP  # obtained from the signal MC file with the "reverse" gen-matching option
 }
 
 ###############################################################################
@@ -169,46 +172,6 @@ def cross_section_bkg(bkg_process):
 ###############################################################################
 
 
-def lumi_factors(type_eff, bkg_categories):
-    """
-    "Lumi scale" defined as alpha that satisifies lumi_data=alpha*lumi_bkg
-    """
-    lumi_scales = {}
-
-    file_sig = ROOT.TFile(f"{sig_mc_repo}/tnp_{type_eff}_mc_vertexWeights1_oscharge{sc_id[1]}.root")
-    wsum_histo_sig = file_sig.Get("weightSum")
-    num_init_sig = wsum_histo_sig.Integral()
-    xsection_sig = xsec_ZmmPostVFP*1000  # has to be put in fb
-    lumi_sig = num_init_sig/xsection_sig
-    lumi_scales.update({"Zmumu" : lumi_data/lumi_sig})
-
-    print("Zmumu", lumi_sig)
-
-    bkg_cat = copy(bkg_categories)
-
-    if "SameCharge" in bkg_cat: 
-        lumi_scales.update({"SameCharge" : 1.0})       
-        bkg_cat.remove("SameCharge")
-
-    for cat in bkg_cat:
-        file = ROOT.TFile(f"{bkg_repo}/tnp_{type_eff}_{cat}_vertexWeights1_oscharge{sc_id[1]}.root")
-        
-        wsum_histo = file.Get("weightSum")
-        num_init = wsum_histo.Integral()
-        print(num_init)
-        xsection = cross_section_bkg(cat)*1000  # has to be put in fb
-        lumi_bkg = num_init/xsection
-
-        scale = lumi_data/lumi_bkg
-        print(cat, lumi_bkg, scale)
-    
-        lumi_scales.update({cat : scale})
-    
-    return lumi_scales
-
-###############################################################################
-
-
 def lumi_factor(filepath, process):
     """
     Returns the lumi factor for the process in the given file
@@ -223,8 +186,6 @@ def lumi_factor(filepath, process):
         xsection = cross_section_bkg(process)*1000
         
     lumi_process = num_init/xsection
-
-    print(lumi_process)
 
     scale = lumi_data/lumi_process
 

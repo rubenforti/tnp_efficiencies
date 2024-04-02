@@ -6,7 +6,7 @@ import sys
 import pickle
 from array import array
 from utilities.fit_utils import fit_quality, pearson_chi2_eval
-from utilities.base_library import eval_efficiency, binning, bin_dictionary
+from utilities.base_library import eval_efficiency, binning, bin_dictionary, sumw2_error
 
 
 def efficiency_from_res(res_pass, res_fail):
@@ -51,9 +51,9 @@ class results_manager:
                 if self._analysis == 'indep':
                     res_pass = import_ws.obj(f"results_pass_{bin_key}")
                     res_fail = import_ws.obj(f"results_fail_{bin_key}")
-                    self.add_result({"pass":res_pass, "fail":res_fail}, bin_key)
+                    self.add_result({"pass":res_pass, "fail":res_fail}, bin_key, import_ws)
                 elif self._analysis == 'sim':
-                    self.add_result({"sim":import_ws.obj(f"results_sim_{bin_key}")}, bin_key)
+                    self.add_result({"sim":import_ws.obj(f"results_sim_{bin_key}")}, bin_key, import_ws)
                 else:
                     print("ERROR: analysis type not recognized")
         
@@ -65,7 +65,7 @@ class results_manager:
                 idx_list += 1
 
 
-    def add_result(self, res, bin_key):
+    def add_result(self, res, bin_key, ws):
         """
         """
         Npass, sigma_Npass = 0, 0
@@ -79,6 +79,10 @@ class results_manager:
                 new_res = {
                     bin_key : {
                         "efficiency" : efficiency_from_res(res_pass, res_fail),
+                        "efficiency_MC" : eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(),
+                                                          ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
+                                                          sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
+                                                          sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}"))),
                         "pars_pass" : res_pass.floatParsFinal(),
                         "corrmatrix_pass" : res_pass.correlationMatrix(),
                         "status_pass" : (res_pass.status(), res_pass.covQual(), res_pass.edm()),
@@ -145,6 +149,20 @@ class results_manager:
 
         return eff
     
+    def getEffMC(self, bin_key=''):
+        """
+        """
+        if bin_key == "all":
+            eff = [] 
+            [eff.append(self._dict_results[key]["efficiency_MC"]) for key in self._dict_results.keys()]
+        elif bin_key in self._dict_results.keys():
+            eff = self._dict_results[bin_key]["efficiency_MC"]
+        else:
+            print("Bin key not present in the results object dictionary")
+            sys.exit()
+
+        return eff
+            
     def getPars(self, flag, bin_key=''):
         """
         """
@@ -267,8 +285,11 @@ def fill_res_histograms(res_bmark, res_new, hist_dict, bin_dict):
             hist_dict["delta_error"].Fill(deff_test-deff_bmark)
             hist_dict["delta_error_2d"].SetBinContent(bin_pt, bin_eta, deff_test-deff_bmark)
         if "pull" in hist_dict.keys():
-            hist_dict["pull"].Fill((eff_test-eff_bmark)/deff_bmark)
-            hist_dict["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff_test-eff_bmark)/deff_bmark)
+            hist_dict["pull"].Fill((eff_test-eff_bmark)/(deff_bmark**2 + deff_test**2)**0.5)
+            hist_dict["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff_test-eff_bmark)/((deff_bmark**2 + deff_test**2)**0.5))
+        if "pull_ref" in hist_dict.keys():
+            hist_dict["pull_ref"].Fill((eff_test-eff_bmark)/deff_bmark)
+            hist_dict["pull_ref_2d"].SetBinContent(bin_pt, bin_eta, (eff_test-eff_bmark)/deff_bmark)
         if "rm1" in hist_dict.keys():
             hist_dict["rm1"].Fill((eff_test/eff_bmark)-1)
             hist_dict["rm1_2d"].SetBinContent(bin_pt, bin_eta, (eff_test/eff_bmark)-1)
