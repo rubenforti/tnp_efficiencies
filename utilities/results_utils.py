@@ -115,7 +115,9 @@ class results_manager:
     def add_result_from_txt(self, row_list, idx_list, bin_key):
         elements = row_list[idx_list].split('\t')
         eff, deff = float(elements[4]), float(elements[5])
-        self._dict_results.update({bin_key : {"efficiency" : (eff, deff)}})
+        effMC, deffMC = float(elements[6]), float(elements[7])
+        self._dict_results.update({ 
+            bin_key : {"efficiency" : (eff, deff), "efficiency_MC" : (effMC, deffMC)}})
 
 
     def add_result_from_txt_altSig(self, row_list, idx_list, bin_key):

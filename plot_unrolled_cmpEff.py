@@ -13,7 +13,7 @@ from copy import copy
 ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
-gen_folder = "/scratch/rforti/tnp_efficiencies_results/tracking"
+gen_folder = "/scratch/rforti/tnp_efficiencies_results/trackingplus"
 
 import_pdf_library("RooCMSShape")
 
@@ -40,10 +40,17 @@ check_biasMC_agreement = args.check_biasMC_agreement
 if check_biasMC_agreement and(analyze_scale_factors or cmp_syst_effects): 
     sys.exit("Cannot check biasMC agreement and analyze scale factors or compare systematic effects at the same time. Exiting...")
 
-
+'''
 file_nomi = ROOT.TFile(gen_folder + "/benchmark/ws_tracking.root", "READ")
 ws_nomi = file_nomi.Get("w")
 res_nomi = results_manager("indep", "pt_tracking", "eta", import_ws=ws_nomi)
+'''
+
+with open(gen_folder+"/../egm_tnp_results/trackingplus/allEfficiencies.txt", "r") as file_nomi:
+    row_list = file_nomi.readlines()
+
+res_nomi = results_manager("indep", "pt_tracking", "eta", import_txt=row_list)
+
 
 file_alt = ROOT.TFile(gen_folder + "/BBlight_legacySettings/ws_tracking_BBlight.root", "READ")
 ws_alt = file_alt.Get("w")
@@ -337,84 +344,5 @@ legend.Draw()
 CMS_lumi(pad_plot, 5, 0, simulation=False)
 pad_plot.Update()
 
-
 c.SaveAs(f"{plot_name.replace(' ', '_').lower()}_{args.output_subscript}.png" if args.output_subscript else f"{plot_name.replace(' ', '_').lower()}.png")
 
-'''
-
-c_hist = ROOT.TCanvas("c_hist", "c_hist", 1800, 1800)
-c_hist.cd()
-
-style_settings()
-
-pad_title.Draw()
-c_hist.Update()
-
-pad_hist = ROOT.TPad("pad_hist", "pad_hist", 0.0, 0.0, 1.0, 0.96)
-pad_hist.SetMargin(0.11, 0.05, 0.1, 0.05), pad_hist.Draw()
-
-lowlim_hist, uplim_hist = -0.02, 0.022
-
-hist_bin_1 = ROOT.TH1D("hist_bin_1", "hist_bin_1", 25, lowlim_hist, uplim_hist)
-hist_bin_2 = ROOT.TH1D("hist_bin_2", "hist_bin_2", 25, lowlim_hist, uplim_hist)
-hist_bin_3 = ROOT.TH1D("hist_bin_3", "hist_bin_3", 25, lowlim_hist, uplim_hist)
-hist_bin_4 = ROOT.TH1D("hist_bin_4", "hist_bin_4", 25, lowlim_hist, uplim_hist)
-hist_total = ROOT.TH1D("hist_total", "hist_total", 25, lowlim_hist, uplim_hist)
-
-for i in range(len(plot_list)):
-    hist_total.Fill(plot_list[i])
-    if bin_list_eta[i] < netaBins:
-        hist_bin_1.Fill(plot_list[i])
-    elif bin_list_eta[i] < 96:
-        hist_bin_2.Fill(plot_list[i])
-    elif bin_list_eta[i] < 144:
-        hist_bin_3.Fill(plot_list[i])
-    else:
-        hist_bin_4.Fill(plot_list[i])
-
-hist_total.SetLineColor(ROOT.kBlack)
-hist_bin_1.SetLineColor(ROOT.kOrange)
-hist_bin_2.SetLineColor(ROOT.kRed)
-hist_bin_3.SetLineColor(ROOT.kBlue)
-hist_bin_4.SetLineColor(ROOT.kGreen)
-
-hist_total.SetLineWidth(0)
-hist_bin_1.SetLineWidth(2)
-hist_bin_2.SetLineWidth(2)
-hist_bin_3.SetLineWidth(2)
-hist_bin_4.SetLineWidth(2)
-
-hist_total.SetContour(51)
-hist_total.Draw("")
-hist_total.GetZaxis().SetTitle("")
-hist_total.SetTitleSize(0)
-hist_total.SetTitle("")
-
-hist_total.GetXaxis().SetTitle("Syst effect")
-hist_total.GetXaxis().SetTitleOffset(1.2)
-hist_total.GetXaxis().SetTitleSize(0.04)
-hist_total.GetXaxis().SetLabelSize(0.02)
-
-
-hist_bin_1.Draw("same")
-hist_bin_2.Draw("same")
-hist_bin_3.Draw("same")
-hist_bin_4.Draw("same")
-
-legend_hist = ROOT.TLegend(0.7, 0.7, 0.9, 0.9)
-legend_hist.AddEntry(hist_total, "All bins", "l")
-legend_hist.AddEntry(hist_bin_1, "pT #in 24-35", "l")
-legend_hist.AddEntry(hist_bin_2, "pT #in 35-45", "l")
-legend_hist.AddEntry(hist_bin_3, "pT #in 45-55", "l")
-legend_hist.AddEntry(hist_bin_4, "pT #in 55-65", "l")
-legend_hist.Draw()
-
-
-
-
-
-c_hist.Update()
-c_hist.SaveAs("hist_eff.png")
-
-
-'''

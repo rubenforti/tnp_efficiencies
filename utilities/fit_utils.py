@@ -113,38 +113,78 @@ def llr_eval(histo, pdf, axis):
     """
     """
 
+    flag = "pass" if "pass" in histo.GetName() else "fail"
+
+    bin_key = histo.GetName().split("_")[-1]
+    
     binning = axis.getBinning("x_binning")
     NBINS = binning.numBins()   
     EVTS = histo.sumEntries()
     BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
 
+    isBBmodel = False
+
     sum_ll = 0
     max_ll = 0
 
+    sum_nomi_bins = 0 #needed for the BB model
+
     n_fitted_events=0
-    for server in pdf.servers():
-        if "nsig" in server.GetName() or "nbkg" in server.GetName():
-            n_fitted_events += server.getVal()
+    for serv_pdf in pdf.servers():
+        if "nsig" in serv_pdf.GetName() or "nbkg" in serv_pdf.GetName():
+            n_fitted_events += serv_pdf.getVal()
+
+        if "BB" in serv_pdf.GetName():
+            isBBmodel = True
+            histConstr = serv_pdf.servers().findByName(f"bkg_histConstr_{flag}_{bin_key}")
+
+            if histConstr.servers().size() != 2*NBINS: 
+                return -1, 999
+           
+            for i in range(NBINS):
+                sum_nomi_bins += histConstr.servers().findByName(f"bkg_histConstr_{flag}_{bin_key}_nominal_bin_{i}").getVal() * \
+                                 histConstr.servers().findByName(f"bkg_paramHist_{flag}_{bin_key}_gamma_bin_{i}").getVal()
+
     if n_fitted_events == 0:
         print("Warning: not found normalization parameter in the pdf, using the number of events in the dataset as normalization")
         n_fitted_events = histo.sumEntries()
 
     used_bins = 0
+
     for i in range(NBINS):
     
         axis.setVal(binning.binCenter(i))
         weight = histo.weight(i)
 
         pdf_val = pdf.getVal(ROOT.RooArgSet(axis))
-        mu = n_fitted_events*BIN_VOLUME*pdf_val
-        mu = round(mu, 3)
 
-        new_sumll = weight*ROOT.TMath.Log(mu) - mu if mu>0 else 0.0
-        sum_ll += 2*new_sumll
+        if isBBmodel:
+
+            nomi_bin = histConstr.servers().findByName(f"bkg_histConstr_{flag}_{bin_key}_nominal_bin_{i}").getVal()
+            gamma_bin = histConstr.servers().findByName(f"bkg_paramHist_{flag}_{bin_key}_gamma_bin_{i}").getVal()
+            bkg_val = gamma_bin*nomi_bin/sum_nomi_bins
+            sig_val = pdf.servers().findByName(f"conv_{flag}_{bin_key}").getVal(ROOT.RooArgSet(axis))
+
+            norm_bkg = pdf.servers().findByName(f"nbkg_{flag}_{bin_key}").getVal()
+            norm_sig = pdf.servers().findByName(f"nsig_{flag}_{bin_key}").getVal()
+            pdf_val = ((sig_val*norm_sig) + (bkg_val*norm_bkg))/n_fitted_events
+            pdf_val = pdf_val
+
+        mu = n_fitted_events*BIN_VOLUME*pdf_val
+        mu = round(mu, 2)
+
+        # if isBBmodel: print(sig_val*norm_sig, bkg_val*norm_bkg, mu)
+
+        new_sumll = 2*round(weight*ROOT.TMath.Log(mu) - mu, 2) if mu>0 else 0.0
+        sum_ll += new_sumll
 
         if weight > 0:
-            max_ll += 2*weight*ROOT.TMath.Log(weight) - 2*weight
+            new_maxll = 2*round(weight*ROOT.TMath.Log(weight) - weight, 2)
+            max_ll += new_maxll
             used_bins += 1
+
+
+        # print(round(weight,0), "", round(((sig_val*norm_sig) + bkg_val), 0), "", round(new_maxll-new_sumll, 1), "", round(max_ll - sum_ll, 1))
 
     
     # sum_ll += 2*EVTS*ROOT.TMath.Log(n_fitted_events) - 2*n_fitted_events
@@ -263,7 +303,7 @@ def fit_quality(fit_obj, type_checks="egm_legacy", isFitPseudodata=False, isBBmo
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 1e-2)
         check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
-                                 fit_obj["res"], type_chi2="llr", nsigma=10)
+                                 fit_obj["res"], type_chi2="llr", nsigma=16)
 
     elif type_checks == "pseudodata":
         check_migrad = (fit_obj["res"].status() == 0)

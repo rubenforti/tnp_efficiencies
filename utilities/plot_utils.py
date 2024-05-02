@@ -107,8 +107,15 @@ def plot_minv_distrib_with_fit(pad, axis, data, pdf_fit):
                    #ROOT.RooFit.Range("x_binning"),
                    ROOT.RooFit.LineColor(ROOT.kRed))
     
+    isBB_bkg = False
+    for serv in pdf_fit.servers():
+        if "BB" in serv.GetName():
+            isBB_bkg = True
+            break
+       
     for comp in pdf_fit.getComponents():
-        if "bkg" in comp.GetName():
+        if (isBB_bkg is False and "bkg" in comp.GetName()) or \
+           (isBB_bkg is True  and "BB_bkg" in comp.GetName() and "_paramPdf" not in comp.GetName()):
             bkg_set = ROOT.RooArgSet(comp)
             pdf_fit.plotOn(plot_frame,
                 # ROOT.RooFit.NormRange("x_binning"),
@@ -116,7 +123,7 @@ def plot_minv_distrib_with_fit(pad, axis, data, pdf_fit):
                 ROOT.RooFit.Components(bkg_set),
                 ROOT.RooFit.LineColor(ROOT.kBlue),
                 ROOT.RooFit.LineStyle(ROOT.kDashed),
-                ROOT.RooFit.LineWidth(4))
+                ROOT.RooFit.LineWidth(4))   
 
     plot_frame.Draw()
 

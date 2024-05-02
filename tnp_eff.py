@@ -45,10 +45,19 @@ parser.add_argument("--type_eff", default="tracking",
                     choices=["reco", "tracking", "idip", "trigger", "iso"],
                     help="Type of efficiency")
 
+parser.add_argument("-ch", "--charge_selection", default="all",
+                    choices=["plus", "minus", "all"], help="Charge selection")
+
 args = parser.parse_args()
 
 gen_res_folder = args.gen_folder
-folder = gen_res_folder+"/"+args.type_eff+"/"+args.process_name
+
+if args.charge_selection != "all":
+    eff_print = args.type_eff+args.charge_selection 
+else:
+    eff_print = args.type_eff
+
+folder = gen_res_folder+"/"+eff_print+"/"+args.process_name
 datasets_folder = args.datasets_folder
 
 
@@ -67,7 +76,7 @@ fit_settings = {
 
     "generate_datasets" : args.generate_ws,
 
-    "charge_selection" : ["plus", "minus"],
+    "charge_selection" : ["plus", "minus"] if args.charge_selection == "all" else [args.charge_selection],
 
     "binning_pt" : "pt_tracking",
     "binning_eta" : "eta",
@@ -83,11 +92,11 @@ fit_settings = {
 
     "load_bkg_datasets" : True,
 
-    "bkg_categories" : [# "bkg_WW", "bkg_WZ", "bkg_ZZ", 
-                        # "bkg_TTFullyleptonic", "bkg_TTSemileptonic",
-                        # "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets",
-                        # "bkg_Ztautau",
-                        "bkg_SameCharge"
+    "bkg_categories" : ["bkg_WW", "bkg_WZ", "bkg_ZZ", 
+                        "bkg_TTFullyleptonic", "bkg_TTSemileptonic",
+                        "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets",
+                        "bkg_Ztautau",
+                        # "bkg_SameCharge"
                         ],
     
     "import_bkg_samesign" : False,
