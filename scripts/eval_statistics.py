@@ -9,7 +9,7 @@ from utilities.base_library import binning, bin_dictionary, eval_efficiency, sum
 
 base_folder = "/scratch/rforti/tnp_efficiencies_results/tracking"
 
-ws_filename = base_folder+"/legacy_fit/ws_tracking.root"
+ws_filename = base_folder+"/legacy_fit_onlyFailSA_allMC/ws_tracking.root"
 
 # benchmark_filename = base_folder+"/legacy_fit_onlyFailSA_allMC/ws_tracking.root"
 
@@ -20,7 +20,7 @@ ws = file.Get("w")
 results = results_manager("indep", "pt_tracking", "eta", import_ws=ws)
 
 
-benchmark_filename = base_folder+"/allEfficiencies.txt"
+benchmark_filename = base_folder+"/../egm_tnp_results/tracking/allEfficiencies.txt"
 with open(benchmark_filename, "r") as file_bmark:
     row_list = file_bmark.readlines()
     print(type(row_list))

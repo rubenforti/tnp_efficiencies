@@ -35,7 +35,7 @@ binning_mass = "mass_50_130"
 
 study_SS_bkg = False 
 
-
+sys.exit()
 charge_flag = "OS" if not study_SS_bkg else "SS"
 
 folder = gen_res_folder+f"/tracking/bkg_figs"
