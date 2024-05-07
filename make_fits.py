@@ -1,15 +1,12 @@
 """
 """
-
 import ROOT
-import os
-import sys
+import os, sys
 from multiprocessing import Pool
 from itertools import repeat
 from fitter import IndepFitter, SimFitter
-from utilities.dataset_utils import import_pdf_library
-from utilities.base_library import bin_dictionary
-
+from utilities.base_lib import import_pdf_library
+from utilities.binning_utils import bin_dictionary
 
 
 def printFitStatus(type_analysis, bin_key, res, status):

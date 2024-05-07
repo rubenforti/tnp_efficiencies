@@ -1,8 +1,8 @@
 import ROOT
 import sys
 import argparse
-from utilities.base_library import bin_dictionary, binning
-from utilities.results_utils import results_manager
+from utilities.base_lib import bin_dictionary, binning
+from utilities.res_tools import results_manager
 from utilities.CMS_lumi import CMS_lumi
 from utilities.dataset_utils import import_pdf_library
 from utilities.plot_utils import style_settings

@@ -1,6 +1,6 @@
 import ROOT
-from utilities.base_library import binning, bin_dictionary, sumw2_error
-from utilities.results_utils import results_manager, efficiency_from_res, eval_efficiency
+from utilities.base_lib import binning, bin_dictionary, sumw2_error
+from utilities.res_tools import results_manager, efficiency_from_res, eval_efficiency
 from utilities.CMS_lumi import CMS_lumi
 from utilities.dataset_utils import import_pdf_library
 from array import array

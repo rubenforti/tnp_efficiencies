@@ -1,12 +1,10 @@
 """
 """
+import sys, time
 import ROOT
-import time
-import sys
-# from copy import copy
-# from utilities.base_library import lumi_factors, binning, bin_dictionary
 from utilities.dataset_utils import ws_init, gen_import_dictionary
 from utilities.bkg_utils import bkg_2d_distrib, bkg_mass_distribution, show_negweighted_bins
+
 
 t0 = time.time()
 
@@ -20,7 +18,9 @@ gen_res_folder = "/scratch/rforti/tnp_efficiencies_results"
 #  GENERAL SETTINGS
 # ------------------
 
-type_eff = "tracking"
+input_folder = "/scratch/rforti/steve_histograms_2016"
+
+type_eff = "reco"
 type_analysis = "indep"
 bkg_categories = ["bkg_SameCharge",
                   "bkg_WW", "bkg_WZ", "bkg_ZZ", 
@@ -31,23 +31,25 @@ bkg_categories = ["bkg_SameCharge",
 
 binning_pt = "pt_singlebin"
 binning_eta = "eta_singlebin"
-binning_mass = "mass_50_130"
+binning_mass = "mass_60_120"
 
 study_SS_bkg = False 
 
-sys.exit()
 charge_flag = "OS" if not study_SS_bkg else "SS"
 
-folder = gen_res_folder+f"/tracking/bkg_figs"
+folder = "/scratch/rforti/tnp_efficiencies_results/recoplus/prova"
+ws_filename = folder+f"/ws_reco_singlebin.root"
 
-ws_filename = folder+f"/ws_tracking_bkg_{charge_flag}_singlebin.root"
+# folder = gen_res_folder+f"/tracking/bkg_figs"
+
+#ws_filename = folder+f"/ws_tracking_bkg_{charge_flag}_singlebin.root"
 '''
 
 folder = "zjets_tests/prova_bkg_distr/OS"
 ws_filename = "zjets_tests/ws_prova.root"
 '''
 
-generate_datasets = False       
+generate_datasets = True       
 
 figpath = folder
 filepath = folder
@@ -88,7 +90,7 @@ if study_SS_bkg:
 if generate_datasets is True:
 
     # base_folder = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023"
-    base_folder = "../steve_hists_tmp"
+    base_folder = f"/scratch/rforti/steve_histograms_2016/{type_eff}"
     
     import_categories = bkg_categories
     if minv_plots["flag"] and minv_plots["plot_on_data"]:

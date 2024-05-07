@@ -3,8 +3,8 @@
 import ROOT
 from array import array
 from copy import copy
-from utilities.base_library import binning, bin_dictionary, eval_efficiency, sumw2_error
-from utilities.results_utils import results_manager, init_results_histos, fill_res_histograms
+from utilities.base_lib import binning, bin_dictionary, eval_efficiency, sumw2_error
+from utilities.res_tools import results_manager, init_results_histos, fill_res_histograms
 from utilities.dataset_utils import import_pdf_library
 
 NBINS = 21

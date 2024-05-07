@@ -7,7 +7,7 @@ import sys
 import os
 import argparse
 from copy import deepcopy as dcp
-from utilities.base_library import bin_dictionary
+from utilities.binning_utils import bin_dictionary
 from utilities.dataset_utils import ws_init, gen_import_dictionary
 from make_fits import runFits, runParallelFits
 
@@ -78,9 +78,9 @@ fit_settings = {
 
     "charge_selection" : ["plus", "minus"] if args.charge_selection == "all" else [args.charge_selection],
 
-    "binning_pt" : "pt_tracking",
+    "binning_pt" : "pt_reco",
     "binning_eta" : "eta",
-    "binning_mass" : "mass_50_130",
+    "binning_mass" : "mass_60_120",
 
     "fitOnlyBkg" : False,
 
@@ -196,6 +196,9 @@ if fit_settings["generate_datasets"]:
         ws.writeToFile(fit_settings["ws_name"])
 
 
+sys.exit("Exiting...")
+
+
 # -----------------------------------------------------------------------------------------------------------
 # FIT PARAMETERS SETTINGS
 # ------------------------
@@ -220,7 +223,6 @@ fit_settings.update(par_fit_settings)
 
 for k,v in fit_settings.items():
     print(k, " ", v)
-
 
 # -----------------------------------------------------------------------------------------------------------
 #  RUNNING FITS

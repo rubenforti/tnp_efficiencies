@@ -1,6 +1,6 @@
 import ROOT
 import sys
-from utilities.base_library import bin_dictionary, lumi_factor, binning
+from utilities.base_lib import bin_dictionary, lumi_factor, binning
 from utilities.dataset_utils import ws_init, get_roohist
 
 

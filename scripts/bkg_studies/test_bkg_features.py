@@ -3,7 +3,7 @@ import os, sys
 from array import array
 import argparse
 import ctypes
-from utilities.base_library import bin_dictionary, sumw2_error, binning
+from utilities.base_lib import bin_dictionary, sumw2_error, binning
 from utilities.dataset_utils import gen_import_dictionary, ws_init
 from matplotlib import pyplot as plt
 from utilities.bkg_utils import bkg_mass_distribution

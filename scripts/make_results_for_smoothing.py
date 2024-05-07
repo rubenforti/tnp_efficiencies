@@ -1,6 +1,6 @@
 import ROOT
-from utilities.base_library import binning, bin_dictionary, eval_efficiency, sumw2_error
-from utilities.results_utils import results_manager
+from utilities.base_lib import binning, bin_dictionary, eval_efficiency, sumw2_error
+from utilities.res_tools import results_manager
 from utilities.dataset_utils import import_pdf_library
 
 import_pdf_library("RooCMSShape")

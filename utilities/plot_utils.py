@@ -6,7 +6,7 @@ import os
 import pickle
 from copy import deepcopy
 from array import array
-from utilities.base_library import  binning, sumw2_error
+from utilities.base_lib import binnings, sumw2_error
 from utilities.CMS_lumi import CMS_lumi
 
 
@@ -307,7 +307,7 @@ def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
 
     plot_commands = ROOT.RooLinkedList()
     plot_commands.Add(ROOT.RooFit.Name(label))
-    plot_commands.Add(ROOT.RooFit.LineColor(colors[label]))
+    plot_commands.Add(ROOT.RooFit.LineColor(colors[label.replace("_SS", "")]))
 
 
     if isHistPlot:
@@ -317,7 +317,7 @@ def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
         plot_commands.Add(ROOT.RooFit.MarkerColor(colors[label.replace("_SS", "")]))
     else:
         bkg_obj_plot = ROOT.RooHistPdf(f"{label}_pdf", f"{label}_pdf", ROOT.RooArgSet(axis), tmp_histo)
-        plot_commands.Add(ROOT.RooFit.LineColor(colors[label]))
+        plot_commands.Add(ROOT.RooFit.LineColor(colors[label.replace("_SS", "")]))
         plot_commands.Add(ROOT.RooFit.LineStyle(1))
         plot_commands.Add(ROOT.RooFit.Normalization(tmp_histo.sumEntries(), ROOT.RooAbsReal.NumEvent))
 
@@ -331,7 +331,7 @@ def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
 
 def plot_bkg(plot_dictionary, flag, bin_key,
              charge_separation="",
-             group_backgrounds=True, logscale=True, figpath=''):
+             group_backgrounds=False, logscale=True, figpath=''):
     """
     Function that creates and saves the plot containing the mass distributions 
     of the various bkg processes and the total bkg; a reference histogram 
@@ -481,9 +481,9 @@ def plot_bkg(plot_dictionary, flag, bin_key,
         
         if nEntries < 0: continue
 
-        
-        if bkg_cat != "SameCharge":
-            if (bkg_cat == list(bkg_plot_it_dict.keys())[-1]) or (bkg_cat=="Zjets"): continue
+        '''
+        if "SameCharge" not in bkg_cat:
+            #if (bkg_cat == list(bkg_plot_it_dict.keys())[-1]) or (bkg_cat=="Zjets"): continue
             #if bkg_cat == list(bkg_plot_it_dict.keys())[-2]: continue
             textbox.AddText(f"\n")
             legend.AddEntry(bkg_cat, " ", "l")
@@ -491,6 +491,7 @@ def plot_bkg(plot_dictionary, flag, bin_key,
             legend_obj.SetLineColor(ROOT.kWhite)
             legend_obj.SetLineWidth(3)
             continue
+        '''
         
         
         pad_plot.cd()
@@ -504,7 +505,7 @@ def plot_bkg(plot_dictionary, flag, bin_key,
         leg_marker_opt = "l" if "SameCharge" not in bkg_cat else "lp"
         legend.AddEntry(bkg_key_print, bkg_key_print, leg_marker_opt)
         legend_obj = legend.GetListOfPrimitives().Last()
-        legend_obj.SetLineColor(colors[bkg_cat])
+        legend_obj.SetLineColor(colors[bkg_cat.replace("_SS", "")])
         legend_obj.SetLineWidth(3)
         if "SameCharge" in bkg_cat: 
             legend_obj.SetMarkerStyle(ROOT.kFullCircle)
@@ -728,7 +729,7 @@ def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=
                        figpath=''):
     """
     """
-    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
 
     if not (len(bins_pt) ==2 or len(bins_eta) == 2):
         sys.exit("ERROR: the projection has to be made by collapsing one of the two dimensions")

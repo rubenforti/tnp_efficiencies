@@ -1,8 +1,8 @@
 import ROOT
 import sys
-from utilities.base_library import bin_dictionary
+from utilities.base_lib import bin_dictionary
 from utilities.dataset_utils import import_pdf_library
-from utilities.results_utils import results_manager
+from utilities.res_tools import results_manager
 
 
 gen_folder = "/scratch/rforti/tnp_efficiencies_results/tracking"

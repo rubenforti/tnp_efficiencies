@@ -2,11 +2,10 @@
 """
 
 import sys
-import os
 import ROOT
-from copy import copy, deepcopy
-from itertools import repeat
-from utilities.base_library import binning, bin_dictionary, lumi_factor, bin_global_idx_dict
+from copy import deepcopy
+from utilities.base_lib import binnings, lumi_factor
+from utilities.binning_utils import bin_dictionary, bin_global_idx_dict
 
 bkg_sum_selector = {
     "bkg_WW" : 1,
@@ -90,7 +89,6 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
 def gen_import_dictionary(base_folder, type_eff, dset_names,
                           ch_set = [""],
                           do_OS_tracking = False,
-                          use_charge_separation = "",
                           add_SS_mc = False,
                           add_SS_bkg = False):
     """
@@ -131,6 +129,7 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
 
         for ch in ch_set:
             filename = f"{base_folder}/tnp_{type_eff}{ch}_{process_name}_vertexWeights1_genMatching{gm_sel}_oscharge{c_sel}{S_sel}.root"
+            print(filename)
             import_dictionary[dset_name]["filenames"].append(filename)
         
         if dset_name=="mc" or ("bkg" in dset_name and "SameCharge" not in dset_name): 
@@ -156,26 +155,6 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
             import_dictionary[f"{dset_name}_SS"]["filenames"] = ss_filenames
 
     return import_dictionary
-                
-###############################################################################
-
-
-def import_pdf_library(*functions):
-    """
-    Imports the C++ defined functions into the ROOT interpreter. 
-    """
-    current_path = os.path.dirname(__file__)
-    import_path = os.path.join(current_path, '..', 'libCpp')
-    
-    for function in functions:
-        ctrl_head = ROOT.gInterpreter.Declare(f' #include "{import_path}/{function}.h"')
-        ctrl_source = ROOT.gSystem.CompileMacro(f"{import_path}/{function}.cc", opt="k")
-
-        if ctrl_head is not True: 
-            sys.exit("ERROR in header loading")
-        if ctrl_source != 1: 
-            sys.exit("ERROR in sourcefile compiling and loading")
-            
 
 ###############################################################################
 
@@ -271,7 +250,7 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
         for it_file in range(len(files)): 
             th1_bincontent += tmp_histos[it_file].GetBinContent(i+1)
         if round(roohisto.weight(i), 5) != round(th1_bincontent, 5):
-            # print(roohisto.weight(i), th1_bincontent)
+            print(roohisto.weight(i), th1_bincontent)
             sys.exit(f"ERROR: bin {i} has different content in TH1 and RooDataHist")
     print("Consistency check passed, RooDataHist imported correctly\n")
             
@@ -396,7 +375,7 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
         bin_idx_dict = bin_global_idx_dict(binning_pt, binning_eta)
         bins = bin_dictionary()
 
-    bins_mass = binning(binning_mass)
+    bins_mass = binnings[binning_mass]
 
     if import_existing_ws is True:
         ws_file = ROOT.TFile(existing_ws_filename)
@@ -437,7 +416,7 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                 files, lumi_scale = dset_obj["filenames"], dset_obj["lumi_scale"]
 
                 if "bkg" in dset_name:
-                    if lightMode_bkg is True and dset_name in merging_dict.keys(): continue
+                    #if lightMode_bkg is True and dset_name in merging_dict.keys(): continue
                     dset_type = "bkg" if not "SameCharge" in dset_name else "data_SC"
                     dset_subs = dset_name.replace("bkg", "")
                     if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
@@ -466,22 +445,3 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
     
     return ws
       
-###############################################################################     
-###############################################################################
-
-
-if __name__ == '__main__':
-
-    type_eff = "tracking"
-
-    base_folder = "/scratchnvme/rajarshi/Latest_3D_Steve_Histograms_22_Sep_2023"
-
-    d = gen_import_dictionary(base_folder, type_eff, ["data", "mc", "bkg_WW", "bkg_WZ", "bkg_SameCharge"], 
-                              ch_set=["plus", "minus"], scale_MC=True, add_SS_mc=False, add_SS_bkg=False)
-    
-
-    ws= ws_init(d, "indep", "pt_singlebin", "eta_singlebin", "mass_50_130", lightMode_bkg=True)
-
-    ws.Print()
-
-

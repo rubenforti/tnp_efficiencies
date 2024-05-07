@@ -1,6 +1,6 @@
 import ROOT
 from utilities.dataset_utils import import_pdf_library
-from utilities.base_library import bin_dictionary, binning
+from utilities.base_lib import bin_dictionary, binning
 
 
 bin_dict = bin_dictionary("pt_tracking", "eta")

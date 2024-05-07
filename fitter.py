@@ -2,12 +2,10 @@
 """
 import ROOT
 import sys
-
 from copy import copy as cp, deepcopy as dcp
 from utilities.dataset_utils import get_totbkg_roohist
-from utilities.results_utils import efficiency_from_res
 from utilities.plot_utils import plot_fitted_pass_fail
-from utilities.base_library import eval_efficiency, sumw2_error, eval_norm_corrected
+from utilities.base_lib import eval_efficiency, sumw2_error, eval_norm_corrected, efficiency_from_res
 from utilities.fit_utils import getSidebands, fit_quality, llr_test_bkg
 
 

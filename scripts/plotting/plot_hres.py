@@ -4,8 +4,8 @@ import ROOT
 from copy import copy
 from utilities.CMS_lumi import CMS_lumi
 from utilities.plot_utils import style_settings
-from utilities.results_utils import results_manager
-from utilities.base_library import binning, bin_dictionary
+from utilities.res_tools import results_manager
+from utilities.base_lib import binning, bin_dictionary
 import statistics
 
 

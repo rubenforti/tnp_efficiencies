@@ -2,15 +2,13 @@
 """
 import ROOT
 import sys
-from utilities.base_library import binning, bin_dictionary, bin_global_idx_dict, sumw2_error
-from utilities.base_library import eval_efficiency as eval_bkgfrac  #La formula è la stessa
+from utilities.base_lib import binnings, sumw2_error, eval_efficiency
+from utilities.binning_utils import bin_dictionary, bin_global_idx_dict
 from utilities.results_utils import init_pass_fail_histos
 from utilities.dataset_utils import get_totbkg_roohist
 from utilities.plot_utils import plot_bkg, plot_2d_bkg_distrib, plot_projected_bkg
 from array import array
 
-
-# bkg_categories = ["WW", "WZ", "ZZ", "TTFullyleptonic", "Ztautau"]
 
 ###############################################################################
 
@@ -21,7 +19,7 @@ def show_negweighted_bins(ws_filename, bkg_categories, binning_pt, binning_eta, 
     file = ROOT.TFile(ws_filename, "READ")
     ws = file.Get("w")
 
-    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
     nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
 
     bin_dict = bin_dictionary(binning_pt, binning_eta)
@@ -148,7 +146,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
     file = ROOT.TFile(ws_filename, "READ")
     ws = file.Get("w")
 
-    bins_pt, bins_pt = binning(binning_pt), binning(binning_eta)
+    bins_pt, bins_pt = binnings[binning_pt], binnings[binning_eta]
     bin_dict = bin_dictionary(binning_pt, binning_eta)
     
     bins_ratio = [round(0.0 + 0.2*i, 2) for i in range(6)] + \
@@ -210,6 +208,10 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
         
                 datasets = make_bkg_dictionary(ws, import_categories, flag, bin_key, bin_pt, bin_eta)
 
+                for k, v in datasets.items():
+                    print(k, " ", v)
+                    print(" ")
+
                 ch_sel = "SS" if is_SS_bkg else "OS"
 
                 # plot_bkg(datasets, flag, bin_key, logscale=setlog, figpath=f"{figpath}/minv_plots_w_sig")
@@ -223,7 +225,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                 nsignal = datasets["mc"].sumEntries()
                 err_nsignal = sumw2_error(datasets["mc"])
 
-                bkgfrac_mc, err_bkgfrac_mc = eval_bkgfrac(nbkg, nsignal, err_nbkg, err_nsignal)
+                bkgfrac_mc, err_bkgfrac_mc = eval_efficiency(nbkg, nsignal, err_nbkg, err_nsignal)
             
                 if compare_bkgfrac:
                     if type(datasets["fit_pars"]["nsig"]) is ROOT.RooRealVar:
@@ -236,7 +238,7 @@ def bkg_mass_distribution(type_eff, ws_filename, bkg_categories, binning_pt, bin
                     else:
                         fit_par_nbkg = ROOT.RooRealVar(fit_par_nbkg.GetName(), fit_par_nbkg.GetTitle(), 0)
 
-                    bkgfrac_fit, err_bkgfrac_fit = eval_bkgfrac(fit_par_nbkg.getVal(), 
+                    bkgfrac_fit, err_bkgfrac_fit = eval_efficiency(fit_par_nbkg.getVal(), 
                                                                 fit_par_nsig.getVal(),
                                                                 fit_par_nbkg.getError(), 
                                                                 fit_par_nsig.getError())
@@ -301,7 +303,7 @@ def bkg_2d_distrib(ws_filename, bkg_categories, binning_pt, binning_eta,
     else:
         add_title = ""
 
-    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
     bin_dict = bin_dictionary(binning_pt, binning_eta)    
 
     plot_categories = [cat.replace("bkg_", "") for cat in bkg_categories]

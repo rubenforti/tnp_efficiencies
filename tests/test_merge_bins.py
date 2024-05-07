@@ -3,7 +3,7 @@
 
 import ROOT
 import unittest
-from utilities.base_library import binning, bin_dictionary
+from utilities.binning_utils import binning, bin_dictionary
 
 
 def create_flat_th3():

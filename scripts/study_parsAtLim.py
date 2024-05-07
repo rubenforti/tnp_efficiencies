@@ -2,7 +2,7 @@
 """
 import ROOT
 import math
-from utilities.base_library import bin_dictionary, binning
+from utilities.base_lib import bin_dictionary, binning
 from utilities.dataset_utils import import_pdf_library
 
 gen_dir = "/scratch/rforti/tnp_efficiencies_results/tracking"
