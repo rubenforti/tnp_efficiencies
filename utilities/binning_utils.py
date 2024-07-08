@@ -1,9 +1,21 @@
 """
 """
+import sys
 import utilities.base_lib as base_lib
 
 
-def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta", get_mergedbins_bounds=False):
+def get_pt_binning_ref(type_eff):
+    """
+    """
+    if type_eff in ["reco", "tracking"]:
+        return f"pt_{type_eff}"
+    elif type_eff in ["idip", "trigger", "iso"]:
+        return "pt"
+    else:
+        sys.exit("Wrong efficiency step inserted. Exiting...")
+
+
+def bin_dictionary(binning_pt_name, binning_eta_name, get_mergedbins_bounds=False, pt_binning_ref="pt"):
     """
     Creates a dictionary that relates the physical bounds of every bin (keys)
     to the indexes useful for the bin selection. The indexes are returned in a 
@@ -22,11 +34,12 @@ def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta", get_mergedbins_
 
     binning_pt, binning_eta = base_lib.binnings[binning_pt_name], base_lib.binnings[binning_eta_name]
 
-    if "tracking" in binning_pt_name: binning_pt_name = "pt"
-
+    # The special binnings for reco and tracking are not to be intended as merged binnings
+    if "reco" in binning_pt_name or "tracking" in binning_pt_name: binning_pt_name = "pt"
+        
     cnt_mergedpt = 0
-    nbins_eta = len(binning_eta)-1
-
+    nbins_eta = len(binning_eta)-1    
+    
     for idx_pt in range(1, len(binning_pt)):
         for idx_eta in range(1, len(binning_eta)):
 
@@ -35,9 +48,11 @@ def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta", get_mergedbins_
             if binning_pt_name == "pt" and binning_eta_name == "eta":
                 index_dictionary[bin_key] = [global_idx, idx_pt, idx_eta]
                 global_idx +=1
+                print(global_idx, idx_pt, idx_eta)
             else:
                 global_idx, bounds_idx_pt, bounds_idx_eta = get_idx_from_bounds([binning_pt[idx_pt-1], binning_pt[idx_pt]],
-                                                                                [binning_eta[idx_eta-1], binning_eta[idx_eta]])
+                                                                                [binning_eta[idx_eta-1], binning_eta[idx_eta]],
+                                                                                pt_binning_ref=pt_binning_ref)
                 if get_mergedbins_bounds is False:
                     eta_idx = int(1+(nbins_eta*(bounds_idx_eta[0]-1)/48.))
                     pt_idx = int(bounds_idx_pt[0] - cnt_mergedpt)
@@ -46,19 +61,22 @@ def bin_dictionary(binning_pt_name="pt", binning_eta_name="eta", get_mergedbins_
                 else:
                     index_dictionary[bin_key] = [global_idx, bounds_idx_pt, bounds_idx_eta]
 
+                print(global_idx, bounds_idx_pt, bounds_idx_eta)
+
     return index_dictionary
 
 ###############################################################################
 
 
-def get_idx_from_bounds(bounds_pt, bounds_eta):
+def get_idx_from_bounds(bounds_pt, bounds_eta, pt_binning_ref="pt"):
     """
     Function that, given the bin bounds (that have to be present in the binning
     arrays!!!), returns the coordinates of the selected region. The coordinates 
     are given as list of global indexes and as bounds on pt/eta indexes (max 
     and min, since the region is rectangular)
     """
-    initial_dict = bin_dictionary()
+
+    initial_dict = bin_dictionary(binning_pt_name=pt_binning_ref, binning_eta_name="eta")
     global_bins = []
     bounds_pt_idx, bounds_eta_idx = [], []
 

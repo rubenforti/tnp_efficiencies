@@ -2,10 +2,10 @@
 """
 
 import sys
-import ROOT
+import ROOT # type: ignore
 from copy import deepcopy
-from utilities.base_lib import binnings, lumi_factor
-from utilities.binning_utils import bin_dictionary, bin_global_idx_dict
+import utilities.base_lib as base_lib
+from utilities.binning_utils import get_pt_binning_ref, bin_dictionary, bin_global_idx_dict
 
 bkg_sum_selector = {
     "bkg_WW" : 1,
@@ -32,7 +32,7 @@ bkg_sum_selector = {
 # separate the SS events from the OS ones into two folders.
 # The same function adapted to the new formalism is present below
 '''
-def gen_import_dictionary(base_folder, type_eff, dset_names,
+def gen_import_dictionary(input_folder, type_eff, dset_names,
                           ch_set = [""],
                           scale_MC = False,
                           add_SS_mc = False,
@@ -60,7 +60,7 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
             S_sel, c_sel = "SS", "0"
 
         for ch in ch_set:
-                filename = f"{base_folder}/{S_sel}/tnp_{type_eff}{ch}_{flag_set}_vertexWeights1_oscharge{c_sel}.root"
+                filename = f"{input_folder}/{S_sel}/tnp_{type_eff}{ch}_{flag_set}_vertexWeights1_oscharge{c_sel}.root"
                 import_dictionary[dset_name]["filenames"].append(filename)
         
         if (dset_name=="mc" and scale_MC is True) or ("bkg" in dset_name and "SameCharge" not in dset_name): 
@@ -86,7 +86,7 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
 ###############################################################################
 
 
-def gen_import_dictionary(base_folder, type_eff, dset_names,
+def gen_import_dictionary(input_folder, type_eff, dset_names,
                           ch_set = [""],
                           do_OS_tracking = False,
                           add_SS_mc = False,
@@ -94,7 +94,7 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
     """
     Generates a dictionary that contains the information about the datasets
     to be imported. The keys are the names of the datasets, the values are
-    dictionaries that contain the filepath(s) and the luminosity scale factor
+    dictionaries that contain the filepath(s) and the luminosity scale factor.
     """
     import_dictionary = {}
     
@@ -128,12 +128,12 @@ def gen_import_dictionary(base_folder, type_eff, dset_names,
             gm_sel = "-1"
 
         for ch in ch_set:
-            filename = f"{base_folder}/tnp_{type_eff}{ch}_{process_name}_vertexWeights1_genMatching{gm_sel}_oscharge{c_sel}{S_sel}.root"
+            filename = f"{input_folder}/tnp_{type_eff}{ch}_{process_name}_vertexWeights1_genMatching{gm_sel}_oscharge{c_sel}{S_sel}.root"
             print(filename)
             import_dictionary[dset_name]["filenames"].append(filename)
         
         if dset_name=="mc" or ("bkg" in dset_name and "SameCharge" not in dset_name): 
-            lumi_scale = lumi_factor(filename, process_name)
+            lumi_scale = base_lib.lumi_factor(filename, process_name)
         
         import_dictionary[dset_name]["lumi_scale"] = lumi_scale
 
@@ -261,13 +261,14 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
 
 def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta, 
                        bkg_selector=bkg_sum_selector,
+                       use_SS=False,
                        fail_template_with_all_SA=False):
     """
     Returns a RooDataHist that represents the total background, for a given
     pt-eta bin. This can be created in two ways, corresponding to two different
     "import_obj" types:
       - "import_obj" is a list: the first position has to be occupied by the
-        workspace, the second by the list of the processes to be summed;
+        workspace, the second by the list of the processes to be summed
       - "import_obj" is a dictionary: the keys must be the names of the 
         datasets to be summed, while the values have to be dictionaries
         containing the filepath(s) and the luminosity factor for the process. 
@@ -275,10 +276,13 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
     manually with the "bkg_selector" dictionary (e.g. to include/exclude a
     certain process or to subtract it from the sum).
     """
+    
+    postfix = "_SS" if use_SS is True else ""
+
     if type(import_obj) is list and type(import_obj[0]) is ROOT.RooWorkspace:  # First position has to be occupied by the workspace, the second by the list of the processes to be summed
         ws, categories = import_obj
-        if type(ws.data(f"Minv_bkg_{flag}_{bin_key}_total")) is ROOT.RooDataHist:
-            return ws.data(f"Minv_bkg_{flag}_{bin_key}_total")
+        if type(ws.data(f"Minv_bkg_{flag}_{bin_key}_total{postfix}")) is ROOT.RooDataHist:
+            return ws.data(f"Minv_bkg_{flag}_{bin_key}_total{postfix}")
         else:
             iter_dict = {}
             for bkg_cat in categories:
@@ -293,22 +297,23 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
     else:
         sys.exit("ERROR: invalid object type given")
     
-    bkg_total_histo = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_total", f"Minv_bkg_{flag}_{bin_key}_total", 
-                                       ROOT.RooArgSet(axis), "x_binning")
+    bkg_total_histo = ROOT.RooDataHist(
+        f"Minv_bkg_{flag}_{bin_key}_total{postfix}", f"Minv_bkg_{flag}_{bin_key}_total{postfix}",
+        ROOT.RooArgSet(axis), "x_binning")
     
     bkg_flags = []
     n_events_bkg = []
 
-    '''
+    """
     ## Not used for fits, it breaks all the naming conventions. It is up to the user to define correctly the names of the bkg sources :)
     for k in iter_dict.keys():
-        # Checks if the total bkg histogram that is going to be created is made
-        # of SS events (of montecarlo datasets) and adjust the name accordingly
-        if ("SS" in k) and ("mc" not in k) :
-            bkg_total_histo.SetName(f"Minv_bkg_{flag}_{bin_key}_total_SS")
-            bkg_total_histo.SetTitle(f"Minv_bkg_{flag}_{bin_key}_total_SS")
-            break
-    '''
+    # Checks if the total bkg histogram that is going to be created is made
+    # of SS events (of montecarlo datasets) and adjust the name accordingly
+    if ("SS" in k) and ("mc" not in k) :
+        bkg_total_histo.SetName(f"Minv_bkg_{flag}_{bin_key}_total_SS")
+        bkg_total_histo.SetTitle(f"Minv_bkg_{flag}_{bin_key}_total_SS")
+        break
+    """
 
     # Loop over the background categories                
     for bkg_cat, bkg_obj in iter_dict.items():
@@ -325,12 +330,14 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
             dset_type = "bkg" if not "SameCharge" in bkg_cat else "data_SC"
             
             bkg_histo = get_roohist(files, dset_type, flag, axis, bin_key, bin_pt, bin_eta, 
-                                    global_scale=lumi_scale, fail_template_with_all_SA=fail_template_with_all_SA)
+                                    global_scale=lumi_scale, 
+                                    fail_template_with_all_SA=fail_template_with_all_SA)
         else:
             bkg_histo = bkg_obj
             
-        bkg_histo_tmp = ROOT.RooDataHist(f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_tmp", f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_tmp",
-                                         ROOT.RooArgSet(axis), "x_binning")
+        bkg_histo_tmp = ROOT.RooDataHist(
+            f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_tmp", f"Minv_bkg_{flag}_{bin_key}_{bkg_cat}_tmp",
+            ROOT.RooArgSet(axis), "x_binning")
 
         coeff_sum = bkg_selector[bkg_cat]
 
@@ -348,7 +355,12 @@ def get_totbkg_roohist(import_obj, flag, axis, bin_key, bin_pt, bin_eta,
 
 ###############################################################################
 
-def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mass, 
+def ws_init(input_folder, dset_names, type_eff, binning_pt, binning_eta, binning_mass,
+            type_analysis = "indep",
+            ch_set = [""],
+            do_OS_tracking = False,
+            add_SS_mc = False,
+            add_SS_bkg = False,
             import_existing_ws = False, 
             existing_ws_filename = "",
             fail_template_with_all_SA=False,
@@ -357,25 +369,28 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
     """
     Initializes a RooWorkspace with the datasets corresponding to a given 
     efficiency step. The objects stored are RooDataHist of TP_mass in every 
-    pt-eta bin requested. The import_sets dictionary has as keys the names of 
-    the datasets to be imported ("data", "mc", and the various backgrounds) and
-    must contain as values:
-        - the paths of the file;
-        - the luminosity scale factors (for MC datasets);
-    The value of a MC dataset has to be a dictionary with the "filename" and 
-    "lumi_scale" keys. For "mc" case (referred to the signal template), it is
-    possible not to specify the luminosity scale factor, since it could be used
-    as a mere template: furhter consistency checks could be necessary in this
-    case, depending on the analysis requested. 
+    pt-eta bin requested.
     """
 
+    import_datasets = gen_import_dictionary(input_folder, type_eff, dset_names,
+                                            ch_set=ch_set,
+                                            do_OS_tracking=do_OS_tracking,
+                                            add_SS_mc=add_SS_mc,
+                                            add_SS_bkg=add_SS_bkg)
+    
+    for k, v in import_datasets.items():
+        print(k, " ", v)
+        print("")
+
+    print(ch_set, altBinning_bkg)
+
     if altBinning_bkg is False:
-        bins = bin_dictionary(binning_pt, binning_eta, get_mergedbins_bounds=True)
+        bins = bin_dictionary(binning_pt, binning_eta, get_mergedbins_bounds=True, pt_binning_ref=get_pt_binning_ref(type_eff))
     else:
-        bin_idx_dict = bin_global_idx_dict(binning_pt, binning_eta)
+        bin_idx_dict = bin_global_idx_dict(type_eff, binning_pt, binning_eta)
         bins = bin_dictionary()
 
-    bins_mass = binnings[binning_mass]
+    bins_mass = base_lib.binnings[binning_mass]
 
     if import_existing_ws is True:
         ws_file = ROOT.TFile(existing_ws_filename)
@@ -389,10 +404,11 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
     for dataset_key, dataset_obj in import_datasets.items():
         print(dataset_key, dataset_obj["filenames"])
         dataset_obj["filenames"] = [ROOT.TFile(v, "READ") for v in dataset_obj["filenames"]]
-   
-    # Automatically excluded the SS datasets from the merging process
-    # In future version of this code, the distiction between OS, SS and sign-integrated datasets should be made more clear !!!
-    merging_dict = {k : v for k, v in import_datasets.items() if ("_SS" not in k and bkg_sum_selector[k]!=0)}
+
+    # Create the dictionaries for the creation of the "total bkg" histograms
+    merging_dict_OS = {k : v for k, v in import_datasets.items() if ("_SS" not in k and bkg_sum_selector[k]!=0)}
+    merging_dict_SS = {k : v for k, v in import_datasets.items() if ("_SS" in k and bkg_sum_selector[k.replace("_SS", "")]!=0)}
+    
     
     # Loop over the pt-eta bins
     for bin_key, [gl_idx, bin_pt, bin_eta] in bins.items():
@@ -416,10 +432,11 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                 files, lumi_scale = dset_obj["filenames"], dset_obj["lumi_scale"]
 
                 if "bkg" in dset_name:
-                    #if lightMode_bkg is True and dset_name in merging_dict.keys(): continue
+                    if lightMode_bkg is True and dset_name in list(merging_dict_SS.keys())+list(merging_dict_OS): continue
                     dset_type = "bkg" if not "SameCharge" in dset_name else "data_SC"
                     dset_subs = dset_name.replace("bkg", "")
-                    if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
+                    if altBinning_bkg is True: 
+                        bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
                 elif dset_name=="mc_SS":
                     dset_type = dset_name.replace("_SS", "")
                     dset_subs = "_SS"
@@ -434,14 +451,18 @@ def ws_init(import_datasets, type_analysis, binning_pt, binning_eta, binning_mas
                 ws.Import(histo)
             
             # Importing the total background histogram if light mode is called (only for OS)
-            if len(merging_dict)>0:
-                if altBinning_bkg is True: bin_pt, bin_eta = bin_idx_dict[str(gl_idx)]
-                bkg_total_histo = get_totbkg_roohist(merging_dict, flag, axis, bin_key, bin_pt, bin_eta,
-                                                     fail_template_with_all_SA=fail_template_with_all_SA)
-                ws.Import(bkg_total_histo)
-                # print(bkg_total_histo.GetTitle(), bkg_total_histo.sumEntries())
+            for merge_dict in [merging_dict_OS, merging_dict_SS]:
+                if len(merge_dict)>0:
+                    bkg_total_histo = get_totbkg_roohist(merge_dict, flag, axis, bin_key, bin_pt, bin_eta,
+                                                         use_SS=(merge_dict==merging_dict_SS),
+                                                         fail_template_with_all_SA=fail_template_with_all_SA)
+                    """
+                    if merge_dict==merging_dict_SS:
+                        bkg_total_histo.SetName(f"{bkg_total_histo.GetName()}_SS")
+                        bkg_total_histo.SetTitle(f"{bkg_total_histo.GetTitle()}_SS")
+                    """
+                    ws.Import(bkg_total_histo)
+                    print(bkg_total_histo.GetTitle(), bkg_total_histo.sumEntries())
 
-
-    
     return ws
       

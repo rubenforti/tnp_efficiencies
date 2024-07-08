@@ -22,7 +22,8 @@ colors = {
     "bkg_WminusJets" : ROOT.kOrange-3,
     "bkg_SameCharge" : ROOT.kYellow+2,
     "bkg_Zjets" : ROOT.kBlue+4,
-    "bkg_total" :  ROOT.kRed, #ROOT.kBlack, 
+    "bkg_total" : ROOT.kRed,
+    "bkg_total_SS" : ROOT.kRed-2, #ROOT.kBlack, 
     "mc" : ROOT.kBlue, #ROOT.kRed,
     "mc_SS" : ROOT.kBlue-2, #ROOT.kOrange+4, 
     "pdf_bkg_fit" : ROOT.kRed-2,
@@ -323,15 +324,14 @@ def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
 
     bkg_obj_plot.plotOn(frame, plot_commands)
 
-    print(f"{label} plotted with {nbins_total_bkg} bins")
-    # plot_frame.Draw("same")
+    # print(f"{label} plotted with {nbins_total_bkg} bins")
 
 ###############################################################################
 
 
 def plot_bkg(plot_dictionary, flag, bin_key,
              charge_separation="",
-             group_backgrounds=False, logscale=True, figpath=''):
+             group_backgrounds=True, logscale=True, figpath=''):
     """
     Function that creates and saves the plot containing the mass distributions 
     of the various bkg processes and the total bkg; a reference histogram 
@@ -430,12 +430,18 @@ def plot_bkg(plot_dictionary, flag, bin_key,
     textbox.SetTextAlign(12)
         
     # Plotting the total bkg
-    total_bkg = plot_objects["bkg_total"]
+
+    postfix = "" if charge_separation == "" else f"_{charge_separation}"
+    ### Temporary, just for consistency
+    if postfix == "_OS": postfix = ""
+    ###
+    print(charge_separation, postfix)
+    total_bkg = plot_objects[f"bkg_total{postfix}"]
     pad_plot.cd()
     plot_bkg_object(frame, axis, [total_bkg], "bkg_total", list_nbins_plot)
     plotted_histos.append(total_bkg)
+    
     pad_info.cd()
-
     legend.AddEntry(f"Total bkg {charge_separation}", f"Total bkg {charge_separation}", "l")
     legend_obj = legend.GetListOfPrimitives().Last()
     legend_obj.SetLineColor(colors["bkg_total"])
@@ -464,20 +470,24 @@ def plot_bkg(plot_dictionary, flag, bin_key,
 
     for bkg_cat, bkg_obj in bkg_plot_it_dict.items():
 
-        print (bkg_cat, bkg_obj)
-
         if bkg_cat == "bkg_total": continue
     
         bkg_key_print = deepcopy(bkg_cat).replace("bkg_", "")
 
         nEntries = 0
         if group_backgrounds:
-            hist_plotting = [plot_objects[key] for key in bkg_obj]
-            for hist in hist_plotting: nEntries += hist.sumEntries()
-            if len(hist_plotting) == 0: continue
+            hist_plotting = [plot_objects[key] for key in bkg_obj if type(plot_objects[key]) is ROOT.RooDataHist]
+            not_found_bkgs = [key for key in bkg_obj if type(plot_objects[key]) is not ROOT.RooDataHist]
+            for nf_bkg in not_found_bkgs:
+                print(f"WARNING: {nf_bkg} not found as RooDataHist object in the workspace. Skipping...")
+            if len(hist_plotting) == 0: 
+                continue
+            for hist in hist_plotting:
+                nEntries += hist.sumEntries()
+            
         else:
             hist_plotting = [bkg_obj]
-            nEntries = bkg_obj.sumEntries()
+            nEntries = bkg_obj.sumEntries()       
         
         if nEntries < 0: continue
 
@@ -492,7 +502,7 @@ def plot_bkg(plot_dictionary, flag, bin_key,
             legend_obj.SetLineWidth(3)
             continue
         '''
-        
+
         
         pad_plot.cd()
         plot_bkg_object(frame, axis, hist_plotting, bkg_cat, list_nbins_plot)
@@ -604,7 +614,7 @@ def plot_bkg(plot_dictionary, flag, bin_key,
     
     frame.SetMinimum(0.1)
     
-    print(ctrl_plot_max, frame.GetMaximum())
+    # print(ctrl_plot_max, frame.GetMaximum())
     frame.Draw()
     #pad_plot.Update()
 
@@ -630,9 +640,185 @@ def plot_bkg(plot_dictionary, flag, bin_key,
     c.Update()
 
     filename = f"bkg_{bin_key}_{flag}" if bin_key!="[24.0to65.0][-2.4to2.4]" else f"bkg_total_{flag}"
-    if charge_separation != "": filename += f"_{charge_separation}"
+    #if charge_separation != "": filename += f"_{charge_separation}"
 
-    c.SaveAs(f"{figpath}/{filename}.png")
+    c.SaveAs(f"{figpath}/{flag}/{filename}.png")
+
+###############################################################################
+
+
+def plot_bkg_comparison(plot_dictionary, flag, bin_key, figpath=''):
+    """
+    Function that creates and saves the plot containing the mass distributions 
+    of two different backgrounds. The objects to be plotted are contained in 
+    the dictionary "plot_objects", which must be structured as follows:
+        plot_objects = { 
+            "axis":RooRealVar, "bkg_1":RooDataHist, "bkg_2":RooDataHist 
+            }
+    The order of the dictionary has to be the one shown here; the bkg keys are
+    the labels used in the plots to refer to the two histograms.
+    """
+
+    plot_objects = deepcopy(plot_dictionary)
+
+    hist_list = list(plot_objects.values())
+    hist_names = list(plot_objects.keys())
+
+    c = ROOT.TCanvas(f"c_{bin_key}_{flag}", "c", 900, 900)
+    c.cd()
+
+    style_settings()
+
+    pad_title = ROOT.TPad("pad_title", "pad_title", 0, 0.9, 1, 1)
+    pad_plot = ROOT.TPad("pad_plot", "pad_plot", 0, 0.3, 1, 0.9)
+    pad_ratio = ROOT.TPad("pad_ratio", "pad_ratio", 0, 0, 1, 0.3)
+
+    pad_title.SetMargin(0.1, 0.1, 0.1, 0.1), pad_title.Draw()
+    pad_plot.SetMargin(0.1, 0.05, 0, 0.05), pad_plot.Draw()
+    pad_ratio.SetMargin(0.1, 0.05, 0.2, 0.0), pad_ratio.Draw()
+
+    pad_title.cd()
+    titlebox = ROOT.TPaveText(0, 0, 1, 1, "NDC NB")
+    titlebox.SetFillColor(0)
+    # titlebox.SetTextFont(42)
+    titlebox.SetTextSize(0.25)
+
+    title_str = f"{hist_names[1].replace('bkg_','')}-{hist_names[2].replace('bkg_','')} comparison ({flag}ing probes)"
+    if bin_key != "[24.0to65.0][-2.4to2.4]": 
+        title_str += f" - bin {bin_key}"
+
+    titlebox.AddText(title_str)
+    titlebox.Draw()
+    c.Update()
+
+
+    axis = plot_objects["axis"]
+
+    binning_plot = axis.getBinning("plot_binning")
+    nbins = binning_plot.numBins()
+
+
+    # Initializing the plotting pad
+    pad_plot.cd()
+    frame = axis.frame(ROOT.RooFit.Bins(axis.getBins("plot_binning")))
+    frame.SetTitle("")
+    frame.SetTitleSize(0)
+    frame_yaxis = frame.GetYaxis()
+    frame_yaxis.SetTitle("Events / (1 GeV)")
+    frame_yaxis.SetTitleSize(0.032)
+    frame_yaxis.SetTitleOffset(1.2)
+    frame_axis = frame.GetXaxis()
+    frame_axis.SetTitle("")
+    frame_axis.SetTitleSize(0)
+
+    # Create the legend in the upper part of the plot pad
+    pad_plot.cd()
+    legend = ROOT.TLegend(0.65, 0.8, 0.95, 0.95)
+    legend.SetNColumns(1)
+    legend.SetFillColor(0)
+    legend.SetTextSize(0.03)
+    legend.SetTextAlign(12)
+    legend.SetBorderSize(1)
+
+
+    #Initializing the ratio pad
+    pad_ratio.cd()    
+    frame_ratio = axis.frame(ROOT.RooFit.Bins(nbins))
+    frame_ratio.SetTitle("")
+    frame_ratio.SetTitleSize(0)
+    frame_ratio_yaxis = frame_ratio.GetYaxis()
+
+    hist_names_label = [h.replace("bkg_","")+"_MC" if "total" in h else h.replace("bkg_","") for h in hist_names]
+
+    frame_ratio_yaxis.SetTitle(f"Ratio {hist_names_label[1]} / {hist_names_label[2]}")
+    frame_ratio_yaxis.SetTitleSize(0.064)
+    frame_ratio_yaxis.SetTitleOffset(0.6)
+    frame_ratio_yaxis.SetLabelSize(0.07)
+    frame_ratio_axis = frame_ratio.GetXaxis()
+    frame_ratio_axis.SetTitle("M_{inv} TP [GeV]")
+    frame_ratio_axis.SetTitleSize(0.07)
+    frame_ratio_axis.SetTitleOffset(1.2)
+    frame_ratio_axis.SetLabelSize(0.07)
+
+    for bkg_key, bkg_hist in plot_objects.items():
+        if bkg_key=="axis": continue
+
+        plot_commands = ROOT.RooLinkedList()
+        plot_commands.Add(ROOT.RooFit.Name(bkg_key))
+        plot_commands.Add(ROOT.RooFit.LineColor(colors[bkg_key.replace("_SS", "")]))
+        
+        if "total" in bkg_key:
+            bkg_obj_plot = ROOT.RooHistPdf(f"{bkg_key}_pdf", f"{bkg_key}_pdf", ROOT.RooArgSet(axis), bkg_hist)
+            plot_commands.Add(ROOT.RooFit.LineColor(colors[bkg_key]))
+            plot_commands.Add(ROOT.RooFit.LineStyle(1))
+            plot_commands.Add(ROOT.RooFit.Normalization(bkg_hist.sumEntries(), ROOT.RooAbsReal.NumEvent))
+        else:
+            bkg_obj_plot = bkg_hist
+            plot_commands.Add(ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson))
+            plot_commands.Add(ROOT.RooFit.MarkerColor(colors[bkg_key.replace("_SS", "")]))
+
+        pad_plot.cd()
+        bkg_obj_plot.plotOn(frame, plot_commands)
+
+
+        legend.AddEntry(bkg_key, f"{bkg_key.replace('bkg_','')}: {bkg_hist.sumEntries():.0f} #pm {sumw2_error(bkg_hist):.0f}", "l" if "MC" in bkg_key else "lp")
+        legend_obj = legend.GetListOfPrimitives().Last()
+        legend_obj.SetLineColor(colors[bkg_key.replace("_SS", "")])
+        legend_obj.SetMarkerColor(colors[bkg_key.replace("_SS", "")])
+        legend_obj.SetLineWidth(3)
+
+
+    print(hist_list[1].sumEntries(), hist_list[2].sumEntries())
+
+    total_ratio = hist_list[1].sumEntries()/hist_list[2].sumEntries()
+
+    legend.AddEntry(" ", f"Ratio = {total_ratio:.2f}", "")
+
+    pad_plot.cd()
+    frame.Draw()
+    legend.Draw()
+    CMS_lumi(pad_plot, 5, 0, simulation=(True if ("MC" in hist_names[1] and "MC" in hist_names[2]) else False))
+
+
+    array_ratio, array_ratio_err = [1]*nbins, [0]*nbins
+    max_ratio, min_ratio = 1, 1
+    for i in range(nbins):
+        if hist_list[2].weight(i) == 0: continue
+        array_ratio[i] = hist_list[1].weight(i)/hist_list[2].weight(i)
+        if array_ratio[i] == 0: continue
+        array_ratio_err[i] = array_ratio[i] * (
+            (hist_list[1].weightError(ROOT.RooAbsData.SumW2)/hist_list[1].weight(i))**2 + 
+            (hist_list[2].weightError(ROOT.RooAbsData.SumW2)/hist_list[2].weight(i))**2 )**0.5
+        if array_ratio[i] > max_ratio: max_ratio = array_ratio[i]
+        if array_ratio[i] < min_ratio: min_ratio = array_ratio[i]
+        
+    pad_ratio.cd()
+    histo_ratio = ROOT.RooDataHist("ratio", "ratio", ROOT.RooArgSet(axis), "plot_binning")
+    for i in range(nbins):
+        axis.setVal(binning_plot.binCenter(i))
+        histo_ratio.add(ROOT.RooArgSet(axis), array_ratio[i], array_ratio_err[i]**2)
+    histo_ratio.plotOn(frame_ratio, ROOT.RooFit.Binning("plot_binning"), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2))
+    
+    frame_ratio.SetMaximum(max(max_ratio+0.2, 1.2))
+    frame_ratio.SetMinimum(min(min_ratio-0.2, 0.8))
+
+    frame_ratio.Draw()
+
+    hline = ROOT.TLine(axis.getBinning("plot_binning").binLow(0), 1, axis.getBinning("plot_binning").binHigh(nbins-1), 1)
+    hline.SetLineStyle(2)
+    hline.Draw()
+
+    hline_avg = ROOT.TLine(axis.getBinning("plot_binning").binLow(0), total_ratio,
+                           axis.getBinning("plot_binning").binHigh(nbins-1), total_ratio)
+    hline_avg.SetLineColor(ROOT.kRed)
+    hline_avg.Draw()
+
+    filename = f"bkgComp_{bin_key}_{flag}" if bin_key!="[24.0to65.0][-2.4to2.4]" else f"bkgComp_total_{flag}"
+    #if charge_separation != "": filename += f"_{charge_separation}"
+
+    c.SaveAs(f"{figpath}/{flag}/{filename}.png")
+
+
 
 ###############################################################################
 
@@ -650,6 +836,8 @@ def plot_2d_bkg_distrib(histos_dict, bkg_cat, figpath=""):
     hist_pass, hist_fail = histos_dict["pass"], histos_dict["fail"]
 
     style_settings()
+
+    print(hist_pass.GetEntries(), hist_fail.GetEntries())
 
     pad_title = ROOT.TPad("pad_title", "pad_title", 0, 0.94, 1, 1)
     pad_subtitle_pass = ROOT.TPad("pad_subtitle_pass", "pad_subtitle_pass", 0, 0.9, 0.5, 0.94)
@@ -731,7 +919,7 @@ def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=
     """
     bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
 
-    if not (len(bins_pt) ==2 or len(bins_eta) == 2):
+    if not (len(bins_pt)==2 or len(bins_eta)==2):
         sys.exit("ERROR: the projection has to be made by collapsing one of the two dimensions")
 
     if len(bins_pt) > len(bins_eta):
@@ -854,39 +1042,17 @@ def plot_projected_bkg(plot_dictionary, binning_pt, binning_eta, flag, logscale=
 if __name__ == '__main__':
 
     
-    '''
-    file = ROOT.TFile('results/benchmark_iso/ws_iso_indep.root', "READ")
-
+    file = ROOT.TFile("/scratch/rforti/tnp_efficiencies_results/recoplus/bkg_studies/ws_recoplus.root", "READ")
     ws = file.Get("w")
+
     
-    res = results_manager("indep")
-    res.Open("results/benchmark_iso_sim/results_iso_sim.pkl")
+    bin_key = "[24.0to26.0][-2.4to-2.3]"
 
-    for bin_pt in range(1, 16):
-        for bin_eta in range(1, 49):
-            res.add_result(ws, bin_pt, bin_eta, check=False)
-    '''
-    # res.Write('results/benchmark_iso/new_results_2.pkl')
+    plot_dict = {
+        "axis" : ws.var(f"x_fail_{bin_key}"),
+        "WminusJets" : ws.data(f"Minv_bkg_fail_{bin_key}_WplusJets_SS"),
+        "Zjets" : ws.data(f"Minv_bkg_fail_{bin_key}_Zjets_SS"),
+    }
 
-    # plot_results("root_files/ws/ws_iso_indep.root", res)
-
-    style_settings()
-
-
-    axis = ROOT.RooRealVar("mass", "mass", 60, 120)
-
-    mu = ROOT.RooRealVar("mu", "mu", 90, 60, 120)
-    sigma = ROOT.RooRealVar("sigma", "sigma", 5, 0.5, 10)
-    gaus = ROOT.RooGaussian("gaus", "gaus", axis, mu, sigma)
-
-    data = gaus.generateBinned(ROOT.RooArgSet(axis), 10000)
-
-    c = ROOT.TCanvas("c", "c", 800, 600)
-    c.cd()
-
-    pad_plot = ROOT.TPad("pad_plot", "pad_plot", 0, 0.25, 0.7, 0.95)
-    pad_plot.Draw()
-    plot_minv_distrib_with_fit(pad_plot, "pass",axis, data, gaus, pull=False)
-    
-    c.SaveAs("../prova_plot.pdf")
-
+    plot_bkg_comparison(plot_dict, "fail", bin_key, logscale=True,
+                        figpath="./")

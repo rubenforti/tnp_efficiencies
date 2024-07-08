@@ -2,6 +2,7 @@
 """
 import os, sys
 import ROOT
+import argparse
 from array import array
 
 
@@ -29,7 +30,25 @@ binnings = {
     "eta_4bins" : array('d', [round(-2.4 + i*1.2, 2) for i in range(5)]),
     }
 
-lumi_data = 16.8  # fb^-1
+default_binnings_by_eff = {
+    "reco" : ["pt_reco", "eta", "mass_60_120"],
+    "tracking" : ["pt_tracking", "eta", "mass_50_130"],
+    "idip" : ["pt", "eta", "mass_60_120"],
+    "trigger" : ["pt", "eta", "mass_60_120"],
+    "iso" : ["pt", "eta", "mass_60_120"]
+}
+
+bkg_categories = ["bkg_SameCharge",
+                  "bkg_WW", "bkg_WZ", "bkg_ZZ", 
+                  "bkg_TTSemileptonic", "bkg_TTFullyleptonic", "bkg_Ztautau",
+                  "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets"
+                  ]
+
+default_steve_hists_folder = "/scratch/rforti/steve_histos_2016/"
+
+
+lumi_data = 16.8  # fb^-1, for 2016postVFP
+
 
 BR_TAUToMU = 0.1739
 BR_TAUToE = 0.1782
@@ -48,6 +67,65 @@ cross_sections_bkg = {
     "Ztautau" : xsec_ZmmPostVFP*Z_TAU_TO_LEP_RATIO,
     "Zjets" : xsec_ZmmPostVFP  # obtained from the signal MC file with the "reverse" gen-matching option
 }
+
+###############################################################################
+
+
+def base_parser():
+    """
+    """
+    parser = argparse.ArgumentParser(description='Command line basic parser of tnp_efficiencies')
+    
+    parser.add_argument('-e', '--eff', type=str, choices=['reco', 'tracking', 'idip', 'trigger', 'iso'], default='reco',
+                        help='Type of efficiency to be studied')
+    parser.add_argument('-g', '--generate_ws', action='store_true',
+                        help="Generate the workspace")
+    parser.add_argument('-i', '--input', type=str, default='',
+                        help='Folder containing the input histograms or the root file containing the workspace')
+    parser.add_argument('-o', '--output_folder', type=str, default='./',
+                        help='Folder where to store the results')
+    parser.add_argument('-y', '--year', type=str, choices=['2016', '2017', '2018'], default='2016')
+    parser.add_argument('-ch', '--charge_selection', type=str, choices=['plus', 'minus', 'all', ''], default='all')
+    parser.add_argument('--an', '--analysis', type=str, choices=['indep', 'sim', 'sim_sf'], default='indep',
+                        help='Type of fitting analysis to be performed')
+    parser.add_argument('--binning_pt', type=str, choices=[b_key for b_key in binnings.keys() if 'pt' in b_key])
+    parser.add_argument('--binning_eta', type=str, choices=[b_key for b_key in binnings.keys() if 'eta' in b_key])
+    parser.add_argument('--binning_mass', type=str, choices=[b_key for b_key in binnings.keys() if 'mass' in b_key])
+
+    parser.add_argument("--ws_postfix", type=str, default="", 
+                        help="Postfix to be added to the workspace name (when generating it)")
+    parser.add_argument('--OS_tracking', action='store_true',
+                        help='Study the tracking efficiency only in the OS region')
+    parser.add_argument('--all_SA_fail', action='store_true',
+                        help='Build the signal template for the failing probes by using all the probes with their SA inv. mass [tested for tracking step, but introduces a bias]')
+
+    return parser
+
+###############################################################################
+
+
+def control_parsing(args):
+    """
+    Apply control conditions on the arguments returned by the parser
+    """
+
+    if args.binning_pt is None:   args.binning_pt   = default_binnings_by_eff[args.eff][0]
+    if args.binning_eta is None:  args.binning_eta  = default_binnings_by_eff[args.eff][1]
+    if args.binning_mass is None: args.binning_mass = default_binnings_by_eff[args.eff][2]
+
+    if "all" in args.bkg_categories: args.bkg_categories = bkg_categories
+    
+    args.charge_selection = ["plus", "minus"] if args.charge_selection=="all" else [args.charge_selection]
+
+    if args.input.endswith(".root"):
+        ws_filename = args.input
+    else:
+        eff_postfix = "" if args.charge_selection in ["all", ""] else args.charge_selection
+        ws_filename = args.output_folder+f"/ws_{args.eff}{eff_postfix}.root"
+        if args.ws_postfix != "": 
+            ws_filename = ws_filename.replace(".root", f"_{args.ws_postfix}.root")
+
+    return args
 
 ###############################################################################
 
