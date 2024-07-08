@@ -81,9 +81,11 @@ def base_parser():
     parser.add_argument('-g', '--generate_ws', action='store_true',
                         help="Generate the workspace")
     parser.add_argument('-i', '--input', type=str, default='',
-                        help='Folder containing the input histograms or the root file containing the workspace')
+                        help='Folder containing the input histograms (not used when the ws generation is off)')
     parser.add_argument('-o', '--output_folder', type=str, default='./',
                         help='Folder where to store the results')
+    parser.add_argument('-ws', '--ws_filename', type=str, default='',
+                        help='Name of the root file that contains the workspace (or will contain, when generating it)')
     parser.add_argument('-y', '--year', type=str, choices=['2016', '2017', '2018'], default='2016')
     parser.add_argument('-ch', '--charge_selection', type=str, choices=['plus', 'minus', 'all', ''], default='all')
     parser.add_argument('--an', '--analysis', type=str, choices=['indep', 'sim', 'sim_sf'], default='indep',
@@ -117,13 +119,12 @@ def control_parsing(args):
     
     args.charge_selection = ["plus", "minus"] if args.charge_selection=="all" else [args.charge_selection]
 
-    if args.input.endswith(".root"):
-        ws_filename = args.input
-    else:
+
+    if args.ws_filename == "":
         eff_postfix = "" if args.charge_selection in ["all", ""] else args.charge_selection
-        ws_filename = args.output_folder+f"/ws_{args.eff}{eff_postfix}.root"
+        args.ws_filename = args.output_folder+f"/ws_{args.eff}{eff_postfix}.root"
         if args.ws_postfix != "": 
-            ws_filename = ws_filename.replace(".root", f"_{args.ws_postfix}.root")
+            args.ws_filename = args.ws_filename.replace(".root", f"_{args.ws_postfix}.root")
 
     return args
 

@@ -46,14 +46,6 @@ args = parser.parse_args()
 
 base_lib.control_parsing(args) 
 
-if args.input.endswith(".root"):
-        ws_filename = args.input
-else:
-    eff_postfix = "" if args.charge_selection in ["all", ""] else args.charge_selection
-    ws_filename = args.output_folder+f"/ws_{args.eff}{eff_postfix}.root"
-    if args.ws_postfix != "": 
-        ws_filename = ws_filename.replace(".root", f"_{args.ws_postfix}.root")
-
 an_opt = {}
 for an_type in args.bkg_study: 
     an_opt[an_type] = {opt : vars(args)[opt] for opt in an_options[an_type]}
@@ -78,8 +70,8 @@ if args.generate_ws is True:
                  add_SS_bkg=(args.study_SS or args.add_SS_bkg), 
                  lightMode_bkg=args.lightMode_bkg)
                  
-    ws.writeToFile(ws_filename)
+    ws.writeToFile(args.ws_filename)
 
 
-analyze_bkg(args.eff, ws_filename, args.binning_pt, args.binning_eta, args.bkg_categories, args.bkg_study, an_opt,
+analyze_bkg(args.eff, args.ws_filename, args.binning_pt, args.binning_eta, args.bkg_categories, args.bkg_study, an_opt,
             output_path=args.output_folder)
