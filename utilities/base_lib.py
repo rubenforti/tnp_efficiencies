@@ -82,13 +82,13 @@ def base_parser():
                         help="Generate the workspace")
     parser.add_argument('-i', '--input', type=str, default='',
                         help='Folder containing the input histograms (not used when the ws generation is off)')
-    parser.add_argument('-o', '--output_folder', type=str, default='./',
+    parser.add_argument('-o', '--output', type=str, default='./',
                         help='Folder where to store the results')
     parser.add_argument('-ws', '--ws_filename', type=str, default='',
                         help='Name of the root file that contains the workspace (or will contain, when generating it)')
     parser.add_argument('-y', '--year', type=str, choices=['2016', '2017', '2018'], default='2016')
     parser.add_argument('-ch', '--charge_selection', type=str, choices=['plus', 'minus', 'all', ''], default='all')
-    parser.add_argument('--an', '--analysis', type=str, choices=['indep', 'sim', 'sim_sf'], default='indep',
+    parser.add_argument('-an', '--type_analysis', type=str, choices=['indep', 'sim', 'sim_sf'], default='indep',
                         help='Type of fitting analysis to be performed')
     parser.add_argument('--binning_pt', type=str, choices=[b_key for b_key in binnings.keys() if 'pt' in b_key])
     parser.add_argument('--binning_eta', type=str, choices=[b_key for b_key in binnings.keys() if 'eta' in b_key])
@@ -111,20 +111,34 @@ def control_parsing(args):
     Apply control conditions on the arguments returned by the parser
     """
 
+    # Setting the default binning
     if args.binning_pt is None:   args.binning_pt   = default_binnings_by_eff[args.eff][0]
     if args.binning_eta is None:  args.binning_eta  = default_binnings_by_eff[args.eff][1]
     if args.binning_mass is None: args.binning_mass = default_binnings_by_eff[args.eff][2]
 
-    if "all" in args.bkg_categories: args.bkg_categories = bkg_categories
+    # Control on output folder
+    if not os.path.exists(args.output): os.makedirs(args.output)
     
-    args.charge_selection = ["plus", "minus"] if args.charge_selection=="all" else [args.charge_selection]
-
-
+    # Control on workspace filename. The resulting 'args.ws_filename' object is
+    # the full path of the workspace file, ready to be used in the routine
     if args.ws_filename == "":
         eff_postfix = "" if args.charge_selection in ["all", ""] else args.charge_selection
-        args.ws_filename = args.output_folder+f"/ws_{args.eff}{eff_postfix}.root"
+        args.ws_filename = args.output+f"/ws_{args.eff}{eff_postfix}.root"
         if args.ws_postfix != "": 
             args.ws_filename = args.ws_filename.replace(".root", f"_{args.ws_postfix}.root")
+    else:
+        if not args.ws_filename.endswith(".root"): 
+            args.ws_filename += ".root"
+        if "/" not in args.ws_filename:
+            args.ws_filename = args.output_folder+"/"+args.ws_filename
+    
+    # Charge selection
+    args.charge_selection = ["plus", "minus"] if args.charge_selection=="all" else [args.charge_selection]
+
+    # Control on the workspace existence
+    if args.generate_ws and os.path.exists(args.ws_filename): 
+        confirm_gen = input("Workspace already exists, do you REALLY want to generate a new one from scratch? (y/n) ")
+        if confirm_gen != "y": args.generate_ws = False
 
     return args
 
@@ -231,4 +245,16 @@ def import_pdf_library(*functions):
             sys.exit("ERROR in header loading")
         if ctrl_source != 1: 
             sys.exit("ERROR in sourcefile compiling and loading")
-            
+
+
+
+if __name__=="__main__":
+    parser = base_parser()
+
+    import utilities.bkg_utils as bkg_utils
+
+    parser = bkg_utils.base_parser_bkg(parser)
+
+    args = parser.parse_args()
+
+    for k, v in vars(args).items(): print(k, v)

@@ -48,7 +48,7 @@ def bin_dictionary(binning_pt_name, binning_eta_name, get_mergedbins_bounds=Fals
             if binning_pt_name == "pt" and binning_eta_name == "eta":
                 index_dictionary[bin_key] = [global_idx, idx_pt, idx_eta]
                 global_idx +=1
-                print(global_idx, idx_pt, idx_eta)
+                # print(global_idx, idx_pt, idx_eta)
             else:
                 global_idx, bounds_idx_pt, bounds_idx_eta = get_idx_from_bounds([binning_pt[idx_pt-1], binning_pt[idx_pt]],
                                                                                 [binning_eta[idx_eta-1], binning_eta[idx_eta]],
@@ -61,7 +61,7 @@ def bin_dictionary(binning_pt_name, binning_eta_name, get_mergedbins_bounds=Fals
                 else:
                     index_dictionary[bin_key] = [global_idx, bounds_idx_pt, bounds_idx_eta]
 
-                print(global_idx, bounds_idx_pt, bounds_idx_eta)
+                # print(global_idx, bounds_idx_pt, bounds_idx_eta)
 
     return index_dictionary
 

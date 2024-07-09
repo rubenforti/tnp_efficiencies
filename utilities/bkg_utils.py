@@ -16,13 +16,12 @@ def base_parser_bkg(parser):
     """
     """
     parser.add_argument("-b", "--bkg_categories", type=str, nargs="+", choices=base_lib.bkg_categories+["all"], default=["all"])
-    parser.add_argument("--add_SS_bkg", action="store_true", help="Add the same-sign events to the background datasets")
+    parser.add_argument("--import_bkg_SS", action="store_true", 
+                        help="Import the same-sign background")
     parser.add_argument("--lightMode_bkg", action="store_true", 
                         help="Import only the total background histograms in the workspace")
-    parser.add_argument("--altBinning_bkg", action="store_true",
-                        help="Use the given binning as the one for the background datasets only")
-                            # The actual binning that is used in the workspace is the standard one ("pt","eta"): for each of them
-                            # the bkg histogram(s) saved is the one of the coarser bin that includes the standard one
+    parser.add_argument("--mergedbins_bkg", type=str, nargs=2, default=["", ""],
+                        help="Use different binning (pt, eta) for background w.r.t. signal and data (that are evaluated in standard bins)")
 
     return parser
 

@@ -1,136 +1,39 @@
 """
 """
-import ROOT
-import time
-import json
-import sys
 import os
-import argparse
-from copy import deepcopy as dcp
+import sys
+import time
+import ROOT
+import utilities.base_lib as base_lib
 from utilities.binning_utils import bin_dictionary
-from utilities.dataset_utils import ws_init, gen_import_dictionary
-from make_fits import runFits, runParallelFits
+from utilities.bkg_utils import base_parser_bkg
+from utilities.fit_utils import base_parser_fit, finalize_fit_parsing, checkImport_custom_pdf, printFitStatus, doSingleFit
+from utilities.dataset_utils import ws_init
+from fitter import IndepFitter, SimFitter
+from multiprocessing import Pool
+from itertools import repeat
 
 
 t0 = time.time()
 
 ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
-
 ROOT.Math.MinimizerOptions.SetDefaultMinimizer("Minuit2")
 
-
-gen_res_folder = "/scratch/rforti/tnp_efficiencies_results"
-# datasets_folder = "../steve_hists_tmp" 
-datasets_folder = "/scratch/rforti/steve_histograms_2016/tracking"
-
-parser = argparse.ArgumentParser(description="Run the fits for the tracking efficiency")
-
-parser.add_argument("--gen_folder", default=gen_res_folder,
-                    help="General folder where the fits will be saved")
-
-parser.add_argument("--process_name",  help="Name that characterizes the fit strategy")
-
-parser.add_argument("--datasets_folder", default=datasets_folder,
-                    help="Folder where the datasets are stored")
-
-parser.add_argument("--ws_flags", nargs="+", default=[],
-                    help="Flags to be added to the workspace name")
-
-parser.add_argument("-g", "--generate_ws", action="store_true", help="Generate the workspace")
-
-parser.add_argument("--type_fit", default="indep", help="Type of fit to be performed")
-
-parser.add_argument("--type_eff", default="tracking",
-                    choices=["reco", "tracking", "idip", "trigger", "iso"],
-                    help="Type of efficiency")
-
-parser.add_argument("-ch", "--charge_selection", default="all",
-                    choices=["plus", "minus", "all"], help="Charge selection")
-
+parser = base_lib.base_parser()
+parser = base_parser_bkg(parser)
+parser = base_parser_fit(parser)
 args = parser.parse_args()
 
-gen_res_folder = args.gen_folder
-
-if args.charge_selection != "all":
-    eff_print = args.type_eff+args.charge_selection 
-else:
-    eff_print = args.type_eff
-
-folder = gen_res_folder+"/"+eff_print+"/"+args.process_name
-datasets_folder = args.datasets_folder
+base_lib.control_parsing(args)
+finalize_fit_parsing(args)
 
 
-ws_name_str = f"ws_{args.type_eff}"
-for postfix in args.ws_flags: ws_name_str += f"_{postfix}"
-ws_name_str += ".root"
+if "sim" in args.type_analysis:
+    sys.exit("ERROR: Simultaneous fits are implemented but not tested since long time, please check the code before running")
 
 
-fit_settings = {
-
-    "ws_name" : folder+"/"+ws_name_str,
-
-    "type_eff" : args.type_eff,
-
-    "type_analysis" : args.type_fit,
-
-    "generate_datasets" : args.generate_ws,
-
-    "charge_selection" : ["plus", "minus"] if args.charge_selection == "all" else [args.charge_selection],
-
-    "binning_pt" : "pt_reco",
-    "binning_eta" : "eta",
-    "binning_mass" : "mass_60_120",
-
-    "fitOnlyBkg" : False,
-
-    "fitPseudodata" : False,
-
-    "use_extended_sig_template_fail" : False,
-
-    "par_fit_settings_type" : "custom",
-
-    "load_bkg_datasets" : True,
-
-    "bkg_categories" : ["bkg_WW", "bkg_WZ", "bkg_ZZ", 
-                        "bkg_TTFullyleptonic", "bkg_TTSemileptonic",
-                        "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets",
-                        "bkg_Ztautau",
-                        # "bkg_SameCharge"
-                        ],
-    
-    "import_bkg_samesign" : False,
-    "import_mc_samesign" : False,
-
-    "mergedbins_bkg" : False,
-    "binning_pt_bkg" : "pt_12bins",
-    "binning_eta_bkg" : "eta_16bins",
-
-    "fit_verb" : -1,
-
-    "parallel_fits" : False,
-
-    "refit_nobkg" : True,
-
-    "useMinos" : False,
-
-    "import_pdfs" : True,
-
-    "savefigs" : True, 
-    "figpath" : {"good": f"{folder}/fit_plots",
-                "check": f"{folder}/fit_plots/check",
-                "prefit": f"{folder}/fit_plots/prefit_bkg"}
-
-}
-
-if fit_settings["mergedbins_bkg"] and (fit_settings["binning_pt"] != "pt" or fit_settings["binning_eta"] != "eta"):
-    sys.exit("ERROR: Evaluation of background in merged bins for its comparison on data is allowed only wrt reco-bins of pt and eta for data")
-
-if fit_settings["fitPseudodata"] or fit_settings["fitOnlyBkg"]: 
-    fit_settings["load_bkg_datasets"] = True
-
-
-# -----------------------------------------------------------------------------------------------------------
+# -------------------------
 #  SUMMARY OF THE SETTINGS
 # -------------------------
 print("\n")
@@ -139,106 +42,143 @@ print("|-"+('------------'*4)+"-|")
 print("|         ~ Summary of the fit settings ~          |")
 print("|-"+('------------'*4)+"-|")
 print("--"+('------------'*4)+"--")
-for key, value in fit_settings.items(): print("| ", key, " ", value, f"\n| {'------------'*4}")
+for key, value in vars(args).items():
+    if "fit_settings" in key: continue
+    print("| ", key, " ", value, f"\n| {'------------'*4}")
+print("--"+('------------'*4)+"--")
+print(f"| {'------------'*4}")
+for key, value in args.par_fit_settings.items():
+    print("| ", key, " ", value, f"\n| {'------------'*4}")
 print("--"+('------------'*4)+"--")
 print("\n\n")
 
-confirm = input("Do you confirm the settings and start the fit? (y/n) ")
-if confirm != "y": sys.exit("Exiting...")
+if not args.auto_run:
+    confirm = input("Do you confirm the settings and start the fit? (y/n) ")
+    if confirm != "y": sys.exit("Exiting...")
 
 
-# -----------------------------------------------------------------------------------------------------------
+# --------------------
 #  DATASET GENERATION
 # --------------------
+if args.generate_ws is True:
+    # Two-step routine: first generate the workspace for data and the signal
+    # template; then, if requested, import the background template in the same
+    # workspace (with different binning if specified)
 
-if fit_settings["generate_datasets"] and os.path.exists(fit_settings["ws_name"]): 
-    confirm_gen = input("Workspace already exists, do you REALLY want to generate a new one from scratch? (y/n) ")
-    if confirm_gen != "y": fit_settings["generate_datasets"] = False
+    # Step 1
+    ws = ws_init(args.input, ["data", "mc"], args.eff, args.binning_pt, args.binning_eta, args.binning_mass,
+                 type_analysis=args.type_analysis, ch_set=args.charge_selection, do_OS_tracking=args.OS_tracking,
+                 fail_template_with_all_SA=args.all_SA_fail, add_SS_mc=args.import_mc_SS)
+    ws.writeToFile(args.ws_filename)
 
-
-if fit_settings["generate_datasets"]:
-
-    if not os.path.exists(folder): os.makedirs(folder)
-
-    import_categories = ["data", "mc"]
-
-    if fit_settings["load_bkg_datasets"] and not fit_settings["mergedbins_bkg"]: 
-        import_categories += fit_settings["bkg_categories"]
-
-    import_dictionary = gen_import_dictionary(datasets_folder, fit_settings["type_eff"], import_categories,
-                                              ch_set=fit_settings["charge_selection"],
-                                              do_OS_tracking=False,
-                                              add_SS_mc=fit_settings["import_mc_samesign"], 
-                                              add_SS_bkg=fit_settings["import_bkg_samesign"])
-
-    
-    
-    ws = ws_init(import_dictionary, fit_settings["type_analysis"], 
-                 fit_settings["binning_pt"], fit_settings["binning_eta"], fit_settings["binning_mass"], 
-                 lightMode_bkg=True, # (True if fit_settings["import_bkg_samesign"] is False else False), 
-                 fail_template_with_all_SA=fit_settings["use_extended_sig_template_fail"])
-
-    ws.writeToFile(fit_settings["ws_name"])
-    ws.Print()
-    
-    if fit_settings["load_bkg_datasets"] and fit_settings["mergedbins_bkg"]: 
-
-        import_dict_bkg = gen_import_dictionary(datasets_folder, fit_settings["type_eff"], fit_settings["bkg_categories"],
-                                                ch_set=fit_settings["charge_selection"], add_SS_bkg=fit_settings["import_bkg_samesign"])
-
-        if fit_settings["mergedbins_bkg"] is False:
-            binning_pt_bkg, binning_eta_bkg = fit_settings["binning_pt"], fit_settings["binning_eta"]
+    # Step 2
+    if args.importBkg:
         
-        ws = ws_init(import_dict_bkg, fit_settings["type_analysis"], binning_pt_bkg, binning_eta_bkg, 
-                     fit_settings["binning_mass"], import_existing_ws=True, existing_ws_filename=fit_settings["ws_name"], 
-                     lightMode_bkg=True, altBinning_bkg=fit_settings["mergedbins_bkg"],
-                     fail_template_with_all_SA=fit_settings["use_extended_sig_template_fail"])
-        ws.writeToFile(fit_settings["ws_name"])
+        using_mergedbins_bkg = bool(args.mergedbins_bkg[0]) or bool(args.mergedbins_bkg[1])
+        binning_pt_bkg, binning_eta_bkg = args.binning_pt, args.binning_eta if not using_mergedbins_bkg else args.mergedbins_bkg
+        
+        ws = ws_init(args.input, args.bkg_categories, args.eff, binning_pt_bkg, binning_eta_bkg, args.binning_mass,
+                     type_analysis=args.type_analysis, ch_set=args.charge_selection, do_OS_tracking=args.OS_tracking,
+                     add_SS_bkg=args.add_SS_bkg, lightMode_bkg=True, altBinning_bkg=True,
+                     import_existing_ws=True, existing_ws_filename=args.ws_filename)
+        ws.writeToFile(args.ws_filename)
 
 
-sys.exit("Exiting...")
+# sys.exit("Exiting...")
 
 
-# -----------------------------------------------------------------------------------------------------------
-# FIT PARAMETERS SETTINGS
-# ------------------------
-
-if fit_settings["par_fit_settings_type"] == "legacy":
-    with open(f"legacy_fit_settings.json") as file: fit_settings_json = json.load(file)
-    if fit_settings["type_eff"] in ["idip", "trigger", "iso"]:
-        par_fit_settings = fit_settings_json["idip_trig_iso"]
-    else:
-        par_fit_settings = fit_settings_json[fit_settings["type_eff"]]
-
-elif fit_settings["par_fit_settings_type"] == "custom":
-    with open(f"custom_fit_settings.json") as file: fit_settings_json = json.load(file)
-    #run_key = fit_settings["par_fit_settings_type"].split("_")[1]
-    nRUN = input("Insert the run number: ")
-    par_fit_settings = fit_settings_json["run1"]
-    [par_fit_settings.update(fit_settings_json["run"+str(run_idx)]) for run_idx in range(2, int(nRUN)+1)]
-else:
-    sys.exit("ERROR: wrong fit settings indicated")
-
-fit_settings.update(par_fit_settings)
-
-for k,v in fit_settings.items():
-    print(k, " ", v)
-
-# -----------------------------------------------------------------------------------------------------------
+# --------------
 #  RUNNING FITS
 # --------------
 
-if fit_settings["parallel_fits"] is False:
-    runFits(fit_settings)
-else:
-    runParallelFits(fit_settings)
+file_ws = ROOT.TFile(args.ws_filename)
+ws = file_ws.Get("w")
+
+checkImport_custom_pdf(args.par_fit_settings["bkg_model"])
+
+if not args.no_saveFigs:
+    for path in args.figpath.values(): 
+        if not os.path.exists(path): os.makedirs(path)
+
+prob_bins = []
+
+for bin_key in bin_dictionary(args.binning_pt, args.binning_eta).keys():
+
+    # Routine for fits performed in series, the parallel version is in the next block
+
+    if args.parallel: continue
+
+    #if bin_key != "[24.0to35.0][-2.3to-2.2]": continue
+    
+    if args.type_analysis == "indep":
+        dict_flags = ["pass", "fail"]
+        fitter = IndepFitter(bin_key, args.fit_settings)            
+    elif args.type_analysis in ["sim", "sim_sf"]:
+        dict_flags = ["sim"]
+        fitter = SimFitter(bin_key, args.fit_settings)
+    else:
+        sys.exit("ERROR: wrong analysis type indicated")
+    
+    fitter.manageFit(ws)
 
 
-# print(fit_settings)
+    res = {flag : fitter.res_obj[flag] for flag in dict_flags}
 
+    if not args.no_saveFigs and fitter.existingFit is False: 
+        fitter.saveFig(ws)
+        for flag in ["pass", "fail"]:
+            if "prefit" in fitter.settings["bkg_model"][flag]: 
+                fitter.saveFig_prefit(flag)
+
+    if not args.no_importPdfs: fitter.importFitObjects(ws)
+
+    if fitter.bin_status is False: 
+        prob_bins.append(bin_key)
+    printFitStatus(args.type_analysis, bin_key, res, fitter.bin_status)
+
+
+
+if args.parallel:
+
+    if args.type_analysis == "indep":
+        dict_flags = ["pass", "fail"]
+        fitters = [IndepFitter(bin_key, args.fit_settings) for bin_key in bin_dictionary(args.binning_pt, args.binning_eta).keys()]
+    elif args.type_analysis in ["sim", "sim_sf"]:
+        dict_flags = ["sim"]
+        fitters = [SimFitter(bin_key, args.fit_settings) for bin_key in bin_dictionary(args.binning_pt, args.binning_eta).keys()]
+    else:
+        print("ERROR: wrong analysis type indicated")
+        sys.exit()
+    
+
+    pool = Pool(processes=8)
+    fit_outputs = pool.starmap(doSingleFit, zip(fitters, repeat(ws), repeat(dict_flags)))
+
+    print("FITS DONE")
+    
+    for fitter_out, res_fit in fit_outputs:
+        print(f"Analyzing bin {fitter_out.bin_key}")
+        
+        if not args.no_importPdfs: fitter_out.importFitObjects(ws)
+
+        if not args.no_saveFigs and fitter_out.existingFit is False: 
+            fitter_out.saveFig(ws)
+            for flag in ["pass", "fail"]:
+                if "prefit" in fitter_out.settings["bkg_model"][flag]: 
+                    fitter_out.saveFig_prefit(flag)
+
+        
+        if fitter_out is False: prob_bins.append(fitter_out.bin_key)
+        printFitStatus(args.type_analysis, fitter_out.bin_key, res_fit, fitter_out.bin_status, prob_bins)
+
+
+print(f"NUM of problematic bins = {len(prob_bins)}")
+print(prob_bins)
+
+ws.writeToFile(args.ws_filename)
 
 # -----------------------------------------------------------------------------------------------------------
 
 t1 = time.time()
 
-print(f"TEMPO = {(t1-t0)/60} min")
+print(f"Time spent = {(t1-t0)/60} min")

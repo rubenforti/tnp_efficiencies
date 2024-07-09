@@ -5,7 +5,130 @@ import sys
 import os
 import math
 import ROOT
+import json
+import utilities.base_lib as base_lib
 from array import array
+
+# list of bkg strategies that use 
+bkg_template_types = ["mc_raw", "BB_light", "num_estimation", "cmsshape_prefitBkg", "cmsshape_prefitBkg_SS"]
+
+# dictionary that maps the bkg model to the corresponding custom C++ class to be loaded
+dict_classes = {
+        "cmsshape" : "RooCMSShape",
+        "cmsshape_prefitBkg" : "RooCMSShape",
+        "cmsshape_prefitBkg_SS" : "RooCMSShape",
+        "cmsshape_new" : "RooCMSShape_mod",
+        "CB" : "my_double_CB"
+    }
+
+fit_settings_args = ["type_analysis", "bkg_categories", "fitOnlyBkg", "fitPseudodata", "fit_verb", "refit_nobkg", "useMinos"]
+
+###############################################################################
+
+def base_parser_fit(parser):
+    """
+    """
+    parser.add_argument("-n", "--process_name", default="", 
+                        help="Name that characterizes the fit strategy")
+    '''
+    # The argument 'analysis' is already present in the base parser, better to use that one
+    parser.add_argument("-f", "--type_fit", default="indep", choices=["indep", "sim", "sim_sf"],
+                        help="Type of fit to be performed")
+    '''
+    parser.add_argument("-p", "--par_fit_settings", default="custom_fit_settings.json",
+                        help="Name of the json file containing the fit settings (to be stored in the 'configs' folder)")
+
+    parser.add_argument("--fitOnlyBkg", action="store_true",
+                        help="Perform only the fit on background template")
+
+    parser.add_argument("--fitPseudodata", action="store_true",
+                        help="Perform the fit on pseudodata")
+
+    parser.add_argument("--extended_sig_template_for_fail", action="store_true",
+                        help="For failing probes, the signal template is built by using both pass and fail MC template, evaluated with SA variables")
+
+    parser.add_argument("--auto_run", action="store_true",
+                        help="Run the fits automatically, updating the fit settings according to the json file")
+
+    parser.add_argument("--import_mc_SS", action="store_true",
+                        help="Import the same-sign MC")
+
+    parser.add_argument("--fit_verb", type=int, default=-1,
+                        help="Verbosity of the fit output")
+
+    parser.add_argument("--parallel", action="store_true",
+                        help="Perform the fits in parallel")
+
+    parser.add_argument("--refit_nobkg", action="store_true",
+                        help="Refit the signal templates without the background")
+
+    parser.add_argument("--useMinos", action="store_true",
+                        help="Use Minos for the fit")
+
+    parser.add_argument("--no_importPdfs", action="store_true",
+                        help="Don't import the pdfs into the workspace")
+
+    parser.add_argument("--no_saveFigs", action="store_true",
+                        help="Don't save the fit plots")
+    
+    return parser
+
+
+###############################################################################
+
+def finalize_fit_parsing(args):
+    """
+    Apply control conditions on the arguments returned by the parser, regarding
+    the fit settings
+    """
+    # Import of the fit settings
+    with open(f"configs/{args.par_fit_settings.replace('.json', '')}.json") as file: fit_settings_json = json.load(file)
+    if "legacy" in args.par_fit_settings:
+        if args.eff in ["idip", "trigger", "iso"]:
+            par_fit_settings = fit_settings_json["idip_trig_iso"]
+        else:
+            par_fit_settings = fit_settings_json[args.eff]
+    else:
+        if args.auto_run:
+            par_fit_settings = fit_settings_json["run1"]
+        else:
+            nRUN = input("Insert the run number: ")
+            par_fit_settings = fit_settings_json["run1"]
+            [par_fit_settings.update(fit_settings_json["run"+str(run_idx)]) for run_idx in range(2, int(nRUN)+1)]
+    args.par_fit_settings = par_fit_settings
+
+    # Control on background categories
+    if "all" in args.bkg_categories: args.bkg_categories = base_lib.bkg_categories
+
+    # Apposite argument for import of background template
+    args.importBkg = True if (args.fitPseudodata is True or args.fitOnlyBkg is True or \
+                              args.par_fit_settings["bkg_model"]["pass"] in bkg_template_types or \
+                              args.par_fit_settings["bkg_model"]["fail"] in bkg_template_types) else False 
+
+    # Control on the mergedbins option
+    if (args.mergedbins_bkg[0] != "" or args.mergedbins_bkg[1] != ""):
+        if args.eff not in [ "idip", "trigger", "iso"]: 
+            sys.exit("ERROR: mergedbins_bkg can be used only for idip, trigger, iso efficiencies")
+        if args.binning_pt != "pt" or args.binning_eta != "eta":
+            sys.exit("ERROR: Evaluation of background in merged bins for its comparison on data is allowed only w.r.t. standard bins of pt and eta for data")
+
+    # Control on the output folder
+    outpath = args.output if args.process_name in args.output else f"{args.output}/{args.process_name}"
+    if not os.path.exists(outpath): os.makedirs(outpath)
+    args.output = outpath
+
+    # Setting the output folders for figures
+    args.figpath = { "good"  : f"{args.output}/fit_plots",
+                     "check" : f"{args.output}/fit_plots/check" }
+    if "prefit" in args.par_fit_settings["bkg_model"]["pass"] or "prefit" in args.par_fit_settings["bkg_model"]["fail"]:
+        args.figpath.update({ "prefit": f"{args.output}/fit_plots/prefit_bkg" })
+
+    # Fit settings dictionary (to be passed to the 'fitter' object)
+    print(vars(args))
+    args.fit_settings = { key : vars(args)[key] for key in fit_settings_args }
+    args.fit_settings.update(args.par_fit_settings)
+
+###############################################################################
 
 
 def check_existing_fit(type_analysis, ws, bin_key):
@@ -29,7 +152,51 @@ def check_existing_fit(type_analysis, ws, bin_key):
             return res
         else:
             return 0
-        
+
+###############################################################################
+
+
+def checkImport_custom_pdf(bkg_models):
+    """
+    """
+    dict_classes = {
+        "cmsshape" : "RooCMSShape",
+        "cmsshape_prefitBkg" : "RooCMSShape",
+        "cmsshape_prefitBkg_SS" : "RooCMSShape",
+        "cmsshape_new" : "RooCMSShape_mod",
+        "CB" : "my_double_CB"
+    }
+    for flag in ["pass", "fail"]:
+        if bkg_models[flag] in dict_classes.keys():
+            base_lib.import_pdf_library(dict_classes[bkg_models[flag]])
+            print(f"Imported {dict_classes[bkg_models[flag]]} from pdf_library")
+
+###############################################################################
+
+
+def printFitStatus(type_analysis, bin_key, res, status):
+
+    if status is True: print(f"Bin {bin_key} is OK!\n\n")
+    else:
+        print(f"Bin {bin_key} has problems!\n")
+        list_flags = ["pass", "fail"] if type_analysis == "indep" else ["sim"]
+        print("****")
+        for fl in list_flags:
+            res[fl].Print()
+            res[fl].correlationMatrix().Print()
+            print("****")
+        print('\n')
+        print("Minimizer status")
+        print("----------------")
+        print("       ", *list_flags)
+        print("----------------")
+        print("Status ", *[res[fl].status() for fl in list_flags])
+        print("CovQual", *[res[fl].covQual() for fl in list_flags])
+        print("EDM    ", *[res[fl].edm() for fl in list_flags])
+        print('\n')
+
+
+
 ###############################################################################
 
 
@@ -362,6 +529,21 @@ def llr_test_bkg(histo, pdf, alpha=0.05):
     null = True if pval > alpha else False
 
     return null
+
+###############################################################################
+
+
+# Useful for parallel fits
+
+def doSingleFit(fitter, ws, flags):
+    """
+    """
+    fitter.manageFit(ws)
+
+    res = {flag : fitter.res_obj[flag] for flag in flags}
+
+    return fitter, res
+
 
 ###############################################################################
 ###############################################################################

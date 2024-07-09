@@ -147,6 +147,7 @@ class AbsFitter():
         backgrounds is created and loaded in the apposite attribute.
         """
         bkg_model = self.settings["bkg_model"][flag]
+
         if bkg_model == "expo":
             self.pdfs["bkg_pdf"].update({
                 flag : ROOT.RooExponential(f"expo_bkg_{flag}_{self.bin_key}", "Exponential background",
@@ -294,7 +295,8 @@ class AbsFitter():
     def initDatasets(self, ws, loadOnlyBkg=False, loadPseudodata=False):
         """
         """
-        if loadPseudodata and loadOnlyBkg: sys.exit("ERROR: fitPseudodata and fitOnlyBkg cannot be both True!")
+        if loadPseudodata and loadOnlyBkg: 
+            sys.exit("ERROR: fitPseudodata and fitOnlyBkg cannot be both True!")
 
         for flag in ["pass", "fail"]:
 
@@ -519,7 +521,7 @@ class AbsFitter():
             ROOT.RooArgList(self.pars["f_ch_assign"][flag], self.norm["nbkg"][flag], self.norm["nsig"][flag]))
 
 
-    def saveFig(self, ws):
+    def saveFig(self, ws, figpath_dict):
         """
         """
 
@@ -562,13 +564,14 @@ class AbsFitter():
                              "efficiency_mc" : [eff_mc, deff_mc],
                              "scale_factor" : [scale_factor, d_scale_factor]})
 
-        figpath = (self.settings["figpath"]["good"] if self.bin_status is True else self.settings["figpath"]["check"])
+        #figpath = (self.settings["figpath"]["good"] if self.bin_status is True else self.settings["figpath"]["check"])
+        figpath = figpath_dict["good"] if self.bin_status is True else figpath_dict["check"]
 
         plot_fitted_pass_fail(self.settings["type_analysis"], plot_objects, self.bin_key,
                               figpath=figpath)
 
 
-    def saveFig_prefit(self, flag):
+    def saveFig_prefit(self, flag, figpath_dict):
         """
         """
         plot_objects={}
@@ -596,7 +599,8 @@ class AbsFitter():
         plot_objects.update({"efficiency":[1,0], "efficiency_mc":[1,0], "scale_factor":[1,0]})
         
         plot_fitted_pass_fail(self.settings["type_analysis"], plot_objects, self.bin_key, 
-                              figpath=self.settings["figpath"]["prefit"])
+                              #figpath=self.settings["figpath"]["prefit"])
+                              figpath=figpath_dict["prefit"])
 
 
 ###############################################################################
