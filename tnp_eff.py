@@ -20,6 +20,7 @@ ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 ROOT.Math.MinimizerOptions.SetDefaultMinimizer("Minuit2")
 
+
 parser = base_lib.base_parser()
 parser = base_parser_bkg(parser)
 parser = base_parser_fit(parser)
@@ -27,6 +28,7 @@ args = parser.parse_args()
 
 base_lib.control_parsing(args)
 finalize_fit_parsing(args)
+
 
 
 if "sim" in args.type_analysis:
@@ -74,12 +76,12 @@ if args.generate_ws is True:
     # Step 2
     if args.importBkg:
         
-        using_mergedbins_bkg = bool(args.mergedbins_bkg[0]) or bool(args.mergedbins_bkg[1])
+        using_mergedbins_bkg = (bool(args.mergedbins_bkg[0]) or bool(args.mergedbins_bkg[1]))
         binning_pt_bkg, binning_eta_bkg = args.binning_pt, args.binning_eta if not using_mergedbins_bkg else args.mergedbins_bkg
-        
+
         ws = ws_init(args.input, args.bkg_categories, args.eff, binning_pt_bkg, binning_eta_bkg, args.binning_mass,
                      type_analysis=args.type_analysis, ch_set=args.charge_selection, do_OS_tracking=args.OS_tracking,
-                     add_SS_bkg=args.add_SS_bkg, lightMode_bkg=True, altBinning_bkg=True,
+                     add_SS_bkg=args.import_bkg_SS, lightMode_bkg=True, altBinning_bkg=using_mergedbins_bkg,
                      import_existing_ws=True, existing_ws_filename=args.ws_filename)
         ws.writeToFile(args.ws_filename)
 
@@ -91,10 +93,10 @@ if args.generate_ws is True:
 #  RUNNING FITS
 # --------------
 
+checkImport_custom_pdf(args.par_fit_settings["bkg_model"])
+
 file_ws = ROOT.TFile(args.ws_filename)
 ws = file_ws.Get("w")
-
-checkImport_custom_pdf(args.par_fit_settings["bkg_model"])
 
 if not args.no_saveFigs:
     for path in args.figpath.values(): 
@@ -108,7 +110,7 @@ for bin_key in bin_dictionary(args.binning_pt, args.binning_eta).keys():
 
     if args.parallel: continue
 
-    #if bin_key != "[24.0to35.0][-2.3to-2.2]": continue
+    # if bin_key != "[24.0to35.0][-2.3to-2.2]": continue
     
     if args.type_analysis == "indep":
         dict_flags = ["pass", "fail"]
@@ -125,10 +127,10 @@ for bin_key in bin_dictionary(args.binning_pt, args.binning_eta).keys():
     res = {flag : fitter.res_obj[flag] for flag in dict_flags}
 
     if not args.no_saveFigs and fitter.existingFit is False: 
-        fitter.saveFig(ws)
+        fitter.saveFig(ws, args.figpath)
         for flag in ["pass", "fail"]:
             if "prefit" in fitter.settings["bkg_model"][flag]: 
-                fitter.saveFig_prefit(flag)
+                fitter.saveFig_prefit(flag, args.figpath["prefit"])
 
     if not args.no_importPdfs: fitter.importFitObjects(ws)
 
@@ -149,15 +151,21 @@ if args.parallel:
     else:
         print("ERROR: wrong analysis type indicated")
         sys.exit()
-    
+
+
+    def doSingleFit(fitter): 
+        fitter.manageFit(ws)
+        if fitter.bin_status is False: 
+            prob_bins.append(fitter.bin_key)
 
     pool = Pool(processes=8)
-    fit_outputs = pool.starmap(doSingleFit, zip(fitters, repeat(ws), repeat(dict_flags)))
+    pool.map(doSingleFit, fitters)
 
     print("FITS DONE")
     
-    for fitter_out, res_fit in fit_outputs:
+    for fitter_out in fitters:
         print(f"Analyzing bin {fitter_out.bin_key}")
+        print(fitter_out.bin_status)
         
         if not args.no_importPdfs: fitter_out.importFitObjects(ws)
 
@@ -167,9 +175,8 @@ if args.parallel:
                 if "prefit" in fitter_out.settings["bkg_model"][flag]: 
                     fitter_out.saveFig_prefit(flag)
 
-        
-        if fitter_out is False: prob_bins.append(fitter_out.bin_key)
-        printFitStatus(args.type_analysis, fitter_out.bin_key, res_fit, fitter_out.bin_status, prob_bins)
+        #if fitter_out.bin_status is False: prob_bins.append(fitter_out.bin_key)
+        # printFitStatus(args.type_analysis, fitter_out.bin_key, res, fitter_out.bin_status, prob_bins)
 
 
 print(f"NUM of problematic bins = {len(prob_bins)}")

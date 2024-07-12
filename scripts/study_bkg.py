@@ -1,11 +1,12 @@
 """
 """
+import sys
 import ROOT
 import utilities.base_lib as base_lib
 from utilities.dataset_utils import ws_init
 from utilities.bkg_utils import base_parser_bkg, analyze_bkg 
 
-
+# Relevant arguments in the parser for the different studies
 an_options = {
     "negweighted_bins" : ["is_SS_bkg"],
     "minv_distrib" : ["is_SS_bkg", "cmp_data", "cmp_signal", "cmp_bkgfit", "logscale"],
@@ -41,10 +42,16 @@ parser.add_argument("--projected", action="store_true", help="Plot the 2D bkg di
 parser.add_argument("--cmp_cat", type=str, nargs=2, default=["bkg_SameCharge", "bkg_total"],
                     help="Background categories to be compared")
 
-
 args = parser.parse_args()
 
 base_lib.control_parsing(args) 
+if "all" in args.bkg_categories: args.bkg_categories = base_lib.bkg_categories
+if (args.mergedbins_bkg[0] != "" or args.mergedbins_bkg[1] != ""):
+        if args.eff not in [ "idip", "trigger", "iso"]: 
+            sys.exit("ERROR: mergedbins_bkg can be used only for idip, trigger, iso efficiencies")
+        if args.binning_pt != "pt" or args.binning_eta != "eta":
+            sys.exit("ERROR: Evaluation of background in merged bins for its comparison on data is allowed only w.r.t. standard bins of pt and eta for data")
+    
 
 an_opt = {}
 for an_type in args.bkg_study: 

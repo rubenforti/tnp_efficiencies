@@ -1,10 +1,10 @@
 import ROOT
 import sys
 import argparse
-from utilities.base_lib import bin_dictionary, binning
-from utilities.res_tools import results_manager
+from utilities.base_lib import binnings, import_pdf_library
+from utilities.results_manager import results_manager
 from utilities.CMS_lumi import CMS_lumi
-from utilities.dataset_utils import import_pdf_library
+from utilities.binning_utils import bin_dictionary
 from utilities.plot_utils import style_settings
 from array import array
 from copy import copy
@@ -13,7 +13,10 @@ from copy import copy
 ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
-gen_folder = "/scratch/rforti/tnp_efficiencies_results/trackingplus"
+gen_folder = "/scratch/rforti/tnp_efficiencies_results/reco"
+
+binning_pt_name = "pt_reco"
+binning_eta_name = "eta"
 
 import_pdf_library("RooCMSShape")
 
@@ -40,31 +43,27 @@ check_biasMC_agreement = args.check_biasMC_agreement
 if check_biasMC_agreement and(analyze_scale_factors or cmp_syst_effects): 
     sys.exit("Cannot check biasMC agreement and analyze scale factors or compare systematic effects at the same time. Exiting...")
 
-'''
-file_nomi = ROOT.TFile(gen_folder + "/benchmark/ws_tracking.root", "READ")
-ws_nomi = file_nomi.Get("w")
-res_nomi = results_manager("indep", "pt_tracking", "eta", import_ws=ws_nomi)
-'''
 
+file_nomi = ROOT.TFile(gen_folder + "/legacy_fit/ws_reco.root", "READ")
+ws_nomi = file_nomi.Get("w")
+res_nomi = results_manager("indep", binning_pt_name, binning_eta_name, import_ws=ws_nomi)
+
+'''
 with open(gen_folder+"/../egm_tnp_results/trackingplus/allEfficiencies.txt", "r") as file_nomi:
     row_list = file_nomi.readlines()
 
 res_nomi = results_manager("indep", "pt_tracking", "eta", import_txt=row_list)
+'''
 
-
-file_alt = ROOT.TFile(gen_folder + "/BBlight_legacySettings/ws_tracking_BBlight.root", "READ")
+file_alt = ROOT.TFile(gen_folder + "/BBlight_legacySettings/ws_reco_BBlight.root", "READ")
 ws_alt = file_alt.Get("w")
-res_alt = results_manager("indep", "pt_tracking", "eta", import_ws=ws_alt)
+res_alt = results_manager("indep", binning_pt_name, binning_eta_name, import_ws=ws_alt)
 
 plot_name = qnt + " comparison"
 
 
-binning_pt_name = "pt_tracking"
-binning_eta_name = "eta"
-
-
-nptBins = len(binning(binning_pt_name))-1
-netaBins = len(binning(binning_eta_name))-1
+nptBins = len(binnings[binning_pt_name])-1
+netaBins = len(binnings[binning_eta_name])-1
 ntotBins = nptBins*netaBins
 
 
@@ -79,20 +78,22 @@ if cmp_syst_effects is True:
     with open(gen_folder+"/../egm_tnp_results/tracking/allEfficiencies.txt", "r") as file_nomi:
         row_list = file_nomi.readlines()
 
-    res_nomi_old = results_manager("indep", "pt_tracking", "eta", import_txt=row_list)
-    res_alt_old = results_manager("indep", "pt_tracking", "eta", import_txt=row_list, altSig_check=True)
+    res_nomi_old = results_manager("indep", binning_pt_name, binning_eta_name, import_txt=row_list)
+    res_alt_old = results_manager("indep",  binning_pt_name, binning_eta_name, import_txt=row_list, altSig_check=True)
     
 
 if check_biasMC_agreement is True:
     plot_name = "Agreement of syst effect measured on data wrt expected bias from MC"
     file_pseudo_nomi = ROOT.TFile(gen_folder + "/pseudodata/ws_tracking_pseudodata.root", "READ")
     file_pseudo_alt = ROOT.TFile(gen_folder + "/pseudodata_BBlight_legacySettings/ws_tracking_pseudodata.root", "READ")
-    res_pseudo_nomi = results_manager("indep", "pt_tracking", "eta", import_ws=file_pseudo_nomi.Get("w"))
-    res_pseudo_alt = results_manager("indep", "pt_tracking", "eta", import_ws=file_pseudo_alt.Get("w"))
+    res_pseudo_nomi = results_manager("indep", binning_pt_name, binning_eta_name, import_ws=file_pseudo_nomi.Get("w"))
+    res_pseudo_alt = results_manager("indep", binning_pt_name, binning_eta_name, import_ws=file_pseudo_alt.Get("w"))
 
 
 c = ROOT.TCanvas("c", "c", 3600, 1800)
 c.cd()
+
+#style_settings()
 
 pad_title = ROOT.TPad("pad_title", "pad_title", 0.0, 0.95, 1.0, 1.0)
 pad_title.SetMargin(0.05, 0.05, 0.05, 0.05), pad_title.Draw()
@@ -142,6 +143,9 @@ for bin_key, [n_bin, idx_pt, idx_eta] in bin_dictionary(binning_pt_name, binning
 
     eff_alt, d_eff_alt = res_alt.getEff(bin_key)
     eff_nomi, d_eff_nomi = res_nomi.getEff(bin_key)
+
+    if n_bin == 58:
+        print(bin_key, eff_alt, d_eff_alt, eff_nomi, d_eff_nomi)
 
     band_amplitude = d_eff_nomi
 
@@ -266,6 +270,7 @@ float_points_graph.Draw("same ZP")
 
 c.Update()
 
+
 offsetXaxis = 0.5
 
 vertline = ROOT.TLine(36, 0, 36, 1.2)
@@ -313,6 +318,7 @@ baseline_legend.SetLineWidth(0)
 
 legend = ROOT.TLegend(0.09, 0.78, 0.25, 0.92)
 legend.SetTextSize(0.03)
+
 
 if analyze_scale_factors:
     if not cmp_syst_effects:

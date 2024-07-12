@@ -669,7 +669,7 @@ class IndepFitter(AbsFitter):
     
             print(f"Starting fit for {flag} category")
             self.doFit(flag)
-            if self.status[flag] is False and self.settings["refit_nobkg"] and not self.settings["fitOnlyBkg"]:
+            if (not self.status[flag]) and (not self.settings["no_refitOnlySig"]) and (not self.settings["fitOnlyBkg"]):
                 self.attempt_noBkgFit(flag)
 
         self.bin_status = bool(self.status["pass"]*self.status["fail"])
@@ -817,7 +817,7 @@ class SimFitter(AbsFitter):
 
             self.doFit("sim")
 
-            if self.status["sim"] is False and self.settings["refit_nobkg"]: 
+            if self.status["sim"] is False and self.settings["no_refitOnlySig"]: 
                 self.attempt_noBkgFit(ws)
 
             print(f"Fitted bin {self.bin_key} with status {self.status['sim']}\n")

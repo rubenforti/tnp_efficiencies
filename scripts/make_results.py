@@ -3,24 +3,23 @@
 import ROOT
 from array import array
 from copy import copy
-from utilities.base_lib import binning, bin_dictionary, eval_efficiency, sumw2_error
-from utilities.res_tools import results_manager, init_results_histos, fill_res_histograms
-from utilities.dataset_utils import import_pdf_library
+from utilities.base_lib import binnings, eval_efficiency, sumw2_error, import_pdf_library
+from utilities.binning_utils import bin_dictionary
+from utilities.results_manager import results_manager
+from utilities.results_utils import init_results_histos, fill_res_histograms
 
 NBINS = 21
 
 eff_min = 0.895
-rel_err_eff_min = 1e-4
-rel_err_eff_max = 7e-3
-sf_min = 0.99
-sf_max = 1.03
-
+rel_err_eff_min, rel_err_eff_max = 1e-4, 7e-3
+sf_min, sf_max =  0.99, 1.03
 
 delta_min = -5e-2
 delta_error_min = -5e-3
 pull_min = -5
 rm1_min = -3e-2
 ratio_error_min = -1
+
 
 res_var_dict = {
     "efficiency" : {
@@ -64,7 +63,7 @@ def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
     file_in = ROOT.TFile(ws_name, "READ")
     ws = file_in.Get("w")
 
-    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
 
     bin_dict = bin_dictionary(binning_pt, binning_eta)
     
@@ -125,7 +124,7 @@ def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binni
 
     res_new = results_manager("indep", binning_pt, binning_eta, import_ws=ws_new)
 
-    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
     bin_dict = bin_dictionary(binning_pt, binning_eta)
 
     bin_dict_original = copy(bin_dict)
@@ -189,7 +188,7 @@ def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list, isola
     file_pseudodata = ROOT.TFile.Open(ws_filename)
     ws = file_pseudodata.Get("w")
 
-    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
     bin_dict = bin_dictionary(binning_pt, binning_eta)
 
     nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
@@ -275,7 +274,7 @@ def eval_minos(ws_hesse_filename, ws_filename, binning_pt, binning_eta):
     file_hesse = ROOT.TFile.Open(ws_hesse_filename)
     ws_hesse = file_hesse.Get("w")
 
-    bins_pt, bins_eta = binning(binning_pt), binning(binning_eta)
+    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
     bin_dict = bin_dictionary(binning_pt, binning_eta)
 
     asymm_binning = array("d", [-0.5 + (i/75.) for i in range(76)])
@@ -327,16 +326,16 @@ if __name__ == '__main__':
 
     import_pdf_library("RooCMSShape")
 
-    base_folder = "/scratch/rforti/tnp_efficiencies_results/tracking"
+    base_folder = "/scratch/rforti/tnp_efficiencies_results/reco"
 
-    ws_filename = base_folder+"/pseudodata/ws_tracking_pseudodata.root"
+    ws_filename = base_folder+"/BBlight_legacySettings/ws_reco_BBlight.root"
 
-    # benchmark_res = base_folder+"/legacy_fit_onlyFailSA_allMC/ws_tracking.root"
+    benchmark_res = base_folder+"/legacy_fit/ws_reco.root"
 
 
     # save_eff_results(benchmark_res, "indep", "pt_tracking", "eta")
-    # compare_efficiency(benchmark_res, ws_filename, "pt_tracking", "eta", resCmp_list, postfix_name="legacy-onlyFailSA")
+    compare_efficiency(benchmark_res, ws_filename, "pt_reco", "eta", resCmp_list)
 
     # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
 
-    compare_eff_pseudodata(ws_filename, "pt_tracking", "eta", resCmp_list, isolate_effect="")
+    # compare_eff_pseudodata(ws_filename, "pt_tracking", "eta", resCmp_list, isolate_effect="")

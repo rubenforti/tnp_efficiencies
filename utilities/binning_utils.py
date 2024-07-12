@@ -21,20 +21,23 @@ def bin_dictionary(binning_pt_name, binning_eta_name, get_mergedbins_bounds=Fals
     to the indexes useful for the bin selection. The indexes are returned in a 
     3-element list containing the global index, the pt index and the eta index
     in this order. If the bins are not merged (w.r.t. the original binning of a
-    given step) these objects are integers i; otherwise, two cases can be chosen
-    by the "get_mergedbins_bounds" flag:
+    given step) these objects are integers i; otherwise, two cases can be 
+    chosen by the "get_mergedbins_bounds" flag:
       - get_mergedbins_bounds=True: the pt and eta indexes are returned as
         lists, containing the indexes of bins in the original binning that are
         merged in the given bin;
       - get_mergedbins_bounds=False: the pt and eta indexes are returned as
         integers, containing the index referred to the actual grid pt-eta.
+    
     """
     index_dictionary = {}
     global_idx = 1
 
     binning_pt, binning_eta = base_lib.binnings[binning_pt_name], base_lib.binnings[binning_eta_name]
 
-    # The special binnings for reco and tracking are not to be intended as merged binnings
+    # The special binnings for reco and tracking are not to be intended as
+    # "merged" binnings: therefore, the binning name is changed to "pt" to
+    # enter the regular loop that returns the simple indexes, instead of
     if "reco" in binning_pt_name or "tracking" in binning_pt_name: binning_pt_name = "pt"
         
     cnt_mergedpt = 0
@@ -70,10 +73,11 @@ def bin_dictionary(binning_pt_name, binning_eta_name, get_mergedbins_bounds=Fals
 
 def get_idx_from_bounds(bounds_pt, bounds_eta, pt_binning_ref="pt"):
     """
-    Function that, given the bin bounds (that have to be present in the binning
-    arrays!!!), returns the coordinates of the selected region. The coordinates 
-    are given as list of global indexes and as bounds on pt/eta indexes (max 
-    and min, since the region is rectangular)
+    Function that, given the "physical" bin bounds, returns the coordinates of
+    the corresponding region in the reference system of the standard binning. 
+    The coordinates are given as lists indexes (note that every region is 
+    rectangular). The "pt_binning_ref" parameter is used to specify the pt 
+    binning to be used as standard, needed for 'reco' and 'tracking' steps.
     """
 
     initial_dict = bin_dictionary(binning_pt_name=pt_binning_ref, binning_eta_name="eta")

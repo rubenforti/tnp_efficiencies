@@ -387,8 +387,8 @@ def ws_init(input_folder, dset_names, type_eff, binning_pt, binning_eta, binning
     if altBinning_bkg is False:
         bins = bin_dictionary(binning_pt, binning_eta, get_mergedbins_bounds=True, pt_binning_ref=get_pt_binning_ref(type_eff))
     else:
-        bin_idx_dict = bin_global_idx_dict(type_eff, binning_pt, binning_eta)
-        bins = bin_dictionary()
+        bin_idx_dict = bin_global_idx_dict(binning_pt, binning_eta)
+        bins = bin_dictionary("pt", "eta", pt_binning_ref=get_pt_binning_ref(type_eff))  # To be checked
 
     bins_mass = base_lib.binnings[binning_mass]
 

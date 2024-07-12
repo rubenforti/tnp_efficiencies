@@ -21,7 +21,7 @@ dict_classes = {
         "CB" : "my_double_CB"
     }
 
-fit_settings_args = ["type_analysis", "bkg_categories", "fitOnlyBkg", "fitPseudodata", "fit_verb", "refit_nobkg", "useMinos"]
+fit_settings_args = ["type_analysis", "bkg_categories", "fitOnlyBkg", "fitPseudodata", "fit_verb", "no_refitOnlySig", "useMinos"]
 
 ###############################################################################
 
@@ -59,8 +59,8 @@ def base_parser_fit(parser):
     parser.add_argument("--parallel", action="store_true",
                         help="Perform the fits in parallel")
 
-    parser.add_argument("--refit_nobkg", action="store_true",
-                        help="Refit the signal templates without the background")
+    parser.add_argument("--no_refitOnlySig", action="store_true",
+                        help="Disable the option of performing the fit without the background hypotesis (if the proper conditions are met)")
 
     parser.add_argument("--useMinos", action="store_true",
                         help="Use Minos for the fit")
@@ -116,6 +116,7 @@ def finalize_fit_parsing(args):
     outpath = args.output if args.process_name in args.output else f"{args.output}/{args.process_name}"
     if not os.path.exists(outpath): os.makedirs(outpath)
     args.output = outpath
+    args.ws_filename = f"{args.output}/{args.ws_filename.split('/')[-1]}"
 
     # Setting the output folders for figures
     args.figpath = { "good"  : f"{args.output}/fit_plots",
