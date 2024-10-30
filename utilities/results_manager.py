@@ -4,105 +4,100 @@ import sys
 import ROOT
 import pickle
 from utilities.binning_utils import bin_dictionary 
-from utilities.base_lib import efficiency_from_res, eval_efficiency, sumw2_error
+from utilities.base_lib import efficiency_from_res, eval_efficiency, sumw2_error, import_pdf_library
 
 
 class results_manager:
     """
     """
 
-    def __init__(self, type_analysis, binning_pt, binning_eta, import_ws="", import_txt="", altSig_check=False):
+    def __init__(self, input_file, type_analysis, binning_pt, binning_eta, altModel_check=""):
         """
         """
         self._dict_results = {}
-        self._analysis = type_analysis if type_analysis in ["indep", "sim"] else ""
-        if self._analysis == "":
-            print("ERROR: analysis type not recognized")
-            return None
+        if type_analysis in ["indep", "sim"]:
+            self._analysis = type_analysis 
+        else:
+            sys.exit("ERROR: analysis type not recognized")
         
-        bin_dict = bin_dictionary(binning_pt, binning_eta)
+        if input_file.endswith(".root"):
+            import_pdf_library("RooCMSShape")
+            f = ROOT.TFile(input_file, "READ")
+            input_obj = f.Get("w")
+            type_input = ".root"
+        elif input_file.endswith(".txt"):
+            with open(input_file, "r") as f:
+                input_obj = f.readlines()
+            type_input = ".txt"
+        else:
+            sys.exit("ERROR: input file format not recognized")
         
+        self.add_results(input_obj, type_input, binning_pt, binning_eta, altModel_check=altModel_check)
+
+
+
+    def add_results(self, input_obj, type_input, binning_pt, binning_eta, altModel_check=""):
+        """
+        """
         idx_list = 3  # Number of first useful row in the txt file (first 3 are comments) 
 
-        for bin_key in bin_dict.keys():
-        
-            if type(import_ws) is ROOT.RooWorkspace:
-                if self._analysis == 'indep':
-                    res_pass = import_ws.obj(f"results_pass_{bin_key}")
-                    res_fail = import_ws.obj(f"results_fail_{bin_key}")
-                    self.add_result({"pass":res_pass, "fail":res_fail}, bin_key, import_ws)
-                elif self._analysis == 'sim':
-                    self.add_result({"sim":import_ws.obj(f"results_sim_{bin_key}")}, bin_key, import_ws)
-                else:
-                    print("ERROR: analysis type not recognized")
-        
-            elif type(import_txt) is list:
-                if altSig_check is False:
-                    self.add_result_from_txt(import_txt, idx_list, bin_key)
-                else:
-                    self.add_result_from_txt_altSig(import_txt, idx_list, bin_key)
+        for bin_key in bin_dictionary(binning_pt, binning_eta).keys():
+            if type_input == ".root":
+                self.add_detailed_result(input_obj, bin_key)
+            elif type_input == ".txt":
+                self.add_detailed_result_from_txt(input_obj, idx_list, bin_key, altModel_check)
                 idx_list += 1
-
-
-    def add_result(self, res, bin_key, ws):
-        """
-        """
-        Npass, sigma_Npass = 0, 0
-        Nfail, sigma_Nfail = 0, 0
-
-        if self._analysis == 'indep':
         
-            res_pass, res_fail = res["pass"], res["fail"]
-            if type(res_pass) is ROOT.RooFitResult and type(res_fail) is ROOT.RooFitResult:
 
-                new_res = {
-                    bin_key : {
-                        "efficiency" : efficiency_from_res(res_pass, res_fail),
-                        "efficiency_MC" : eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(),
-                                                          ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
-                                                          sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
-                                                          sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}"))),
-                        "pars_pass" : res_pass.floatParsFinal(),
-                        "corrmatrix_pass" : res_pass.correlationMatrix(),
-                        "status_pass" : (res_pass.status(), res_pass.covQual(), res_pass.edm()),
-                        "pars_fail": res_fail.floatParsFinal(),
-                        "corrmatrix_fail": res_fail.correlationMatrix(),
-                        "status_fail" : (res_fail.status(), res_fail.covQual(), res_fail.edm())
-                        }
-                    }
-                self._dict_results.update(new_res)
-
+        
+    def add_detailed_result(self, ws, bin_key):
+        """
+        """
+        if self._analysis == 'indep':
+            res_pass, res_fail = ws.obj(f"results_pass_{bin_key}"), ws.obj(f"results_fail_{bin_key}")
+            self._dict_results.update( {
+                bin_key : { "efficiency" : efficiency_from_res(res_pass, res_fail),
+                            "efficiency_MC" : eval_efficiency(
+                                ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
+                                sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")), sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}"))),
+                            "pars_pass" : res_pass.floatParsFinal(),
+                            "corrmatrix_pass" : res_pass.correlationMatrix(),
+                            "status_pass" : (res_pass.status(), res_pass.covQual(), res_pass.edm()),
+                            "pars_fail": res_fail.floatParsFinal(),
+                            "corrmatrix_fail": res_fail.correlationMatrix(),
+                            "status_fail" : (res_fail.status(), res_fail.covQual(), res_fail.edm()) } })
+            
         elif self._analysis == 'sim':
-            results = res["sim"]
-            if type(results) is not ROOT.RooFitResult:
-                print("ERROR: result object not recognized")
-                print(bin_key)
-                sys.exit()
-            pars = results.floatParsFinal()
-            new_res = {f"{bin_key}": {
-                "efficiency" : (pars.find(f"efficiency_{bin_key}").getVal(),
-                                pars.find(f"efficiency_{bin_key}").getError()),
-                "pars_sim": results.floatParsFinal(),
-                "corrmatrix_sim": results.covarianceMatrix(),
-                "status_sim": (results.status(), results.covQual(), results.edm())
-                }
-            }
-            self._dict_results.update(new_res)
+            res = ws.obj(f"results_sim_{bin_key}")
+            pars = res.floatParsFinal()
+            self._dict_results.update( {
+                bin_key: {  "efficiency" : (pars.find(f"efficiency_{bin_key}").getVal(), pars.find(f"efficiency_{bin_key}").getError()),
+                            "pars_sim": res.floatParsFinal(),
+                            "corrmatrix_sim": res.covarianceMatrix(),
+                            "status_sim": (res.status(), res.covQual(), res.edm()) } })
+        
         else:
             pass
-    
-    def add_result_from_txt(self, row_list, idx_list, bin_key):
+
+
+    def add_detailed_result_from_txt(self, row_list, idx_list, bin_key, altModel_check=""):
+        """
+        """
         elements = row_list[idx_list].split('\t')
-        eff, deff = float(elements[4]), float(elements[5])
+        if altModel_check=="":
+            eff, deff = float(elements[4]), float(elements[5])
+        elif altModel_check=="altSig":
+            eff, deff = float(elements[8]), float(elements[9])
+        elif altModel_check=="altBkg":
+            eff, deff = float(elements[10]), float(elements[11])
+        else:
+            sys.exit("ERROR: altModel_check not recognized")
+
         effMC, deffMC = float(elements[6]), float(elements[7])
+
         self._dict_results.update({ 
-            bin_key : {"efficiency" : (eff, deff), "efficiency_MC" : (effMC, deffMC)}})
+             bin_key : {"efficiency" : (eff, deff), "efficiency_MC" : (effMC, deffMC)}})
 
-
-    def add_result_from_txt_altSig(self, row_list, idx_list, bin_key):
-        elements = row_list[idx_list].split('\t')
-        eff, deff = float(elements[8]), float(elements[9])
-        self._dict_results.update({bin_key : {"efficiency" : (eff, deff)}})
 
     def Open(self, filename):
         with open(filename, "rb") as file:
@@ -212,3 +207,34 @@ class results_manager:
             elif self._analysis == 'sim':
                 pass
         return pvalue
+    
+
+    '''
+    ### TO BE APPLIED AND TESTED SOMEWHERE
+    def getComparison(self, bin_key='', type="delta", bmark_val=None, bmark_err=None, useTestErrForPull=False):
+        """
+        """
+        if bin_key not in self._dict_results.keys(): sys.exit("Bin key not present in the results object dictionary")
+        if bmark_val is None: sys.exit("Benchmark value not provided")
+
+        if useTestErrForPull and type=="pull": bmark_err=self.getEff(bin_key)[1]
+
+        if bmark_err is None and type in ["delta_err", "ratio_err"]: sys.exit("Benchmark error not provided")
+
+        eff, d_eff = self.getEff(bin_key)
+
+        if type == "delta":
+            return eff - bmark_val
+        elif type == "delta_err":
+            return d_eff - bmark_err
+        elif type == "pull":
+            return (eff - bmark_val) / (d_eff**2 + bmark_err**2)**0.5
+        elif type == "pull_ref":
+            return (eff - bmark_val) / bmark_err
+        elif type == "rm1":
+            return (eff/bmark_val) - 1
+        elif type == "ratio_err":
+            return d_eff / bmark_err
+        else:
+            sys.exit("Type of comparison not recognized")
+    '''

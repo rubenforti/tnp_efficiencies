@@ -1,341 +1,209 @@
 """
 """
+import os
+import sys
+import math
 import ROOT
+import argparse
 from array import array
 from copy import copy
-from utilities.base_lib import binnings, eval_efficiency, sumw2_error, import_pdf_library
+from utilities.base_lib import default_binnings_by_eff, safeSystem
 from utilities.binning_utils import bin_dictionary
 from utilities.results_manager import results_manager
-from utilities.results_utils import init_results_histos, fill_res_histograms
+from utilities.results_utils import init_histos, fill_res_histograms, fill_resCmp_histograms
 
-NBINS = 21
+
+NBINS = 35
 
 eff_min = 0.895
 rel_err_eff_min, rel_err_eff_max = 1e-4, 7e-3
 sf_min, sf_max =  0.99, 1.03
 
-delta_min = -5e-2
-delta_error_min = -5e-3
-pull_min = -5
-rm1_min = -3e-2
+delta_min = -2e-3
+delta_error_min = -2e-3
+pull_min = -1
+rm1_min = -1e-3
 ratio_error_min = -1
 
 
-res_var_dict = {
-    "efficiency" : {
+res_dict = {
+    "efficiency" : { 
         "title" : "Efficiency", 
         "array" : array("d", [round(eff_min + (1-eff_min)*(i/NBINS), 4) for i in range(NBINS+1)])},
     "rel_err_efficiency" : {
         "title" : "Relative error on efficiency", 
         "array" : array("d", [round(rel_err_eff_min + (rel_err_eff_max-rel_err_eff_min)*(i/NBINS), 6) for i in range(NBINS+1)])},
+    "efficiency_MC" : {
+        "title" : "Efficiency MC", 
+        "array" : array("d", [round(eff_min + (1-eff_min)*(i/NBINS), 4) for i in range(NBINS+1)])},
     "sf" : {
         "title" : "Scale Factor", 
         "array" : array("d", [round(sf_min + (sf_max-sf_min)*(i/NBINS), 5) for i in range(NBINS+1)])},
 }
-resCmp_var_dict = {
+resCmp_dict = {
     "delta" : {
         "title" : "Delta efficiency", 
         "array" : array("d", [round(delta_min + (-2*delta_min/NBINS)*i, 6) for i in range(NBINS+1)])},
-    "delta_error" : {
-        "title" : "Delta error", 
+    "delta_err" : {
+        "title" : "Delta error on efficiency", 
         "array" : array("d", [round(delta_error_min + (-2*delta_error_min/NBINS)*i, 6) for i in range(NBINS+1)])},
     "pull" : {
         "title" : "Pull", 
         "array" : array("d", [round(pull_min + (-2*pull_min/NBINS)*i, 6) for i in range(NBINS+1)])},
     "pull_ref" : {
-        "title" : "Pull (referred to bmark stat. error)", 
+        "title" : "Pull (referred to bmark error)", 
         "array" : array("d", [round(pull_min + (-2*pull_min/NBINS)*i, 6) for i in range(NBINS+1)])},
     "rm1" : {
         "title" : "Relative bias", 
         "array" : array("d", [round(rm1_min + (-2*rm1_min/NBINS)*i, 6) for i in range(NBINS+1)])},
-    "ratio_error" : {
-        "title" : "Ratio error minus 1", 
+    "ratio_err" : {
+        "title" : "Ratio of errors minus 1", 
         "array" : array("d", [round(ratio_error_min + (-2*ratio_error_min/NBINS)*i, 6) for i in range(NBINS+1)])}
 }
 
-
-
-###############################################################################
-
-def save_eff_results(ws_name, type_analysis, binning_pt, binning_eta):
-    """
-    """
-    file_in = ROOT.TFile(ws_name, "READ")
-    ws = file_in.Get("w")
-
-    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
-
-    bin_dict = bin_dictionary(binning_pt, binning_eta)
-    
-    results = results_manager(type_analysis, binning_pt, binning_eta, import_ws=ws)
-
-    histos ={}
-    
-    for res_key in ["efficiency", "rel_err_efficiency", "sf"]:
-        histos.update(init_results_histos(res_key, res_var_dict[res_key]["title"], 
-                                          res_var_dict[res_key]["array"], bins_pt, bins_eta))
-
-    
-    for bin_key, [_, bin_pt, bin_eta] in bin_dict.items():
-
-        eff, d_eff = results.getEff(bin_key)
-        eff_mc, d_eff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
-                                           ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
-                                           sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
-                                           sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
-
-        histos["efficiency"].Fill(eff)
-        histos["efficiency_2d"].SetBinContent(bin_pt, bin_eta, eff)
-        histos["rel_err_efficiency"].Fill(d_eff/eff)
-        histos["rel_err_efficiency_2d"].SetBinContent(bin_pt, bin_eta, d_eff/eff)
-        histos["sf"].Fill(eff/eff_mc)
-        histos["sf_2d"].SetBinContent(bin_pt, bin_eta, eff/eff_mc)
-    
-
-    file_out = ROOT.TFile(ws_name.replace("ws", "res"), "RECREATE")
-    file_out.cd()
-    [histo.Write() for histo in histos.values()]
-    file_out.Close()
+def zeroBkg_estimate(pars):
+        for par in pars:
+            if "nbkg" in par.GetName() and "fail" in par.GetName():
+                if math.isclose(par.getVal(), 0.5, abs_tol=1.5): #
+                    # if the fit estimates less than 2 bkg events, it's considered as zero-background
+                    return True
+                else:
+                    return False
+        return True
 
 ###############################################################################
 
 
-def compare_efficiency(ws_txt_bmark_filename, ws_new_filename, binning_pt, binning_eta, res_list,
-                       eval_nobkg_effect=False, postfix_name=""):
-    """
-    Compare the efficiencies and their error between two results files. The first file is 
-    considered as benchmark
-    """
+parser = argparse.ArgumentParser(description='Produce results and compare with a benchmark')
 
-    if ".root" in ws_txt_bmark_filename:
-        file_bmark = ROOT.TFile(ws_txt_bmark_filename, "READ")
-        ws_bmark = file_bmark.Get("w")
-        print(type(ws_bmark))
-        res_benchmark = results_manager("indep", binning_pt, binning_eta, import_ws=ws_bmark)
+subparsers = parser.add_subparsers(help='Sub-command help')
+
+parser.add_argument('-i', '--test_file', type=str, help='Input file (results to be tested)', required=True)
+parser.add_argument('-e', '--eff', type=str, help='Efficiency type', required=True)
+parser.add_argument('--altModel_txt', type=str, default="", choices=["", "altSig", "altBkg"],
+                    help='Benchmark efficiencies (in a .txt file) are selected with the specified method')
+parser.add_argument('--binning_pt', type=str, help='Binning in pt', default="")
+parser.add_argument('--binning_eta', type=str, help='Binning in eta', default="")
+parser.add_argument('--postfix', type=str, default="", help='Postfix name for output file')
+parser.add_argument('--type_analysis', type=str, default="indep", choices=["indep", "sim"], help='Type of analysis')
+parser.add_argument('--pseudodata', action='store_true', help='Evaluation on pseudodata')
+parser.add_argument('--figs', action='store_true', help='Produce figures')
+parser.add_argument('--setLog', action='store_true', help='Set log scale on y axis (when plotting)')
+
+parser_cmp = subparsers.add_parser('cmp', help='Compare results')
+parser_cmp.add_argument('-b', '--bmark_file', type=str, help='Benchmark file', required=True)
+parser_cmp.add_argument('-c', '--comparisons', type=str, nargs="+", default=list(resCmp_dict.keys()),
+                        help='List of comparison statistics to be evaluated')
+parser_cmp.add_argument('--projection', action='store_true', help='Save projections on pt and eta')
+parser_cmp.add_argument('--isolate_effect', type=str, default="", choices=["pass", "fail"], 
+                        help='Isolate effect on pass or fail')
+parser_cmp.add_argument('--eval_onlyFitsWithBkg', action='store_true',
+                         help='Make comparisons only on bins with Bkg (selection only on fail)')
+parser_cmp.add_argument('--eval_asymm', action='store_true', help='Evaluate asymmetry in MINOS errors')
+parser_cmp.add_argument('--add_plain_res', action='store_true', help='Add plain results in the root files')
+
+args = parser.parse_args()
+
+# Selection of which histograms to produce
+if not hasattr(args, 'bmark_file'):
+    list_histograms = res_dict if not args.pseudodata else resCmp_dict
+elif not args.add_plain_res:
+    list_histograms = {k:v for k,v in resCmp_dict.items() if k in args.comparisons}
+else:
+    list_histograms = {res_dict.items(), resCmp_dict.items()}
+
+if args.binning_pt=="": args.binning_pt = default_binnings_by_eff[args.eff][0]
+if args.binning_eta=="": args.binning_eta = default_binnings_by_eff[args.eff][1]
+
+bin_dict = bin_dictionary(args.binning_pt, args.binning_eta)
+
+binnings_1d = {k : v["array"] for k, v in list_histograms.items()}
+names_titles_dict = {k : v["title"] for k, v in list_histograms.items()}
+
+histos = init_histos(names_titles_dict.keys(), names_titles_dict.values(), 
+                     binning_var=binnings_1d, binning_pt=args.binning_pt, binning_eta=args.binning_eta, flag="")
+
+
+res_test = results_manager(args.test_file, args.type_analysis, args.binning_pt, args.binning_eta, 
+                          altModel_check=args.altModel_txt)
+res_benchmark = None
+
+
+if hasattr(args, 'bmark_file'):
+    res_benchmark = results_manager(args.bmark_file, args.type_analysis, args.binning_pt, args.binning_eta, 
+                                    altModel_check=args.altModel_txt)
+
+    if args.eval_onlyFitsWithBkg:
+        bin_dict_original = copy(bin_dict)
+        
+        for b_key in bin_dict_original.keys():
+            pars = res_test.getPars("fail", b_key) if args.type_analyisis=="indep" else res_test.getPars("sim", b_key)
+            if zeroBkg_estimate(pars): bin_dict.pop(b_key)
+
+
+
+
+
+
+fill_res_histograms(res_test, histos, bin_dict)
+fill_resCmp_histograms(res_benchmark, res_test, histos, bin_dict, isPseudodata=args.pseudodata) 
+
+'''
+histos_copy = histos.copy()
+for hist_key in histos_copy.keys():
+    if "2d" in hist_key:
+        histos[hist_key].Sumw2()
+        histo_pt = histos[hist_key].ProjectionX(hist_key.replace("2d", "pt"), 1, len(bins_eta)-1)
+        histo_pt.Scale(1/(len(bins_eta)-1))
+        histo_eta = histos[hist_key].ProjectionY(hist_key.replace("2d", "eta"), 1, len(bins_pt)-1)
+        histo_eta.Scale(1/(len(bins_pt)-1))
+        histos.update({histo_pt.GetName() : histo_pt, histo_eta.GetName() : histo_eta})
+'''
+
+base_lib, outname = args.test_file.rsplit("/", 1)
+
+if hasattr(args, 'bmark_file'):
+    postfix = "-"+args.postfix if args.postfix!="" else ""
+    if args.bmark_file.endswith(".txt"):
+        add_flag = f"_cmp-egm-{args.altModel_txt}" if args.altModel_txt!="" else "_cmp-egm"
     else:
-        with open(ws_txt_bmark_filename, "r") as file_bmark:
-            row_list = file_bmark.readlines()
-        print(type(row_list))
-        res_benchmark = results_manager("indep", "pt_tracking", "eta", import_txt=row_list)
-    
-    file_new = ROOT.TFile(ws_new_filename, "READ")
-    ws_new = file_new.Get("w")
+        add_flag = "_cmp-" + args.bmark_file.split("_")[-1].replace(".root", "") if len(args.bmark_file.split("_"))>2 else "" 
 
+    add_flag += postfix
 
-    res_new = results_manager("indep", binning_pt, binning_eta, import_ws=ws_new)
+    if args.eval_onlyFitsWithBkg: 
+        add_flag += "-onlyFitsWithBkg"
 
-    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
-    bin_dict = bin_dictionary(binning_pt, binning_eta)
+else:
+    add_flag = "_"+args.postfix if args.postfix!="" else ""
 
-    bin_dict_original = copy(bin_dict)
+if args.test_file.endswith(".root"):
+    gen_name = (add_flag+"_"+outname.split("/")[-1].split("_", 1)[1]).replace(".root", "")
+else:
+    gen_name = outname.split("/")[-1].replace(".txt", "")
 
-    if eval_nobkg_effect is True:
-        if t_an == "indep":
-            for b_key in bin_dict_original.keys():
-                pars_pass, pars_fail = [res_new.getPars(flag, b_key) for flag in ["pass", "fail"]]
-                if pars_pass.getSize() == 5 or pars_fail.getSize() == 5:
-                    bin_dict.pop(b_key)
-        elif t_an == "sim":
-            for b_key in bin_dict_original.keys():
-                pars_sim = res_new.getPars("sim", b_key)
-                if pars_sim.getSize() == 10:
-                    bin_dict.pop(b_key)
-
-        NBINS = len(bin_dict.keys())
-    
- 
-    histos = {}
-    [histos.update(init_results_histos(res_key, resCmp_var_dict[res_key]["title"], 
-                                       resCmp_var_dict[res_key]["array"], bins_pt, bins_eta)) 
-     for res_key in res_list]
-    
-    print(type(res_benchmark), type(res_new))
-
-    fill_res_histograms(res_benchmark, res_new, histos, bin_dict) 
-
-    '''
-    histos_copy = histos.copy()
-    for hist_key in histos_copy.keys():
-        if "2d" in hist_key:
-            histos[hist_key].Sumw2()
-            histo_pt = histos[hist_key].ProjectionX(hist_key.replace("2d", "pt"), 1, len(bins_eta)-1)
-            histo_pt.Scale(1/(len(bins_eta)-1))
-            histo_eta = histos[hist_key].ProjectionY(hist_key.replace("2d", "eta"), 1, len(bins_pt)-1)
-            histo_eta.Scale(1/(len(bins_pt)-1))
-            histos.update({histo_pt.GetName() : histo_pt, histo_eta.GetName() : histo_eta})
-    '''
-
-    add_flag = "cmp" if ".root" in ws_txt_bmark_filename else "cmp-egm"
-
-    if postfix_name!="": add_flag += f"-{postfix_name}"
-
-    if eval_nobkg_effect: add_flag += "_noBkgFits"
-
-    file_out = ROOT.TFile(ws_new_filename.replace("ws", f"res_{add_flag}"), "RECREATE")
-    file_out.cd()
-    [histo.Write() for histo in histos.values()]
-    file_out.Close()
-
-    print(file_out.GetName())
-
-
-###############################################################################
-
-def compare_eff_pseudodata(ws_filename, binning_pt, binning_eta, res_list, isolate_effect=""):
-    """
-    """
-
-    file_pseudodata = ROOT.TFile.Open(ws_filename)
-    ws = file_pseudodata.Get("w")
-
-    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
-    bin_dict = bin_dictionary(binning_pt, binning_eta)
-
-    nbins_pt, nbins_eta = len(bins_pt)-1, len(bins_eta)-1
-
-    histos = {}
-    [histos.update(init_results_histos(res_key, resCmp_var_dict[res_key]["title"], 
-                                       resCmp_var_dict[res_key]["array"], bins_pt, bins_eta)) 
-     for res_key in res_list]
-
-    results = results_manager("indep", binning_pt, binning_eta, import_ws=ws)
-    
-    for bin_key, [_, bin_pt, bin_eta] in bin_dict.items():
-        
-        eff, d_eff = results.getEff(bin_key)
-
-        if isolate_effect=="pass":
-            nfail = ws.data(f"Minv_mc_fail_{bin_key}").sumEntries()
-            d_nfail = sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}"))   
-            pars_fail = ws.obj(f"results_pass_{bin_key}").floatParsFinal()
-            npass, d_npass = pars_fail.find(f"nsig_pass_{bin_key}").getVal(), pars_fail.find(f"nsig_pass_{bin_key}").getError()
-            eff, d_eff = eval_efficiency(npass, nfail, d_npass, d_nfail)
-
-        elif isolate_effect=="fail":
-            npass = ws.data(f"Minv_mc_pass_{bin_key}").sumEntries()
-            d_npass = sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}"))
-
-            pars_fail = ws.obj(f"results_fail_{bin_key}").floatParsFinal()
-            nfail, d_nfail = pars_fail.find(f"nsig_fail_{bin_key}").getVal(), pars_fail.find(f"nsig_fail_{bin_key}").getError()
-
-            eff, d_eff = eval_efficiency(npass, nfail, d_npass, d_nfail)
+if args.figs:
+    new_outFolder = base_lib+"/results"+gen_name
+    if os.path.exists(new_outFolder):
+        check = input(f"Directory {new_outFolder} already exists. Do you want to overwrite it? [y/n] ")
+        if check=="y":
+            safeSystem(f"rm -rf {new_outFolder}")
         else:
-            pass
+            sys.exit(0)
+    os.mkdir(new_outFolder) 
+    base_lib = new_outFolder       
 
-        eff_mc, d_eff_mc = eval_efficiency(ws.data(f"Minv_mc_pass_{bin_key}").sumEntries(), 
-                                           ws.data(f"Minv_mc_fail_{bin_key}").sumEntries(),
-                                           sumw2_error(ws.data(f"Minv_mc_pass_{bin_key}")),
-                                           sumw2_error(ws.data(f"Minv_mc_fail_{bin_key}")))
-        
-        '''
-        if bin_key in ["[55.0to65.0][-0.3to-0.2]", "[55.0to65.0][0.2to0.3]",
-                       "[55.0to65.0][-0.2to-0.1]", "[55.0to65.0][0.5to0.6]", "[55.0to65.0][0.7to0.8]"]:
-            
-            histos["delta_2d"].SetBinContent(bin_pt, bin_eta, -999)
-            histos["delta_error_2d"].SetBinContent(bin_pt, bin_eta, -999)
-            histos["pull_2d"].SetBinContent(bin_pt, bin_eta, -999)
-            histos["rm1_2d"].SetBinContent(bin_pt, bin_eta, -999)
-            histos["ratio_error_2d"].SetBinContent(bin_pt, bin_eta, -999)
-            continue
-        '''
+outname = "resHist"+gen_name+".root"
 
-        if "delta" in histos.keys():
-            histos["delta"].Fill(eff-eff_mc)
-            histos["delta_2d"].SetBinContent(bin_pt, bin_eta, eff-eff_mc)
-        if "delta_error" in histos.keys():
-            histos["delta_error"].Fill(d_eff-d_eff_mc)
-            histos["delta_error_2d"].SetBinContent(bin_pt, bin_eta, d_eff-d_eff_mc)
-        if "pull" in histos.keys():
-            histos["pull"].Fill((eff-eff_mc)/d_eff)
-            histos["pull_2d"].SetBinContent(bin_pt, bin_eta, (eff-eff_mc)/d_eff)
-        if "rm1" in histos.keys():
-            histos["rm1"].Fill((eff/eff_mc)-1)
-            histos["rm1_2d"].SetBinContent(bin_pt, bin_eta, (eff/eff_mc)-1)
-        if "ratio_error" in histos.keys():
-            histos["ratio_error"].Fill((d_eff/d_eff_mc)-1)
-            histos["ratio_error_2d"].SetBinContent(bin_pt, bin_eta, (d_eff/d_eff_mc)-1)
+file_out = ROOT.TFile(base_lib+"/"+outname, "RECREATE")
+file_out.cd()
+[histo.Write() for histo in histos.values()]
+file_out.Close()
 
-        print(bin_key, (eff-eff_mc)/d_eff)
+print("\n\nSaved file with results:", file_out.GetName())
 
-
-    resfile = ROOT.TFile(ws_filename.replace("ws", f"res_cmpMC"), "RECREATE")
-    resfile.cd()
-    [histo.Write() for histo in histos.values()]             
-    resfile.Close()
-
-###############################################################################
-
-def eval_minos(ws_hesse_filename, ws_filename, binning_pt, binning_eta):
-    """
-    """
-    file = ROOT.TFile.Open(ws_filename)
-    ws = file.Get("w")
-
-    file_hesse = ROOT.TFile.Open(ws_hesse_filename)
-    ws_hesse = file_hesse.Get("w")
-
-    bins_pt, bins_eta = binnings[binning_pt], binnings[binning_eta]
-    bin_dict = bin_dictionary(binning_pt, binning_eta)
-
-    asymm_binning = array("d", [-0.5 + (i/75.) for i in range(76)])
-    ratio_errors_binning = array("d", [-0.3 + (0.6*i/75.) for i in range(76)])
-
-    histos ={}
-    
-    
-    histos.update(init_results_histos("asymm_minos", "MINOS error asymmetry",
-                                      asymm_binning, bins_pt, bins_eta))
-    histos.update(init_results_histos("ratio_errors", "Ratio errors",
-                                      ratio_errors_binning, bins_pt, bins_eta))
-    
-
-    for bin_key, [_, bin_pt, bin_eta] in bin_dict.items():
-
-        res, res_hesse = ws.obj(f"results_sim_{bin_key}"), ws_hesse.obj(f"results_sim_{bin_key}")
-        
-        pars, pars_hesse = res.floatParsFinal(), res_hesse.floatParsFinal()
-
-        eff, eff_hesse = pars.find(f"efficiency_{bin_key}"), pars_hesse.find(f"efficiency_{bin_key}")
-
-        asymm_minos = (eff.getErrorHi() - abs(eff.getErrorLo()))/(eff.getErrorHi() + abs(eff.getErrorLo()))
-
-        minos_width = (eff.getErrorHi() + abs(eff.getErrorLo()))
-        hesse_width = eff_hesse.getError()*2
-
-        print(minos_width/hesse_width)
-        histos["asymm_minos"].Fill(asymm_minos)
-        histos["asymm_minos_2d"].SetBinContent(bin_pt, bin_eta, asymm_minos)
-        histos["ratio_errors"].Fill((minos_width/hesse_width)-1)
-        histos["ratio_errors_2d"].SetBinContent(bin_pt, bin_eta, (minos_width/hesse_width)-1)
-
-    
-    file_out = ROOT.TFile(ws_filename.replace("ws", "asym"), "RECREATE")
-    file_out.cd()
-    [histo.Write() for histo in histos.values()]
-    file_out.Close()
-
-
-
-###############################################################################
-###############################################################################
-
-if __name__ == '__main__':
-
-    resCmp_list = resCmp_var_dict.keys()
-    print(resCmp_list)
-
-    import_pdf_library("RooCMSShape")
-
-    base_folder = "/scratch/rforti/tnp_efficiencies_results/reco"
-
-    ws_filename = base_folder+"/BBlight_legacySettings/ws_reco_BBlight.root"
-
-    benchmark_res = base_folder+"/legacy_fit/ws_reco.root"
-
-
-    # save_eff_results(benchmark_res, "indep", "pt_tracking", "eta")
-    compare_efficiency(benchmark_res, ws_filename, "pt_reco", "eta", resCmp_list)
-
-    # eval_minos("results/iso_sim/ws_iso_sim.root", "results/iso_sim_minos/ws_iso_sim_minos_eff.root", "pt", "eta")
-
-    # compare_eff_pseudodata(ws_filename, "pt_tracking", "eta", resCmp_list, isolate_effect="")
+if args.figs:
+    cmd = f"python scripts/plotting/plot_hres.py -i {base_lib}/{outname} -e {args.eff}"
+    if args.setLog: 
+        cmd += " --log"
+    safeSystem(cmd)

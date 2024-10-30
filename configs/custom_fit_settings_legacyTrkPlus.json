@@ -1,0 +1,138 @@
+{
+    "run1" : {
+        "fit_checks" : "neglect_atLimPars",
+        "type_refit" : "benchmark",
+        "Nbins" : {
+            "pass" : 2000,
+            "fail" : 2000
+        },
+        "bufFraction" : {
+            "pass" : 0.5,
+            "fail" : 0.5
+        },
+        "bkg_model" : {
+            "pass" : "expo",
+            "fail" : "BB_light"
+        },
+        "pars" : {
+            "mu" : {
+                "pass" : [0.0, -5.0, 5.0],
+                "fail" : [0.0, -3.0, 3.0]
+            },
+            "sigma" : {
+                "pass" : [0.5, 0.1, 5.0],
+                "fail" : [0.5, 0.02, 3.0]
+            },
+            "tau" : {
+                "pass" : [0.0, -5.0, 5.0]
+            }
+        },
+        "norm" : {
+            "nsig" : {
+                "pass" : ["0.9n", 0.5, "1.5n"],
+                "fail" : ["0.25n", 0.5, "1.5n"]
+            },
+            "nbkg" : {
+                "pass" : ["0.1n", 0.5, "1.5n"],
+                "fail" : ["0.75n", 0.5, "1.5n"]
+            }
+        }
+    },
+
+    "run2" : {
+        "Nbins" : {
+            "pass" : 1001,
+            "fail" : 1001
+        },
+        "bufFraction" : {
+            "pass" : 0.1,
+            "fail" : 0.1
+        }
+    },
+
+    "run3" : {
+        "Nbins" : {
+            "pass" : 999,
+            "fail" : 999
+        },
+        "bufFraction" : {
+            "pass" : 0.1,
+            "fail" : 0.1
+        }
+    },
+
+    "run4" : {
+        "Nbins" : {
+            "pass" : 2000,
+            "fail" : 2000
+        },
+        "bufFraction" : {
+            "pass" : 0.1,
+            "fail" : 0.1
+        },
+        "bkg_model" : {
+            "pass" : "expo",
+            "fail" : "mc_raw"
+        }
+    },
+
+    "run5" : {
+        "Nbins" : {
+            "pass" : 2000,
+            "fail" : 1000
+        },
+        "bufFraction" : {
+            "pass" : 0.1,
+            "fail" : 0.05
+        },
+        "pars" : {
+            "mu" : {
+                "pass" : [0.0, -5.0, 5.0],
+                "fail" : [-0.5, -5.0, 5.0]
+            },
+            "sigma" : {
+                "pass" : [0.5, 0.1, 5.0],
+                "fail" : [1.0, 0.02, 3.0]
+            },
+            "tau" : {
+                "pass" : [0.0, -5.0, 5.0]
+            }
+        }
+        
+    },
+
+    "run6" : {
+        "Nbins" : {
+            "pass" : 2000,
+            "fail" : 2000
+        },
+        "bufFraction" : {
+            "pass" : 0.1,
+            "fail" : 0.1
+        },
+        "norm" : {
+            "nsig" : {
+                "pass" : ["0.9n", 0.5, "1.5n"],
+                "fail" : ["0.25n", 0.5, "1.5n"]
+            },
+            "nbkg" : {
+                "pass" : ["0.5n", 0.5, "1.5n"],
+                "fail" : ["0.5n", 0.5, "1.5n"]
+            }
+        },
+        "pars" : {
+            "mu" : {
+                "pass" : [0.0, -5.0, 5.0],
+                "fail" : [1.0, -5.0, 5.0]
+            },
+            "sigma" : {
+                "pass" : [0.5, 0.1, 5.0],
+                "fail" : [2.5, 0.02, 3.0]
+            },
+            "tau" : {
+                "pass" : [0.0, -5.0, 5.0]
+            }
+        }
+    }
+
+}

@@ -2,6 +2,7 @@
     "run1" : {
         "fit_checks" : "egm_legacy",
         "type_refit" : "benchmark",
+        "useBBsignal" : false,
         "Nbins" : {
             "pass" : 2000,
             "fail" : 2000
@@ -12,7 +13,7 @@
         },
         "bkg_model" : {
             "pass" : "expo",
-            "fail" : "cmsshape"
+            "fail" : "BB_light"
         },
         "pars" : {
             "mu" : {

@@ -41,20 +41,25 @@ class AbsFitter():
                 self.bkg_paramHist, self.bkg_histConstr = {}, {}
                 self._one = ROOT.RooRealVar("one", "one", 1.0)
                 self._one.setConstant() 
-                continue
 
-        '''
-        # Not used anymore since the totkbg hist is generated (when needed) in the initial setup of the workspace
-        if self.settings["bkg_model"]["pass"] == "mc_raw" or self.settings["bkg_model"]["fail"] == "mc_raw":
-            self.bkg_categories = self.settings["bkg_categories"]
-            self.bkg_tothist = {}
-        '''
-
-    def _initParams(self, flag):
+    def _initParams(self, flag, backup=False):
         """
         Transforms the list of numbers, representing each parameter (initial
         value, lower bound, upper bound), into a RooRealVar object. 
         """
+        #print("IS BACKUP", backup)
+
+        if backup is True:
+            if flag=="fail":
+                print("AAAA")
+                self.pars.update({
+                    "c1" : { flag : ROOT.RooRealVar(f"c1_{flag}_{self.bin_key}", "c1", 0, -1, 1) },
+                    "c2" : { flag : ROOT.RooRealVar(f"c2_{flag}_{self.bin_key}", "c2", -0.5, -1, 1) },
+                    "c3" : { flag : ROOT.RooRealVar(f"c3_{flag}_{self.bin_key}", "c3", 0, -1, 1) },
+                    "c4" : { flag : ROOT.RooRealVar(f"c4_{flag}_{self.bin_key}", "c4", -0.5, -1, 1) }
+                    })
+            return
+
         for pars_key in self.pars.keys():
             if flag in self.pars[pars_key].keys(): 
                 pars_obj = self.pars[pars_key][flag]
@@ -65,7 +70,7 @@ class AbsFitter():
                     self.pars[pars_key][flag].setConstant()
             else:
                 continue
-
+       
 
     def _createSigPdf(self, flag, ws):
         """
@@ -94,7 +99,7 @@ class AbsFitter():
             })
         self.pdfs["conv_pdf"][flag].setBufferFraction(self.settings["bufFraction"][flag])
 
-    
+
     def _createFixedPdfs(self, flag, ws):
         """
         """
@@ -140,7 +145,7 @@ class AbsFitter():
             })
 
 
-    def _createBkgPdf(self, flag, ws):
+    def _createBkgPdf(self, flag, ws, backup=False):
         """
         Creates the background pdf and loads it into the pdfs dictionary. In 
         case the background is modeled with MC, the histogram of the sum of the
@@ -148,7 +153,13 @@ class AbsFitter():
         """
         bkg_model = self.settings["bkg_model"][flag]
 
-        if bkg_model == "expo":
+        if backup is True and flag=="fail":
+            self.pdfs["bkg_pdf"].update({
+                flag : ROOT.RooChebychev(f"chebychev_bkg_{flag}_{self.bin_key}", "Chebychev background", self.axis[flag], 
+                                         ROOT.RooArgList(self.pars["c1"][flag], self.pars["c2"][flag], self.pars["c3"][flag], self.pars["c4"][flag]))
+                })
+
+        elif bkg_model == "expo":
             self.pdfs["bkg_pdf"].update({
                 flag : ROOT.RooExponential(f"expo_bkg_{flag}_{self.bin_key}", "Exponential background",
                                            self.axis[flag], self.pars["tau"][flag])
@@ -170,19 +181,17 @@ class AbsFitter():
         elif bkg_model == "BB_light":
             self.bkg_paramHist.update({ 
                 flag : ROOT.RooParamHistFunc(f"bkg_paramHist_{flag}_{self.bin_key}", "bkg parametrized histogram", 
-                                             ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total")) })
+                                             ws.data(f"Minv_bkg_{flag}_{self.bin_key}_total"), self.axis[flag]) })
             self.bkg_histConstr.update({
                 flag : ROOT.RooHistConstraint(f"bkg_histConstr_{flag}_{self.bin_key}", "bkg histogram constraints", 
                                               self.bkg_paramHist[flag]) })
             
             if type(self.constr_set[flag]) is not ROOT.RooArgSet: self.constr_set[flag] = ROOT.RooArgSet()
-
             self.constr_set[flag].add( self.bkg_histConstr[flag] )
 
             self.pdfs["bkg_pdf"].update({
                 flag : ROOT.RooRealSumPdf(f"BB_bkg_{flag}_{self.bin_key}", "Barlow-Beeston background", 
                                           ROOT.RooArgList(self.bkg_paramHist[flag]), ROOT.RooArgList(self._one)) })
- 
         else:
             sys.exit("ERROR: background model not recognized")
             
@@ -211,6 +220,12 @@ class AbsFitter():
                     roohist_pseudodata.add(ws.data(f"Minv_bkg_{flag}_{self.bin_key}_{cat.replace('bkg_', '')}"))
                 if counter_bkg_sources == 0: 
                     sys.exit("ERROR: no background source has been found")
+        
+        for i in range(roohist_pseudodata.numEntries()):
+            roohist_pseudodata.get(i)
+            if roohist_pseudodata.weight(i) < 0: 
+                err = roohist_pseudodata.weightError(ROOT.RooAbsData.SumW2)
+                roohist_pseudodata.set(i, 0, err)
 
         self.histo_data.update({flag : roohist_pseudodata})
 
@@ -220,7 +235,7 @@ class AbsFitter():
         par_names = [par.GetName().split("_")[0] for par in pdf_fit.getParameters(data_fit) if par.isConstant() is False]
 
         constr_dict = self.settings["constr"]
-        constraints = ROOT.RooArgSet()
+        constraints = ROOT.RooArgSet() if type(self.constr_set[flag]) is not ROOT.RooArgSet else self.constr_set[flag]
         for constr_key in constr_dict.keys():
             if constr_key not in par_names: continue
             if flag not in constr_dict[constr_key].keys(): continue
@@ -231,7 +246,8 @@ class AbsFitter():
                     "sig" : ROOT.RooRealVar(f"sigConstr_{constr_key}_{flag}_{self.bin_key}", f"sigConstr {constr_key} {flag}", 
                                             constr_values[1], 0.9*constr_values[1], 1.1*constr_values[1])
                     } 
-            constr_dict[constr_key][flag]["mu"].setConstant(), constr_dict[constr_key][flag]["sig"].setConstant()
+            # Why were set as constant? In the BB case, the nuisances are not constant, and makes sense to have them free
+            #constr_dict[constr_key][flag]["mu"].setConstant(), constr_dict[constr_key][flag]["sig"].setConstant()
 
             constr_dict[constr_key][flag].update({
                 "constr_pdf" : ROOT.RooGaussian(f"constr_{constr_key}_{flag}_{self.bin_key}", 
@@ -370,14 +386,15 @@ class AbsFitter():
                     norm_obj[0], norm_obj[1], norm_obj[2] )
 
 
-    def initFitPdfs(self, ws, fitOnlyBkg=False):
+    def initFitPdfs(self, ws, fitOnlyBkg=False, useBackupBkgFail=False):
         """
         """
+
         for flag in ["pass", "fail"]:
-            self._initParams(flag)
+            self._initParams(flag, backup=useBackupBkgFail)
 
             if self.settings["bkg_model"][flag] != "num_estimation":
-                self._createSigPdf(flag, ws), self._createBkgPdf(flag, ws)
+                self._createSigPdf(flag, ws), self._createBkgPdf(flag, ws, backup=useBackupBkgFail)
             else:
                 self._createFixedPdfs(flag, ws)
             
@@ -386,12 +403,11 @@ class AbsFitter():
                 self.pdfs["fit_model"][flag].SetName(f"fitPDF_{flag}_{self.bin_key}")
                 continue
 
-            self.pdfs["sum_pdf"][flag] = ROOT.RooAddPdf(
-                f"sum_{flag}_{self.bin_key}", "Signal+Bkg model", 
-                ROOT.RooArgList(self.pdfs["conv_pdf"][flag], self.pdfs["bkg_pdf"][flag]), 
-                ROOT.RooArgList(self.norm["nsig"][flag], self.norm["nbkg"][flag]) )
+            self.pdfs["sum_pdf"][flag] = ROOT.RooAddPdf(f"sum_{flag}_{self.bin_key}", "Signal+Bkg model", 
+                                                        ROOT.RooArgList(self.pdfs["conv_pdf"][flag], self.pdfs["bkg_pdf"][flag]), 
+                                                        ROOT.RooArgList(self.norm["nsig"][flag],     self.norm["nbkg"][flag]) )
             # Creating a new pdf for plotting purposes, I guess there are other ways but this is the simplest
-            self.pdfs["fit_model"][flag] = ROOT.RooAddPdf(self.pdfs["sum_pdf"][flag], f"fitPDF_{flag}_{self.bin_key}")
+            self.pdfs["fit_model"][flag] = ROOT.RooAddPdf(self.pdfs["sum_pdf"][flag], f"fitPDF_{flag}_{self.bin_key}")    
 
 
     def doFit(self, flag, prefit_bkg=False, sidebands_lims=[90,90]):
@@ -473,7 +489,8 @@ class AbsFitter():
                             ROOT.RooFit.Strategy(2),
                             ROOT.RooFit.SumW2Error(False),
                             ROOT.RooFit.ExternalConstraints(self.constr_set[flag]),
-                            ROOT.RooFit.Save(1), 
+                            ROOT.RooFit.Save(1),
+                            ROOT.RooFit.EvalBackend("legacy"),
                             ROOT.RooFit.PrintLevel(self.settings["fit_verb"]))
         
         res.SetName(f"results_{flag}_{self.bin_key}{subs_res}")
@@ -490,7 +507,7 @@ class AbsFitter():
         
         self.status.update({ 
             flag+subs_res : fit_quality(fit_obj, type_checks=checks, 
-                                        isFitPseudodata=self.settings["fitPseudodata"], isBBmodel=isBBmodel) }) 
+                                        isFitPseudodata=self.settings["fitPseudodata"], isBBmodel=isBBmodel) })
         
         print(res.status(), res.covQual(), res.edm())
         print(f"Fit status for {flag+subs_res} category: {self.status[flag+subs_res]}")
@@ -669,9 +686,17 @@ class IndepFitter(AbsFitter):
     
             print(f"Starting fit for {flag} category")
             self.doFit(flag)
+            
             if (not self.status[flag]) and (not self.settings["no_refitOnlySig"]) and (not self.settings["fitOnlyBkg"]):
                 self.attempt_noBkgFit(flag)
-
+            
+            '''
+            if self.status[flag] is False and flag=="fail":
+                print("Fitting with backup bkg model")
+                self.initFitPdfs(ws, fitOnlyBkg=self.settings["fitOnlyBkg"], useBackupBkgFail=True)
+                self.doFit(flag)
+            '''
+            
         self.bin_status = bool(self.status["pass"]*self.status["fail"])
         print(f"Fitted bin {self.bin_key} with status {self.bin_status}\n")
 

@@ -1,28 +1,34 @@
 """
 """
 import ROOT
+import argparse
 from copy import copy
 from utilities.CMS_lumi import CMS_lumi
 from utilities.plot_utils import style_settings
-from utilities.res_tools import results_manager
-from utilities.base_lib import binning, bin_dictionary
-import statistics
+
+
+variables_1d = ['efficiency', 'rel_err_efficiency', 'efficiency_MC', 'sf', 'delta', 'delta_err', 'pull', 'pull_ref', 'rm1', 'ratio_err']
+
+variables = []
+for var in variables_1d:
+    variables.append(var)
+    variables.append(var+"_2d")
+
 
 
 ROOT.gROOT.SetBatch(True)
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
-
-folder = "/scratch/rforti/tnp_efficiencies_results/tracking"
-analysis = "pseudodata/ws_tracking_pseudodata.root"
-cmp_flag = "legacy-onlyFailSA"
+'''
+folder = "/scratch/rforti/tnp_efficiencies_tracking/trackingplus"
+analysis = "mcbkg/ws_trackingplus_mcbkg.root"
+cmp_flag = "egm-altBkg"
 
 cmpBmark = False
 
 bmark_flag = "Bmark" if cmpBmark else ""
 
 build_results_from_txt = False
-
 
 if build_results_from_txt:
 
@@ -32,7 +38,7 @@ if build_results_from_txt:
     res_nomi = results_manager("indep", "pt_tracking", "eta", import_txt=row_list)
     res_altSig = results_manager("indep", "pt_tracking", "eta", import_txt=row_list, altSig_check=True)
 
-    bins_pt, bins_eta = binning("pt_tracking"), binning("eta")
+    bins_pt, bins_eta = binnings["pt_tracking"], binnings["eta"]
 
 
     hist_dict = {
@@ -80,16 +86,21 @@ if build_results_from_txt:
     print("Pull:", f"Mean = {statistics.mean(pull_list)}", " ", f"Std. = {statistics.pvariance(pull_list)**0.5}")
     print("Bias:", f"Mean = {statistics.mean(bias_list)}", " ", f"Std. = {statistics.pvariance(bias_list)**0.5}")
     print("Rel. error:", f"Mean = {statistics.mean(rel_error_list)}", " ", f"Std. = {statistics.pvariance(rel_error_list)**0.5}")
+'''
 
-else:
-    # file_hres_cmp = ROOT.TFile(f"{folder}/{analysis.replace('ws', f'res_cmp-{cmp_flag}')}", "READ")
-    file_hres_cmp = ROOT.TFile(f"{folder}/{analysis.replace('ws', f'res_cmpMC')}", "READ")
+parser = argparse.ArgumentParser(description='Plot histograms from results')
+parser.add_argument('-i', '--input_file', type=str, help='Input file', required=True)
+parser.add_argument('-e', '--eff', type=str, help='Efficiency type', required=True)
+parser.add_argument('-n', '--h_names', type=str, nargs="+", default=variables,
+                    help="Select specific histograms to be plotted")
+parser.add_argument('--log', action='store_true', help='Set log scale on y axis')
 
-    hist_dict = {}
-    # [histos.update({key.GetName() : file_hres.Get(key.GetName())}) for key in file_hres.GetListOfKeys()]
-    [hist_dict.update({key.GetName() : file_hres_cmp.Get(key.GetName())}) for key in file_hres_cmp.GetListOfKeys()]
-    # [histos.update({key.GetName() : file_other.Get(key.GetName())}) for key in file_other.GetListOfKeys()]
+args = parser.parse_args()
 
+file_hres = ROOT.TFile(args.input_file, "READ")
+
+hist_dict = {}
+[hist_dict.update({key.GetName() : file_hres.Get(key.GetName())}) for key in file_hres.GetListOfKeys() if key.GetName() in args.h_names]
 
 
 for hist_key, hist in hist_dict.items():
@@ -137,7 +148,6 @@ for hist_key, hist in hist_dict.items():
     if "2d" in hist.GetName():
         
         h1d = hist_dict[hist_key.replace("_2d", "")]
-        print(type(h1d))
         lowValZ = h1d.GetXaxis().GetXmin()
         highValZ = h1d.GetXaxis().GetXmax()
         z_axis.SetRangeUser(lowValZ, highValZ)
@@ -158,10 +168,10 @@ for hist_key, hist in hist_dict.items():
         y_axis.SetTitleOffset(1.25)
         y_axis.SetTitleSize(0.04)
         y_axis.SetLabelSize(0.025)
-        #pad_plot.SetLogy()
+        if args.log: 
+            pad_plot.SetLogy()
     
-    
-    
+
     CMS_lumi(pad_plot, 5, 0)
     pad_plot.Update()
     
@@ -175,12 +185,15 @@ for hist_key, hist in hist_dict.items():
 
     c.Update()
 
-    if not build_results_from_txt:
-        save_folder = folder+"/"+analysis.split("/")[0]
-    else:
+    save_folder = args.input_file.rsplit("/", 1)[0]
+    '''
+    if build_results_from_txt:
         save_folder = folder
-
+    '''
     c.SaveAs(f"{save_folder}/{hist.GetName()}.png")
+
+
+print("Saved plots in:", save_folder)
 
     # c.SaveAs(f"{save_folder}/{hist.GetName().replace('h', 'legacy')}.png")
 
