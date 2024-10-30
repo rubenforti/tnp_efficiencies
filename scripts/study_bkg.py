@@ -8,8 +8,8 @@ from utilities.bkg_utils import base_parser_bkg, analyze_bkg
 
 # Relevant arguments in the parser for the different studies
 an_options = {
-    "negweighted_bins" : ["is_SS_bkg"],
-    "minv_distrib" : ["is_SS_bkg", "cmp_data", "cmp_signal", "cmp_bkgfit", "logscale"],
+    "negweighted_bins" : ["study_SS"],
+    "minv_distrib" : ["study_SS", "cmp_data", "cmp_signal", "cmp_bkgfit", "logscale"],
     "2D_distrib" : ["cmp_data", "cmp_signal", "cmp_totBkg", "projected"],
     "cross_cmp" : ["cmp_cat"]
 }
@@ -21,10 +21,10 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 parser = base_lib.base_parser()
 parser = base_parser_bkg(parser)
 
-parser.add_argument("-s", "--bkg_to_study", type=str, nargs="+", choices=an_options.keys(), 
+parser.add_argument("-s", "--type_study", type=str, nargs="+", choices=an_options.keys(), 
                     default="minv_distrib", help="Type of study to be performed")
 
-parser.add_argument("--is_SS_bkg", action="store_true", help="Study the SS background")
+parser.add_argument("--study_SS", action="store_true", help="Study the SS background")
 
 parser.add_argument("--aux_ws", type=str, default="", help="Auxiliary workspace")
 
@@ -54,7 +54,7 @@ if (args.mergedbins_bkg[0] != "" or args.mergedbins_bkg[1] != ""):
     
 
 an_opt = {}
-for an_type in args.bkg_study: 
+for an_type in args.type_study: 
     an_opt[an_type] = {opt : vars(args)[opt] for opt in an_options[an_type]}
 
 
@@ -65,20 +65,20 @@ for an_type in args.bkg_study:
 if args.generate_ws is True:
     
     import_categories = args.bkg_categories
-    if "minv_distr" in args.study and args.cmp_data:
+    if "minv_distrib" in args.type_study and args.cmp_data:
         import_categories += ["data"]
-    if "minv_distr" in args.study and args.cmp_signal:
+    if "minv_distrib" in args.type_study and args.cmp_signal:
         import_categories += ["mc"]
 
     ws = ws_init(args.input, import_categories, args.eff, args.binning_pt, args.binning_eta, args.binning_mass, 
                  ch_set=args.charge_selection, 
                  do_OS_tracking=args.OS_tracking, 
                  add_SS_mc=args.study_SS, 
-                 add_SS_bkg=(args.study_SS or args.add_SS_bkg), 
+                 add_SS_bkg=(args.study_SS or args.import_bkg_SS), 
                  lightMode_bkg=args.lightMode_bkg)
                  
     ws.writeToFile(args.ws_filename)
 
 
-analyze_bkg(args.eff, args.ws_filename, args.binning_pt, args.binning_eta, args.bkg_categories, args.bkg_study, an_opt,
-            output_path=args.output_folder)
+analyze_bkg(args.eff, args.ws_filename, args.binning_pt, args.binning_eta, args.bkg_categories, args.type_study, an_opt,
+            output_path=args.output)

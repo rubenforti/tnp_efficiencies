@@ -178,18 +178,19 @@ def analyze_bkg(type_eff, ws_filename, binning_pt, binning_eta, bkg_categories, 
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             if "minv_distrib" in analysis_list:
-
-                setlog = an_opt["minv_distrib"]["logscale"]
+                
                 if an_opt["minv_distrib"]["logscale"]=="hybrid": 
                     setlog=True if flag=="pass" else False
+                else:
+                    setlog = True if an_opt["minv_distrib"]["logscale"]==flag else False
 
-                ch_sel = "SS" if an_opt["minv_distrib"]["is_SS_bkg"] else "OS"
+                ch_sel = "SS" if an_opt["minv_distrib"]["study_SS"] else "OS"
 
                 if an_opt["minv_distrib"]["cmp_data"] is True:
                     import_categories = ["data"] + bkg_categories
                     figpath_postfix = "_w_data"
                 elif an_opt["minv_distrib"]["cmp_signal"] is True:
-                    import_categories = ["mc" if not an_opt["minv_distrib"]["is_SS_bkg"] else "mc_SS"] + bkg_categories
+                    import_categories = ["mc" if not an_opt["minv_distrib"]["study_SS"] else "mc_SS"] + bkg_categories
                     figpath_postfix = "_w_signal"
                 else:
                     import_categories = bkg_categories

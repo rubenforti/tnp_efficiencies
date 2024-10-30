@@ -8,6 +8,7 @@ import utilities.base_lib as base_lib
 from utilities.binning_utils import get_pt_binning_ref, bin_dictionary, bin_global_idx_dict
 
 bkg_sum_selector = {
+    "bkg_QCD" : 0,
     "bkg_WW" : 1,
     "bkg_WZ" : 1,
     "bkg_ZZ" : 1,
@@ -201,6 +202,12 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
     histo_names = []
 
     for file in files:
+        # The list 'files' can contain 1, 2 or 4 elements:
+        #   - 1 el.: probe has a selected charge
+        #   - 2 el.: probe has a selected charge but the addition on the 'pass_alt' dataset is requested
+        #                or 
+        #            probe is charge-summed
+        #   - 4 el.: probe is charge-summed and the addition of the 'pass_alt' is requested
 
         histo_name = f"{flag}_mu_{type_suffix}"
         
@@ -208,17 +215,16 @@ def get_roohist(files, type_set, flag, axis, bin_key, bin_pt, bin_eta,
            (len(files)==2 and idx_file==1) or (len(files)==4 and idx_file==2) or (len(files)==4 and idx_file==3) ):
             print("Using the 'pass_alt' dataset")
             # selecting the "pass_alt" dataset when the fail template with all
-            # SA is built; the selection above is done to take into account the
-            # possibility of having 4 or 2 files in input (probe charge-divided
-            # or not) and to select the "pass_alt" dataset after the "fail" one
+            # SA is built, taking into acount the different cases
             histo_name = f"pass_mu_{type_suffix}_alt"
         
         histo_names.append(histo_name)
         histo3d = file.Get(histo_name)
 
-        # In the projection, option "e" is specified tofail_template_with_all_SA calculate the bin content errors in the new histogram for 
-        # generic selection of bin_pt and bin_eta. Without it, all works as expected ONLY IF the projection is done 
-        # on a single bin of pt-eta
+        # In the projection, option "e" is specified to calculate the bin
+        # content errors in the new histogram for generic selection of bin_pt
+        # and bin_eta. Without it, all works as expected ONLY IF the projection
+        # is done on a single bin of pt-eta
         th1_histo = histo3d.ProjectionX(f"Histo_{type_set}_{flag}_{idx_file}", bin_pt[0], bin_pt[1], bin_eta[0], bin_eta[1], "e")
         print("Under/overflow events:", th1_histo.GetBinContent(0), th1_histo.GetBinContent(numBins+1))
 

@@ -23,6 +23,16 @@ dict_classes = {
 
 fit_settings_args = ["type_analysis", "bkg_categories", "fitOnlyBkg", "fitPseudodata", "fit_verb", "no_refitOnlySig", "useMinos"]
 
+
+fit_quality_checks = {
+    "egm_legacy" : { "migrad":[0,1],  "covQual":3,  "chi2":{"type":"pearson", "nsigma":15},  "parsAtLim":False  },
+    "new_tight"  : { "migrad":0,  "covQual":3,  "chi2":{"type":"llr", "nsigma":7},      "parsAtLim":True   },
+    "new_loose"  : { "migrad":0,  "covQual":3,  "chi2":{"type":"llr", "nsigma":10},     "parsAtLim":True   },
+    # "allow_atLimPars" : { "migrad":0,  "covQual":3,  "chi2":{"type":"llr", "nsigma":16}, "parsAtLim":False },
+    # "pseudodata" : { "migrad":0,  "covQual":3,  "chi2":{"type":"llr", "nsigma":10},     "parsAtLim":True   }
+}
+
+
 ###############################################################################
 
 def base_parser_fit(parser):
@@ -43,9 +53,6 @@ def base_parser_fit(parser):
 
     parser.add_argument("--fitPseudodata", action="store_true",
                         help="Perform the fit on pseudodata")
-
-    parser.add_argument("--extended_sig_template_for_fail", action="store_true",
-                        help="For failing probes, the signal template is built by using both pass and fail MC template, evaluated with SA variables")
 
     parser.add_argument("--auto_run", action="store_true",
                         help="Run the fits automatically, updating the fit settings according to the json file")
@@ -71,6 +78,12 @@ def base_parser_fit(parser):
     parser.add_argument("--no_saveFigs", action="store_true",
                         help="Don't save the fit plots")
     
+    parser.add_argument("--chi2_sigma", type=int, default=-1,
+                        help="Number of sigma for the chi2 evaluation [NOT IMPLEMENTED YET]")
+
+    parser.add_argument("--allow_atLimPars", action="store_true",
+                        help="Allow the fit to have parameters at the limit [NOT IMPLEMENTED YET]")
+    
     return parser
 
 
@@ -83,7 +96,7 @@ def finalize_fit_parsing(args):
     """
     # Import of the fit settings
     with open(f"configs/{args.par_fit_settings.replace('.json', '')}.json") as file: fit_settings_json = json.load(file)
-    if "legacy" in args.par_fit_settings:
+    if args.par_fit_settings.startswith("legacy"):
         if args.eff in ["idip", "trigger", "iso"]:
             par_fit_settings = fit_settings_json["idip_trig_iso"]
         else:
@@ -129,6 +142,13 @@ def finalize_fit_parsing(args):
     args.fit_settings = { key : vars(args)[key] for key in fit_settings_args }
     args.fit_settings.update(args.par_fit_settings)
 
+    ''' TO BE TESTED
+    # Update on the fit quality checks
+    args.fit_settings["fit_checks"] = fit_quality_checks[args.fit_settings["fit_checks"]]
+    if args.chi2_sigma > 0: args.fit_settings["fit_checks"]["chi2"]["nsigma"] = args.chi2_sigma
+    if args.allow_atLimPars: args.fit_settings["fit_checks"]["parsAtLim"] = False
+    '''
+    
 ###############################################################################
 
 
@@ -276,8 +296,20 @@ def pearson_chi2_eval(histo, pdf, axis):
 
 ###############################################################################
 
+def gof_statistic_eval(histo, pdf, axis, type="llr"):
+    """
+    """
+    print("Evaluating GOF statistic", type)
+    
 
-def llr_eval(histo, pdf, axis):
+
+
+
+
+###############################################################################
+
+
+def llr_eval(histo, pdf, axis, bkg_template=None):
     """
     """
 
@@ -289,13 +321,12 @@ def llr_eval(histo, pdf, axis):
     NBINS = binning.numBins()   
     EVTS = histo.sumEntries()
     BIN_VOLUME = (axis.getMax("fitRange") - axis.getMin("fitRange"))/NBINS
+    PRECISION = 2
 
     isBBmodel = False
 
     sum_ll = 0
     max_ll = 0
-
-    sum_nomi_bins = 0 #needed for the BB model
 
     n_fitted_events=0
     for serv_pdf in pdf.servers():
@@ -304,20 +335,16 @@ def llr_eval(histo, pdf, axis):
 
         if "BB" in serv_pdf.GetName():
             isBBmodel = True
-            histConstr = serv_pdf.servers().findByName(f"bkg_histConstr_{flag}_{bin_key}")
-
-            if histConstr.servers().size() != 2*NBINS: 
-                return -1, 999
-           
-            for i in range(NBINS):
-                sum_nomi_bins += histConstr.servers().findByName(f"bkg_histConstr_{flag}_{bin_key}_nominal_bin_{i}").getVal() * \
-                                 histConstr.servers().findByName(f"bkg_paramHist_{flag}_{bin_key}_gamma_bin_{i}").getVal()
+            paramHist = serv_pdf.servers().findByName(f"bkg_paramHist_{flag}_{bin_key}")
+    
 
     if n_fitted_events == 0:
         print("Warning: not found normalization parameter in the pdf, using the number of events in the dataset as normalization")
         n_fitted_events = histo.sumEntries()
 
     used_bins = 0
+
+    sigma_list = []
 
     for i in range(NBINS):
     
@@ -328,18 +355,22 @@ def llr_eval(histo, pdf, axis):
 
         if isBBmodel:
 
-            nomi_bin = histConstr.servers().findByName(f"bkg_histConstr_{flag}_{bin_key}_nominal_bin_{i}").getVal()
-            gamma_bin = histConstr.servers().findByName(f"bkg_paramHist_{flag}_{bin_key}_gamma_bin_{i}").getVal()
-            bkg_val = gamma_bin*nomi_bin/sum_nomi_bins
-            sig_val = pdf.servers().findByName(f"conv_{flag}_{bin_key}").getVal(ROOT.RooArgSet(axis))
-
-            norm_bkg = pdf.servers().findByName(f"nbkg_{flag}_{bin_key}").getVal()
+            nomi_bin = bkg_template.weight(i)
+            gamma_bin = paramHist.servers().findByName(f"bkg_paramHist_{flag}_{bin_key}_gamma_bin_{i}").getVal()
+            bkg_val = gamma_bin*nomi_bin
+            
             norm_sig = pdf.servers().findByName(f"nsig_{flag}_{bin_key}").getVal()
-            pdf_val = ((sig_val*norm_sig) + (bkg_val*norm_bkg))/n_fitted_events
-            pdf_val = pdf_val
+            sig_val = pdf.servers().findByName(f"conv_{flag}_{bin_key}").getVal(ROOT.RooArgSet(axis))*norm_sig
+
+            pdf_val = (sig_val + bkg_val)/n_fitted_events
+
+            print(60+i, gamma_bin, round((gamma_bin-1)*(nomi_bin**0.5),2))
+
+            sigma_list.append(round((gamma_bin-1)*(nomi_bin**0.5),2))
+
 
         mu = n_fitted_events*BIN_VOLUME*pdf_val
-        mu = round(mu, 2)
+        mu = round(mu, PRECISION)
 
         # if isBBmodel: print(sig_val*norm_sig, bkg_val*norm_bkg, mu)
 
@@ -351,19 +382,17 @@ def llr_eval(histo, pdf, axis):
             max_ll += new_maxll
             used_bins += 1
 
-
-        # print(round(weight,0), "", round(((sig_val*norm_sig) + bkg_val), 0), "", round(new_maxll-new_sumll, 1), "", round(max_ll - sum_ll, 1))
-
-    
-    # sum_ll += 2*EVTS*ROOT.TMath.Log(n_fitted_events) - 2*n_fitted_events
-    # max_ll += 2*EVTS*ROOT.TMath.Log(EVTS) - 2*EVTS
+    import numpy as np
+    print(np.array(sigma_list).mean(), np.array(sigma_list).std()/len(sigma_list)**0.5)
 
     llr = max_ll - sum_ll
 
+    '''
     print("***")
     print("Nbins, Nevents, NfittedEvents:", NBINS, EVTS, n_fitted_events)
     print("SumLL, MaxLL", sum_ll, max_ll)
     print("***")
+    '''
 
     return llr, used_bins
 
@@ -425,7 +454,9 @@ def status_chi2(axis, histo, pdf, res, type_chi2="pearson", nsigma=15):
 
     print(chi2val, used_bins)
     
-    chi2_status = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
+    # chi2_status = bool(abs(chi2val - ndof) < nsigma*((2*ndof)**0.5))
+    chi2_status = bool((chi2val - ndof) < nsigma*((2*ndof)**0.5))
+
     print(chi2val, ndof, chi2_status) 
     return chi2_status
     
@@ -441,42 +472,51 @@ def fit_quality(fit_obj, type_checks="egm_legacy", isFitPseudodata=False, isBBmo
     check_covm = True
     check_parsAtLim = True
 
+    parsfinal = fit_obj["res"].floatParsFinal()
+    for par in parsfinal:
+        if "nsig" in par.GetName():
+            if (par.getError()/par.getVal() > 3) and not (par.getVal() < 1 and par.getError()<70.):
+                fit_obj["res"].setStatus(int(9))
+
     if type_checks == "egm_legacy":
         check_migrad = (fit_obj["res"].status()==0 or fit_obj["res"].status()==1)
         check_covm = (fit_obj["res"].covQual() == 3)
-        if isBBmodel:
-            check_chi2 = True
-        else:
+        if not isBBmodel:
             check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
-                                     fit_obj["res"], type_chi2="pearson", nsigma=10)
+                                     fit_obj["res"], type_chi2="pearson", nsigma=100)
     
     elif type_checks == "new_tight":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 2e-3)
-        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
-                                 fit_obj["res"], type_chi2="llr", nsigma=7)
-        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
+        if not isBBmodel:
+            check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
+                                    fit_obj["res"], type_chi2="llr", nsigma=7)
+            check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
     
     elif type_checks == "new_loose":
+        check_migrad = (fit_obj["res"].status()==0 or fit_obj["res"].status()==1 or fit_obj["res"].status()==3)
+        check_covm = (fit_obj["res"].covQual() == 3)
+        check_edm = (fit_obj["res"].edm() < 5e-2)
+        if not isBBmodel:
+            check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
+                                    fit_obj["res"], type_chi2="llr", nsigma=10)
+            check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
+    
+    elif type_checks == "neglect_atLimPars":
         check_migrad = (fit_obj["res"].status()==0 or fit_obj["res"].status()==3)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 5e-2)
-        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
-                                 fit_obj["res"], type_chi2="llr", nsigma=10)
-        check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
-    
-    elif type_checks == "neglect_atLimPars":
-        check_migrad = (fit_obj["res"].status()==0)
-        check_covm = (fit_obj["res"].covQual() == 3)
-        check_edm = (fit_obj["res"].edm() < 1e-2)
-        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
-                                 fit_obj["res"], type_chi2="llr", nsigma=16)
+        if not isBBmodel:
+            check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"],
+                                    fit_obj["res"], type_chi2="llr", nsigma=15)
 
     elif type_checks == "pseudodata":
         check_migrad = (fit_obj["res"].status() == 0)
         check_covm = (fit_obj["res"].covQual() == 3)
         check_edm = (fit_obj["res"].edm() < 5e-2)
+        check_chi2 = status_chi2(fit_obj["axis"], fit_obj["histo"], fit_obj["pdf"], 
+                                 fit_obj["res"], type_chi2="llr", nsigma=10)
         check_parsAtLim = status_parsAtLim(fit_obj["res"], absTol=1e-4, relTol=1e-5)
     
     else:
@@ -485,7 +525,7 @@ def fit_quality(fit_obj, type_checks="egm_legacy", isFitPseudodata=False, isBBmo
 
     print("check chi2", check_chi2)
 
-    if isFitPseudodata: check_chi2 = True
+    #if isFitPseudodata: check_chi2 = True
 
     return bool(check_migrad*check_covm*check_edm*check_chi2*check_parsAtLim)
  
@@ -552,7 +592,7 @@ def doSingleFit(fitter, ws, flags):
 
 if __name__ == "__main__":
 
-
+    '''
     NBINS = 60
 
     axis = ROOT.RooRealVar("x_pass", "x", 60, 120)
@@ -582,3 +622,20 @@ if __name__ == "__main__":
     llr, ndof = llr_eval(data, gaus_extended)
 
     print(llr, ndof)
+    '''
+
+    f = ROOT.TFile("/scratch/rforti/tnp_efficiencies_reco/recoplus/BBlight/ws_recoplus_BBlight.root")
+    ws = f.Get("w")
+    
+    b_key = "[55.0to60.0][1.6to1.7]"
+
+    axis = ws.var(f"x_fail_{b_key}")
+
+    histo = ws.data(f"Minv_data_fail_{b_key}")
+    pdf = ws.pdf(f"fitPDF_fail_{b_key}")
+
+    llr, ndof = llr_eval(histo, pdf, axis, bkg_template=ws.data(f"Minv_bkg_fail_[55.0to60.0][1.6to1.7]_total"))
+
+    print(llr, ndof)
+
+    

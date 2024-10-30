@@ -12,6 +12,7 @@ from utilities.CMS_lumi import CMS_lumi
 
 
 colors = { 
+    "bkg_QCD" : ROOT.kOrange+1,
     "bkg_WW" : ROOT.kGreen-1,
     "bkg_WZ" : ROOT.kGreen-3,
     "bkg_ZZ" : ROOT.kGreen+1,
@@ -28,6 +29,7 @@ colors = {
     "mc_SS" : ROOT.kBlue-2, #ROOT.kOrange+4, 
     "pdf_bkg_fit" : ROOT.kRed-2,
 
+    "QCD" : ROOT.kOrange+1,
     "Diboson" : ROOT.kGreen,
     "Top" : ROOT.kCyan+3,
     "Ztautau" : ROOT.kMagenta+1,
@@ -43,6 +45,8 @@ colors = {
 
 
 bkg_grouping = {
+    "QCD" : ["bkg_QCD"],
+
     "SameCharge" : ["bkg_SameCharge"],
 
     "Diboson" : ["bkg_WW", "bkg_WZ", "bkg_ZZ"],
@@ -55,9 +59,7 @@ bkg_grouping = {
     "Top_SS" : ["bkg_TTSemileptonic_SS", "bkg_TTFullyleptonic_SS"],
     "Ztautau_SS" : ["bkg_Ztautau_SS"],
     "Wjets_SS" : ["bkg_WplusJets_SS", "bkg_WminusJets_SS"],
-    "Zjets_SS" : ["bkg_Zjets_SS"],
-
-    
+    "Zjets_SS" : ["bkg_Zjets_SS"], 
 }
 
 def style_settings():
@@ -331,7 +333,7 @@ def plot_bkg_object(frame, axis, hist_list, label, list_nbins_plot):
 
 def plot_bkg(plot_dictionary, flag, bin_key,
              charge_separation="",
-             group_backgrounds=True, logscale=True, figpath=''):
+             group_backgrounds=True, logscale=False, figpath=''):
     """
     Function that creates and saves the plot containing the mass distributions 
     of the various bkg processes and the total bkg; a reference histogram 

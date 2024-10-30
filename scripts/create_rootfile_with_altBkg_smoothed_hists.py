@@ -41,8 +41,22 @@ for hist_name_in in file_in.GetListOfKeys():
 
 file_out = ROOT.TFile("allSmooth_GtoHout_vtxAgnIso_altBkg.root", "RECREATE")
 
+
 for ch in ["plus", "minus"]:
-    file_in_new = ROOT.TFile(f"smoothLeptonScaleFactors/GtoH/mu_tracking_{ch}/smoothedSFandEffi_tracking_GtoH_{ch}.root", "READ")
+    file_in_new = ROOT.TFile(f"/scratch/rforti/tnp_efficiencies_results/reco{ch}/BBlight/GtoH/mu_reco_{ch}/smoothedSFandEffi_reco_GtoH_{ch}.root", "READ")
+    #file_in_new.cd()
+    h_in_new = file_in_new.Get(f"SF_nomiAndAlt_GtoH_reco_{ch}").Clone()
+    h_in_new.SetName(f"SF_nomiAndAlt_GtoH_reco_{ch}_altBkg")
+    hists.append(h_in_new)
+    
+    file_out.cd()
+    h_in_new.Write()
+
+
+
+
+for ch in ["plus", "minus"]:
+    file_in_new = ROOT.TFile(f"/scratch/rforti/tnp_efficiencies_results/tracking{ch}/BBlight_legacySettings/GtoH/mu_tracking_{ch}/smoothedSFandEffi_tracking_GtoH_{ch}.root", "READ")
     #file_in_new.cd()
     h_in_new = file_in_new.Get(f"SF_nomiAndAlt_GtoH_tracking_{ch}").Clone()
     h_in_new.SetName(f"SF_nomiAndAlt_GtoH_tracking_{ch}_altBkg")
@@ -57,7 +71,4 @@ for hist in hists:
     idx_ctrl+=1
     #hist.Write()
     #print(hist.GetName())
-
-
-file_out.Close()
 

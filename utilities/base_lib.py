@@ -39,12 +39,13 @@ default_binnings_by_eff = {
 }
 
 bkg_categories = ["bkg_SameCharge",
+                  "bkg_QCD",
                   "bkg_WW", "bkg_WZ", "bkg_ZZ", 
                   "bkg_TTSemileptonic", "bkg_TTFullyleptonic", "bkg_Ztautau",
                   "bkg_WplusJets", "bkg_WminusJets", "bkg_Zjets"
                   ]
 
-default_steve_hists_folder = "/scratch/rforti/steve_histos_2016/"
+default_steve_hists_folder = "/scratch/rforti/steve_histograms_2016/"
 
 
 lumi_data = 16.8  # fb^-1, for 2016postVFP
@@ -57,6 +58,7 @@ xsec_ZmmPostVFP = 2001.9
 
 cross_sections_bkg = {
     # Unit = pb
+    "QCD" : 238800,
     "WW" : 12.6,
     "WZ" : 27.59,  #5.4341,
     "ZZ" : 0.60,
@@ -160,6 +162,8 @@ def lumi_factor(filepath, process):
         
     lumi_process = num_init/xsection
 
+    print(process, num_init, lumi_process)
+
     scale = lumi_data/lumi_process
 
     return scale
@@ -246,15 +250,21 @@ def import_pdf_library(*functions):
         if ctrl_source != 1: 
             sys.exit("ERROR in sourcefile compiling and loading")
 
+###############################################################################
 
 
-if __name__=="__main__":
-    parser = base_parser()
+def safeSystem(cmd, dryRun=False, quitOnFail=True):
+    print(cmd)
+    if dryRun is False:
+        res = os.system(cmd)
+        if res:
+            print('-'*30)
+            print("safeSystem(): error occurred when executing the following command. Aborting")
+            print(cmd)
+            print('-'*30)
+            if quitOnFail:
+                quit()
+        return res
+    else:
+        return 0
 
-    import utilities.bkg_utils as bkg_utils
-
-    parser = bkg_utils.base_parser_bkg(parser)
-
-    args = parser.parse_args()
-
-    for k, v in vars(args).items(): print(k, v)
